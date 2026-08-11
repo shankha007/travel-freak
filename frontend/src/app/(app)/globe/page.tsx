@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { GlobeExplorer } from '@/client/components/globe/globe-explorer'
 import { getRegionDetail, getVisitedRegions } from '@/server/queries/globe'
-import { requireUser } from '@/server/auth'
+import { canUseRegionDetail } from '@/server/entitlements'
 import { Button } from '@/client/components/ui/button'
 
 export const metadata: Metadata = {
@@ -15,8 +15,7 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic'
 
 export default async function GlobePage() {
-  const user = await requireUser()
-  const regions = await getVisitedRegions()
+  const [regions, showRegionDetail] = await Promise.all([getVisitedRegions(), canUseRegionDetail()])
 
   async function loadRegionDetail(countryCode: string) {
     'use server'
@@ -34,8 +33,8 @@ export default async function GlobePage() {
             Add a trip with at least one place and it will light up here. Wishlist entries show as
             planned.
           </p>
-          <Button nativeButton={false} render={<Link href="/trips" />}>
-            Go to trips
+          <Button nativeButton={false} render={<Link href="/trips/new" />}>
+            Add your first trip
           </Button>
         </div>
       </div>
@@ -55,8 +54,9 @@ export default async function GlobePage() {
         regions={regions}
         loadRegionDetail={loadRegionDetail}
         // State/province detail is the headline paid feature; free plans see
-        // country fills only. Enforced here, not in the client component.
-        showRegionDetail={user.planCode !== 'explorer'}
+        // country fills only. Read from plans.limits via entitlements, and
+        // decided on the server — the client component never sees the plan.
+        showRegionDetail={showRegionDetail}
       />
     </div>
   )

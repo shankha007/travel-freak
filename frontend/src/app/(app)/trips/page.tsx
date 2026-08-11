@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
-import { Camera, MapPin, Users } from 'lucide-react'
+import Link from 'next/link'
+import { Camera, MapPin, Plus, Users } from 'lucide-react'
+import { Button } from '@/client/components/ui/button'
 import { getTrips, groupTrips, type TripListItem } from '@/server/queries/trips'
 import { countryFlag } from '@/shared/geo/countries'
 import { formatDateRange } from '@/shared/format'
@@ -95,11 +97,17 @@ export default async function TripsPage() {
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Your trips</h1>
-        <p className="text-sm text-muted-foreground">
-          {trips.length} {trips.length === 1 ? 'trip' : 'trips'} recorded.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Your trips</h1>
+          <p className="text-sm text-muted-foreground">
+            {trips.length} {trips.length === 1 ? 'trip' : 'trips'} recorded.
+          </p>
+        </div>
+        <Button nativeButton={false} render={<Link href="/trips/new" />}>
+          <Plus className="size-4" aria-hidden />
+          New trip
+        </Button>
       </header>
 
       <Tabs defaultValue="all">

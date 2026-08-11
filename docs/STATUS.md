@@ -20,16 +20,16 @@ Last updated: 2026-08-11
 
 | Area | Done | Partial | Stub | Not started |
 |---|---|---|---|---|
-| Infrastructure | 8 | 1 | 0 | 4 |
+| Infrastructure | 9 | 0 | 0 | 4 |
 | Public / marketing | 1 | 1 | 0 | 8 |
 | Auth | 1 | 0 | 0 | 4 |
 | Dashboard & globe | 3 | 1 | 2 | 0 |
-| Trips & planner | 1 | 0 | 0 | 6 |
+| Trips & planner | 1 | 1 | 0 | 5 |
 | Memory & content | 0 | 0 | 1 | 4 |
 | Analytics & resume | 0 | 0 | 2 | 2 |
 | Public sharing | 0 | 0 | 0 | 3 |
 | Account | 0 | 0 | 1 | 5 |
-| **Total** | **14** | **3** | **6** | **36** |
+| **Total** | **15** | **3** | **6** | **35** |
 
 ---
 
@@ -47,7 +47,7 @@ Last updated: 2026-08-11
 | — | Seed data | ✅ Done | 12 trips, 8 countries, 1 demo account |
 | — | Generated DB types | ✅ Done | `npm run db:types` → `shared/types/database.ts` |
 | — | `brand.ts` rename safety | ✅ Done | No component hardcodes the product name |
-| — | `entitlements.ts` | 🟡 Partial | `plans.limits` seeded and read for the globe gate; no central quota module yet |
+| — | **`entitlements.ts`** | ✅ Done | Reads `plans.limits`; `checkTripQuota()` counts live rather than trusting the denormalised counter. Gates both `/trips/new` and the create action |
 | — | Framer Motion | ⬜ Not started | Not installed |
 | — | CI (GitHub Actions) | ⬜ Not started | lint/typecheck/test all pass locally |
 | — | Sentry + PostHog | ⬜ Not started | Plan wants the funnel instrumented on day one |
@@ -97,7 +97,7 @@ Last updated: 2026-08-11
 | # | Feature | Status | Notes |
 |---|---|---|---|
 | 18 | **My Trips** `/trips` | ✅ Done | Tabs All/Past/Ongoing/Upcoming/Drafts with counts, flags, places, visibility |
-| 19 | Create trip `/trips/new` | ⬜ Not started | No write path exists yet — the app is read-only |
+| 19 | **Create trip** `/trips/new` | 🟡 Partial | 4-step wizard (basics → dates → places → visibility), quota-gated, writes trip + places. **No map picker or cover image** — both need screens that do not exist yet |
 | 20 | Trip details `/trips/[id]` | ⬜ Not started | Dashboard activity links here and **currently 404s** |
 | 21 | Itinerary builder | ⬜ Not started | Tables not yet migrated |
 | 22 | Budget planner | ⬜ Not started | `expenses` table not yet migrated |
@@ -162,17 +162,16 @@ Last updated: 2026-08-11
 
 ## Known gaps worth fixing next
 
-1. **The app is read-only.** No create/edit path exists for trips, blogs or media, so a
-   new user sees empty states with no way out. `/trips/new` is the single highest-value
-   next screen.
-2. **Three links 404**: `/register`, `/trips/[id]`, `/b/[slug]`. They are linked from
-   shipped screens.
-3. **No `entitlements.ts`.** The globe paywall reads `planCode` inline. Every quota rule
-   should move into one module before any upload path is written — the plan is explicit
-   that enforcement must be server-side and centralised.
+1. **Trips can be created but not edited or deleted.** There is no `/trips/[id]`, so a
+   typo in a title is permanent through the UI. Trip detail + edit is the next screen.
+2. **Three links 404**: `/register`, `/trips/[id]`, `/b/[slug]`. All are linked from
+   shipped screens — `/register` from both the landing page and login.
+3. **No map picker on create.** Places are country + free-text city, so `trip_places.location`
+   (the PostGIS point) is left null. Distance-travelled and nearest-city snapping cannot be
+   computed until the world map screen lands and supplies coordinates.
 4. **No pgTAP RLS tests.** RLS was verified by hand against the running stack (owner sees
-   12 trips, anon sees 6 public, 0 private leaked). That check should be automated before
-   real users exist.
+   all trips, anon sees only public, 0 private leaked). That check should be automated
+   before real users exist.
 5. **`rollUpToCountries` uses `max(visit_count)`** rather than counting distinct trips, so
    a country visited on four separate trips reports "1 trip" at country level. Existing
    unit tests assert the current behaviour, so changing it means changing them too.

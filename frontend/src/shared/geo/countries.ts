@@ -59,3 +59,32 @@ export function parseRegionCode(
 
 /** Total number of sovereign countries, used for the "% of the world" stat. */
 export const TOTAL_COUNTRIES = 195
+
+export interface CountryOption {
+  /** ISO 3166-1 alpha-3 — the code every table stores. */
+  code: string
+  name: string
+  flag: string
+}
+
+/**
+ * Every country, alphabetised, for pickers.
+ *
+ * Built once at module load rather than per render: the list is ~250 entries
+ * and never changes within a session.
+ */
+export const ALL_COUNTRIES: CountryOption[] = Object.entries(
+  countries.getNames('en', { select: 'official' })
+)
+  .map(([alpha2, name]) => ({
+    code: countries.alpha2ToAlpha3(alpha2) ?? '',
+    name,
+    flag: countryFlag(countries.alpha2ToAlpha3(alpha2)),
+  }))
+  .filter((c) => c.code !== '')
+  .sort((a, b) => a.name.localeCompare(b.name))
+
+/** True when the code is a country we know about. Used to validate input. */
+export function isKnownCountry(alpha3: string): boolean {
+  return countries.alpha3ToAlpha2(alpha3) !== undefined
+}
