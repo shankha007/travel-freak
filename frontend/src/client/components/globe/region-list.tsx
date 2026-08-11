@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { countryFlag, countryName } from '@/shared/geo/countries'
 import { REGION_STATE_META } from '@/shared/geo/region-state'
-import type { VisitedRegion } from '@/shared/types/globe'
+import { regionKey, type VisitedRegion } from '@/shared/types/globe'
 import { Input } from '@/client/components/ui/input'
 import { ScrollArea } from '@/client/components/ui/scroll-area'
 import { cn } from '@/shared/utils'
@@ -81,7 +81,10 @@ export function RegionList({
               const flag = countryFlag(region.countryCode)
 
               return (
-                <li key={region.countryCode}>
+                // Keyed by country + subdivision: on a plan with region detail
+                // one country contributes several rows, and keying by country
+                // alone silently drops all but the first.
+                <li key={regionKey(region.countryCode, region.regionCode)}>
                   <button
                     type="button"
                     onClick={() => onSelectCountry(region.countryCode)}

@@ -83,14 +83,18 @@ export function GlobeExplorer({
     [regions, showRegionDetail]
   )
 
+  // Counted from the country roll-up, never from `displayRegions`. On a plan
+  // with subdivision detail the display rows are states, so counting those
+  // would report "13 countries" for someone who has visited six.
   const stats = useMemo(() => {
-    const visited = displayRegions.filter((r) => r.state === 'visited' || r.state === 'current')
+    const countryLevel = rollUpToCountries(regions)
+    const visited = countryLevel.filter((r) => r.state === 'visited' || r.state === 'current')
     return {
       countries: visited.length,
-      cities: new Set(displayRegions.flatMap((r) => r.cityNames)).size,
+      cities: new Set(regions.flatMap((r) => r.cityNames)).size,
       percentOfWorld: Math.round((visited.length / TOTAL_COUNTRIES) * 100),
     }
-  }, [displayRegions])
+  }, [regions])
 
   useEffect(() => {
     if (!selected) return

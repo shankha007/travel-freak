@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { GlobeExplorer } from '@/client/components/globe/globe-explorer'
-import { DEMO_REGIONS, demoRegionDetail } from '@/client/features/globe/fixtures'
+import { getRegionDetail, getVisitedRegions } from '@/server/queries/globe'
+import { requireUser } from '@/server/auth'
+import { Button } from '@/client/components/ui/button'
 
 export const metadata: Metadata = {
   title: 'Globe',
@@ -11,12 +14,32 @@ export const metadata: Metadata = {
 // dynamically avoids the static-shell fallback that `useSearchParams` forces.
 export const dynamic = 'force-dynamic'
 
-export default function GlobePage() {
-  // TODO(db): replace with the visited_regions query and a real region-detail
-  // loader once migrations are applied. The component contract does not change.
+export default async function GlobePage() {
+  const user = await requireUser()
+  const regions = await getVisitedRegions()
+
   async function loadRegionDetail(countryCode: string) {
     'use server'
-    return demoRegionDetail(countryCode)
+    // Re-reads through RLS on every call, so this cannot be used to fetch a
+    // region belonging to someone else even with a forged country code.
+    return getRegionDetail(countryCode)
+  }
+
+  if (regions.length === 0) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-6">
+        <div className="max-w-sm space-y-3 text-center">
+          <h1 className="text-xl font-semibold tracking-tight">Your globe is empty</h1>
+          <p className="text-sm text-muted-foreground">
+            Add a trip with at least one place and it will light up here. Wishlist entries show as
+            planned.
+          </p>
+          <Button nativeButton={false} render={<Link href="/trips" />}>
+            Go to trips
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -28,7 +51,13 @@ export default function GlobePage() {
         </p>
       </header>
 
-      <GlobeExplorer regions={DEMO_REGIONS} loadRegionDetail={loadRegionDetail} />
+      <GlobeExplorer
+        regions={regions}
+        loadRegionDetail={loadRegionDetail}
+        // State/province detail is the headline paid feature; free plans see
+        // country fills only. Enforced here, not in the client component.
+        showRegionDetail={user.planCode !== 'explorer'}
+      />
     </div>
   )
 }
