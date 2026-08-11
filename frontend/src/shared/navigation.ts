@@ -83,7 +83,7 @@ export const NAV_ITEMS: NavItem[] = [
     href: '/blogs',
     label: 'Blogs',
     icon: 'NotebookPen',
-    status: 'stub',
+    status: 'live',
     phase: 'M',
     screen: 28,
     summary: 'Your posts, drafts and published pieces. Blog Studio is the Tiptap editor.',

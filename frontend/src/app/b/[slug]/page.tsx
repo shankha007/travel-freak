@@ -5,6 +5,8 @@ import { CalendarDays, Clock, EyeOff, Luggage } from 'lucide-react'
 import { getBlogPost } from '@/server/queries/blog'
 import { BRAND, SITE_URL } from '@/shared/brand'
 import { formatDateRange } from '@/shared/format'
+import { PROSE_CLASS } from '@/shared/content/prose'
+import { cn } from '@/shared/utils'
 import { ThemeToggle } from '@/client/components/theme-toggle'
 import { Badge } from '@/client/components/ui/badge'
 import { Button } from '@/client/components/ui/button'
@@ -119,7 +121,7 @@ export default async function BlogPostPage({ params }: PageProps<'/b/[slug]'>) {
           {/* Sanitised in getBlogPost against a tag allowlist, so stored markup
               from the editor cannot execute on this origin. */}
           <div
-            className="mt-8 space-y-4 leading-7 [&_a]:underline [&_a]:underline-offset-4 [&_blockquote]:border-l-2 [&_blockquote]:pl-4 [&_blockquote]:text-muted-foreground [&_h2]:mt-8 [&_h2]:text-xl [&_h2]:font-semibold [&_h3]:mt-6 [&_h3]:text-lg [&_h3]:font-semibold [&_img]:rounded-lg [&_li]:ml-5 [&_ol]:list-decimal [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-muted [&_pre]:p-4 [&_ul]:list-disc"
+            className={cn('mt-8', PROSE_CLASS)}
             dangerouslySetInnerHTML={{ __html: post.contentHtml }}
           />
         </article>

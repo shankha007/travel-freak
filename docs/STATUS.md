@@ -25,11 +25,11 @@ Last updated: 2026-08-12
 | Auth | 2 | 0 | 0 | 3 |
 | Dashboard & globe | 3 | 1 | 2 | 0 |
 | Trips & planner | 2 | 1 | 0 | 4 |
-| Memory & content | 1 | 0 | 1 | 3 |
+| Memory & content | 3 | 0 | 1 | 1 |
 | Analytics & resume | 0 | 0 | 2 | 2 |
 | Public sharing | 0 | 0 | 0 | 3 |
 | Account | 0 | 0 | 1 | 5 |
-| **Total** | **19** | **3** | **6** | **31** |
+| **Total** | **21** | **3** | **6** | **29** |
 
 ---
 
@@ -113,8 +113,8 @@ Last updated: 2026-08-12
 |---|---|---|---|
 | 25 | Memory Vault | 🔵 Stub | Region modal links to `/trips/[id]/vault` |
 | 26 | Media upload + quota meter | ⬜ Not started | Signed-upload route handler is the critical path |
-| 27 | Blog Studio (Tiptap) | ⬜ Not started | Tiptap installed, not wired |
-| 28 | My Blogs `/blogs` | 🔵 Stub | 4 posts seeded and counted on the dashboard |
+| 27 | **Blog Studio** `/blogs/new`, `/blogs/[id]/edit` | ✅ Done | Tiptap v3 with a formatting toolbar, autosave (1.5s debounce, ⌘S, unload guard), excerpt and SEO fields, trip link, visibility, publish/unpublish, soft delete. A new post writes no row until the first save, then swaps the URL in place so the cursor survives. Slugs follow the title until publication and freeze after |
+| 28 | **My Blogs** `/blogs` | ✅ Done | All / Published / Drafts with counts, reading time, linked trip, and a link to the public reader |
 | 29 | **Blog reader** `/b/[slug]` | ✅ Done | Public route. Sanitised HTML, byline, reading time, linked trip, JSON-LD `Article`, `noindex` on anything unpublished, free-plan badge. The author sees their own drafts behind a notice; everyone else gets the same 404 as a slug that does not exist |
 | 30 | Wishlist `/wishlist` | 🔵 Stub | 3 items seeded; already painting `planned` on the globe |
 | 31 | Travel timeline `/timeline` | 🔵 Stub | |
@@ -195,6 +195,32 @@ Found while building the above:
 - **The account menu crashed on open**, taking sign-out with it: `DropdownMenuLabel`
   maps to Base UI's `Menu.GroupLabel`, which throws outside a `Menu.Group`.
 
+## Also on 2026-08-12 — Blog Studio
+
+Screens 27 and 28, which closes the MVP's content loop: a trip can now be
+written up, published, and read at a public URL without touching the database.
+
+Two things worth knowing about how it behaves:
+
+- **A new post writes no row until the first autosave**, so an abandoned
+  `/blogs/new` leaves nothing behind. That save returns an id and the URL is
+  swapped with `history.replaceState`; a router navigation would remount the
+  editor and take the writer's cursor with it.
+- **Publishing never changes visibility.** A private post cannot be published —
+  the button is disabled and the server refuses — because quietly flipping
+  someone's privacy setting to make a button work is how people publish things
+  they did not mean to.
+
+Two more bugs found while verifying it:
+
+- **Toolbar buttons applied formatting at the top of the document** rather than
+  at the cursor: pressing a button moved focus, the selection collapsed, and
+  `chain().focus()` restored the last known caret. Fixed by preventing the
+  default on mousedown.
+- **The editor placeholder never rendered.** Tiptap's Placeholder extension only
+  sets `data-placeholder`; showing it is the stylesheet's job, and the rule was
+  missing from `globals.css`.
+
 ## Known gaps worth fixing next
 
 1. **No map picker on create.** Places are country + free-text city, so `trip_places.location`
@@ -204,8 +230,8 @@ Found while building the above:
 2. **Deleted trips are unreachable.** `restore_trip()` keeps the 30-day promise the delete
    dialog makes, but nothing calls it — there is no trash view. Either build one or the copy
    is writing a cheque the UI cannot cash.
-3. **Blog Studio is still missing**, so the reader has nothing to read but seeded posts, and
-   `/blogs` remains a stub. This is the largest hole left in the MVP content loop.
+3. **The studio has no images.** Blocked on media upload — the sanitiser already allows `<img>`,
+   so the block is the signed-upload route, not the editor. Cover images are the same story.
 4. **`/register` has no email verification path in production.** Locally `enable_confirmations`
    is off and sign-up returns a session; with confirmations on the form shows "check your
    inbox", but there is no `/verify` route to land on afterwards.

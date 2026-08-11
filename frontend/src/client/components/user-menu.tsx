@@ -72,7 +72,9 @@ export function UserMenu({ displayName, email, planCode }: UserMenuProps) {
         {/* A form, not an onClick: sign-out must clear the httpOnly auth
             cookies, which only a server round-trip can do. */}
         <form action={signOut}>
-          <DropdownMenuItem render={<button type="submit" className="w-full" />}>
+          {/* nativeButton, because the render prop really is a <button>: left
+              at the default Base UI adds non-native attributes on top of one. */}
+          <DropdownMenuItem nativeButton render={<button type="submit" className="w-full" />}>
             <LogOut className="size-4" aria-hidden />
             Sign out
           </DropdownMenuItem>
