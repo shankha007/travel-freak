@@ -1,6 +1,6 @@
 .next
 node_modules
 public/geo
-src/types/database.ts
+src/shared/types/database.ts
 supabase/.temp
 *.md

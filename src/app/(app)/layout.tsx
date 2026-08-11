@@ -1,6 +1,6 @@
 import Link from 'next/link'
-import { BRAND } from '@/lib/brand'
-import { ThemeToggle } from '@/components/theme-toggle'
+import { BRAND } from '@/shared/brand'
+import { ThemeToggle } from '@/frontend/components/theme-toggle'
 
 /**
  * Authenticated shell. Navigation and the quota meter land here once auth is
