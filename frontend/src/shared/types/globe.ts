@@ -10,7 +10,14 @@ export interface VisitedRegion {
   /** ISO 3166-2 subdivision, or '' for country-level only. */
   regionCode: string
   state: RegionState
+  /** Distinct completed trips here — `visitTripIds.length`, kept for read sites. */
   visitCount: number
+  /**
+   * The completed trips the count is made of. Carried rather than just counted
+   * so subdivision rows can be combined by set union: a country visited on four
+   * trips reads as 4, and one trip crossing two subdivisions still reads as 1.
+   */
+  visitTripIds: string[]
   firstVisit: string | null
   lastVisit: string | null
   tripIds: string[]
@@ -88,10 +95,16 @@ export function rollUpToCountries(regions: VisitedRegion[]): VisitedRegion[] {
       continue
     }
 
+    // Union rather than max or sum: max reported "1 trip" for a country visited
+    // on four separate trips, and sum double-counted one trip that crossed two
+    // subdivisions. The set of trip ids is the only combinable form.
+    const visitTripIds = [...new Set([...existing.visitTripIds, ...region.visitTripIds])]
+
     byCountry.set(region.countryCode, {
       ...existing,
       state: rank[region.state] > rank[existing.state] ? region.state : existing.state,
-      visitCount: Math.max(existing.visitCount, region.visitCount),
+      visitTripIds,
+      visitCount: visitTripIds.length,
       firstVisit: minDate(existing.firstVisit, region.firstVisit),
       lastVisit: maxDate(existing.lastVisit, region.lastVisit),
       tripIds: [...new Set([...existing.tripIds, ...region.tripIds])],

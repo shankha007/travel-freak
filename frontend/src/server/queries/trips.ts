@@ -1,9 +1,18 @@
 import 'server-only'
 
 import { createClient } from '@/server/supabase/server'
+import { requireUser } from '@/server/auth'
 import type { Database } from '@/shared/types/database'
 
-/** Trip list data. Scoped by RLS, so no explicit user filter is needed. */
+/**
+ * Trip list data.
+ *
+ * Filtered on `user_id` explicitly. RLS is a ceiling, not a scope: `trips` also
+ * has a policy exposing every *published public* trip to everyone, so a query
+ * that leans on RLS alone shows a brand-new user somebody else's holidays as
+ * their own. Ownership scoping belongs in the query; RLS is what stops it being
+ * bypassed.
+ */
 
 export type TripStatus = Database['public']['Enums']['trip_status']
 export type Visibility = Database['public']['Enums']['visibility']
@@ -26,6 +35,7 @@ export interface TripListItem {
 
 export async function getTrips(): Promise<TripListItem[]> {
   const supabase = await createClient()
+  const user = await requireUser()
 
   const { data, error } = await supabase
     .from('trips')
@@ -34,6 +44,7 @@ export async function getTrips(): Promise<TripListItem[]> {
        trip_type, traveler_count, photo_count,
        trip_places ( city_name, country_code, order_index )`
     )
+    .eq('user_id', user.id)
     .is('deleted_at', null)
     .order('start_date', { ascending: false, nullsFirst: false })
 

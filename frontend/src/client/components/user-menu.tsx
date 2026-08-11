@@ -9,7 +9,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/client/components/ui/dropdown-menu'
@@ -49,13 +48,17 @@ export function UserMenu({ displayName, email, planCode }: UserMenuProps) {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="font-normal">
+        {/* A plain div, not DropdownMenuLabel: that maps to Base UI's
+            Menu.GroupLabel, which throws "MenuGroupContext is missing" unless
+            it is inside a Menu.Group. This is a header for the whole menu, not
+            a label for a group of items. */}
+        <div className="px-1.5 py-1">
           <p className="text-sm font-medium">{displayName}</p>
           <p className="truncate text-xs text-muted-foreground">{email}</p>
           <p className="mt-1 text-xs text-muted-foreground">
             {PLAN_LABEL[planCode] ?? planCode} plan
           </p>
-        </DropdownMenuLabel>
+        </div>
 
         <DropdownMenuSeparator />
 

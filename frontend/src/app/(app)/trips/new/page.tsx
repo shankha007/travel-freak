@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { checkTripQuota } from '@/server/entitlements'
-import { CreateTripForm } from '@/client/components/trips/create-trip-form'
+import { TripForm } from '@/client/components/trips/trip-form'
 import { Button } from '@/client/components/ui/button'
 import { Card, CardContent } from '@/client/components/ui/card'
 
@@ -36,7 +36,7 @@ export default async function NewTripPage() {
 
       <div className="max-w-2xl">
         {quota.allowed ? (
-          <CreateTripForm tripsUsed={quota.used} tripLimit={quota.limit} />
+          <TripForm mode="create" tripsUsed={quota.used} tripLimit={quota.limit} />
         ) : (
           <Card>
             <CardContent className="space-y-3 p-6">

@@ -760,6 +760,7 @@ export type Database = {
           updated_at: string
           user_id: string
           visit_count: number
+          visit_trip_ids: string[]
         }
         Insert: {
           city_names?: string[]
@@ -773,6 +774,7 @@ export type Database = {
           updated_at?: string
           user_id: string
           visit_count?: number
+          visit_trip_ids?: string[]
         }
         Update: {
           city_names?: string[]
@@ -786,6 +788,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
           visit_count?: number
+          visit_trip_ids?: string[]
         }
         Relationships: [
           {
@@ -1225,8 +1228,10 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: undefined
       }
+      restore_trip: { Args: { p_trip_id: string }; Returns: boolean }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      soft_delete_trip: { Args: { p_trip_id: string }; Returns: boolean }
       st_3dclosestpoint: {
         Args: { geom1: unknown; geom2: unknown }
         Returns: unknown

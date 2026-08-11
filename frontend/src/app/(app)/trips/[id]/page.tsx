@@ -10,6 +10,7 @@ import {
   Globe2,
   Images,
   MapPin,
+  Pencil,
   Quote,
   Sparkles,
   Users,
@@ -77,10 +78,20 @@ export default async function TripDetailPage({ params }: PageProps<'/trips/[id]'
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-      <div>
+      <div className="flex items-center justify-between gap-2">
         <Button variant="ghost" size="sm" nativeButton={false} render={<Link href="/trips" />}>
           <ArrowLeft className="size-4" aria-hidden />
           Trips
+        </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
+          nativeButton={false}
+          render={<Link href={`/trips/${trip.id}/edit`} />}
+        >
+          <Pencil className="size-4" aria-hidden />
+          Edit
         </Button>
       </div>
 
@@ -290,12 +301,19 @@ export default async function TripDetailPage({ params }: PageProps<'/trips/[id]'
                 <ul className="space-y-3">
                   {trip.blogs.map((blog) => (
                     <li key={blog.id} className="space-y-1">
+                      {/* Drafts are linked too: the reader shows the author
+                          their own unpublished posts behind a notice. */}
                       <p className="flex items-start gap-2 text-sm font-medium">
                         <BookOpen
                           className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
                           aria-hidden
                         />
-                        {blog.title}
+                        <Link
+                          href={`/b/${blog.slug}`}
+                          className="underline-offset-4 hover:underline"
+                        >
+                          {blog.title}
+                        </Link>
                       </p>
                       {blog.excerpt && (
                         <p className="line-clamp-2 text-sm text-muted-foreground">{blog.excerpt}</p>

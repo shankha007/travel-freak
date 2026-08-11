@@ -2,6 +2,7 @@ import 'server-only'
 
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 import { createClient } from '@/server/supabase/server'
+import { requireUser } from '@/server/auth'
 import { rollUpToCountries } from '@/shared/types/globe'
 import type { VisitedRegion } from '@/shared/types/globe'
 import { getVisitedRegions } from '@/server/queries/globe'
@@ -12,6 +13,10 @@ import { getVisitedRegions } from '@/server/queries/globe'
  * Counts come from `head: true` count queries rather than fetching rows and
  * measuring the array — the row bodies are never used, and this keeps the
  * dashboard cheap as a user's history grows.
+ *
+ * Every query filters on `user_id`. RLS also exposes published public trips and
+ * posts to everyone, so counting without the filter would greet a new user with
+ * a stranger's travel history.
  */
 
 export interface DashboardStats {
@@ -55,6 +60,7 @@ const TOTAL_COUNTRIES = 195
 
 export async function getDashboardStats(): Promise<DashboardStats> {
   const supabase = await createClient()
+  const user = await requireUser()
   const regions = await getVisitedRegions()
 
   const countryLevel = rollUpToCountries(regions)
@@ -64,17 +70,27 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const subdivisions = regions.filter((r) => r.regionCode !== '').length
 
   const [trips, upcoming, blogs, memories, completedTrips] = await Promise.all([
-    supabase.from('trips').select('*', { count: 'exact', head: true }).is('deleted_at', null),
     supabase
       .from('trips')
       .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .is('deleted_at', null),
+    supabase
+      .from('trips')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
       .is('deleted_at', null)
       .in('status', ['planning', 'upcoming']),
-    supabase.from('blog_posts').select('*', { count: 'exact', head: true }).is('deleted_at', null),
-    supabase.from('memories').select('*', { count: 'exact', head: true }),
+    supabase
+      .from('blog_posts')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .is('deleted_at', null),
+    supabase.from('memories').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
     supabase
       .from('trips')
       .select('start_date, end_date')
+      .eq('user_id', user.id)
       .eq('status', 'completed')
       .is('deleted_at', null),
   ])
@@ -100,10 +116,12 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 /** The next trip that has not finished, for the countdown widget. */
 export async function getUpcomingTrip(): Promise<UpcomingTrip | null> {
   const supabase = await createClient()
+  const user = await requireUser()
 
   const { data } = await supabase
     .from('trips')
     .select('id, title, slug, summary, start_date, end_date, status, budget_planned, currency')
+    .eq('user_id', user.id)
     .is('deleted_at', null)
     .in('status', ['ongoing', 'upcoming', 'planning'])
     .order('start_date', { ascending: true, nullsFirst: false })
@@ -137,17 +155,20 @@ export async function getUpcomingTrip(): Promise<UpcomingTrip | null> {
 
 export async function getRecentActivity(limit = 6): Promise<RecentActivityItem[]> {
   const supabase = await createClient()
+  const user = await requireUser()
 
   const [trips, blogs] = await Promise.all([
     supabase
       .from('trips')
       .select('id, title, slug, updated_at')
+      .eq('user_id', user.id)
       .is('deleted_at', null)
       .order('updated_at', { ascending: false })
       .limit(limit),
     supabase
       .from('blog_posts')
       .select('id, title, slug, updated_at')
+      .eq('user_id', user.id)
       .is('deleted_at', null)
       .order('updated_at', { ascending: false })
       .limit(limit),

@@ -2,6 +2,7 @@ import 'server-only'
 
 import { cache } from 'react'
 import { createClient } from '@/server/supabase/server'
+import { requireUser } from '@/server/auth'
 
 /**
  * Plan limits and quota checks — the single source of truth for entitlement.
@@ -78,15 +79,22 @@ export interface QuotaCheck {
  * Counts live rather than trusting `usage_counters.trips_count`: the counter is
  * maintained by a trigger and is right in practice, but a quota gate should not
  * depend on a denormalisation being in sync.
+ *
+ * The `user_id` filter is load-bearing, not decoration: `trips` has a policy
+ * exposing every published public trip, so counting on RLS alone would charge a
+ * new user for strangers' holidays and could wall them off before their first
+ * trip.
  */
 export async function checkTripQuota(): Promise<QuotaCheck> {
   const supabase = await createClient()
+  const user = await requireUser()
   const { limits, planName } = await getEntitlements()
 
   const limit = limits.trips ?? null
   const { count } = await supabase
     .from('trips')
     .select('*', { count: 'exact', head: true })
+    .eq('user_id', user.id)
     .is('deleted_at', null)
 
   const used = count ?? 0

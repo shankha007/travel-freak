@@ -3,7 +3,7 @@
 Feature-by-feature state of the build. Screen numbers refer to §5 of
 [PROJECT_PLAN.md](PROJECT_PLAN.md).
 
-Last updated: 2026-08-11
+Last updated: 2026-08-12
 
 ## Legend
 
@@ -20,16 +20,16 @@ Last updated: 2026-08-11
 
 | Area | Done | Partial | Stub | Not started |
 |---|---|---|---|---|
-| Infrastructure | 9 | 0 | 0 | 4 |
+| Infrastructure | 10 | 0 | 0 | 3 |
 | Public / marketing | 1 | 1 | 0 | 8 |
-| Auth | 1 | 0 | 0 | 4 |
+| Auth | 2 | 0 | 0 | 3 |
 | Dashboard & globe | 3 | 1 | 2 | 0 |
-| Trips & planner | 1 | 2 | 0 | 4 |
-| Memory & content | 0 | 0 | 1 | 4 |
+| Trips & planner | 2 | 1 | 0 | 4 |
+| Memory & content | 1 | 0 | 1 | 3 |
 | Analytics & resume | 0 | 0 | 2 | 2 |
 | Public sharing | 0 | 0 | 0 | 3 |
 | Account | 0 | 0 | 1 | 5 |
-| **Total** | **15** | **4** | **6** | **34** |
+| **Total** | **19** | **3** | **6** | **31** |
 
 ---
 
@@ -47,11 +47,12 @@ Last updated: 2026-08-11
 | — | Seed data | ✅ Done | 12 trips, 8 countries, 1 demo account |
 | — | Generated DB types | ✅ Done | `npm run db:types` → `shared/types/database.ts` |
 | — | `brand.ts` rename safety | ✅ Done | No component hardcodes the product name |
-| — | **`entitlements.ts`** | ✅ Done | Reads `plans.limits`; `checkTripQuota()` counts live rather than trusting the denormalised counter. Gates both `/trips/new` and the create action |
+| — | **`entitlements.ts`** | ✅ Done | Reads `plans.limits`; `checkTripQuota()` counts the caller's own live rows rather than trusting the denormalised counter. Gates both `/trips/new` and the create action |
+| — | **pgTAP RLS tests** | ✅ Done | `backend/supabase/tests/database/rls.test.sql`, 40 assertions, `npm run db:test`. Two users, cross-user reads and writes, anon visibility, unpublish, soft delete |
+| — | HTML sanitisation | ✅ Done | `shared/content/sanitize.ts` — allowlist applied on read, so stored post markup cannot execute on the app's origin |
 | — | Framer Motion | ⬜ Not started | Not installed |
 | — | CI (GitHub Actions) | ⬜ Not started | lint/typecheck/test all pass locally |
 | — | Sentry + PostHog | ⬜ Not started | Plan wants the funnel instrumented on day one |
-| — | pgTAP RLS tests | ⬜ Not started | Plan calls this the highest-value suite; RLS verified manually only |
 
 ## Public / marketing
 
@@ -75,7 +76,7 @@ Last updated: 2026-08-11
 | 8 | **Login** `/login` | ✅ Done | Email + password, Zod-validated, generic error copy, `?next=` preserved and open-redirect guarded |
 | — | Session refresh + route protection | ✅ Done | `src/proxy.ts`; `getUser()` not `getSession()` |
 | — | Sign out | ✅ Done | Server Action, clears httpOnly cookies |
-| 7 | Register `/register` | ⬜ Not started | Linked from login and landing — **currently 404s** |
+| 7 | **Register** `/register` | ✅ Done | Email + password + optional name, shared Zod schema, 8-character minimum matching `config.toml`. Handles both projects that require email confirmation and local, where sign-up returns a session immediately. Profile, `explorer` subscription and usage row come from the `on_auth_user_created` trigger |
 | 9 | Forgot / reset / verify | ⬜ Not started | |
 | 10 | Onboarding wizard `/welcome` | ⬜ Not started | "Tap countries you've visited" is the instant-payoff moment |
 | — | Google OAuth | ⬜ Not started | |
@@ -98,7 +99,9 @@ Last updated: 2026-08-11
 |---|---|---|---|
 | 18 | **My Trips** `/trips` | ✅ Done | Tabs All/Past/Ongoing/Upcoming/Drafts with counts, flags, places, visibility |
 | 19 | **Create trip** `/trips/new` | 🟡 Partial | 4-step wizard (basics → dates → places → visibility), quota-gated, writes trip + places. **No map picker or cover image** — both need screens that do not exist yet |
-| 20 | **Trip details** `/trips/[id]` | 🟡 Partial | Hero, stats, route timeline, memories, linked blogs, gallery counts, details panel. **No route map** (no coordinates stored) and **no edit/delete** |
+| 20 | **Trip details** `/trips/[id]` | ✅ Done | Hero, stats, route timeline, memories, linked blogs, gallery counts, details panel, and now **Edit**. Route map still waits on coordinates |
+| — | **Edit trip** `/trips/[id]/edit` | ✅ Done | Same wizard as create (`TripForm`), saveable from any step. Slug and `published_at` are deliberately stable; places are matched by id so memories stay pinned |
+| — | **Delete trip** | ✅ Done | Confirm dialog → `soft_delete_trip()`; sets `deleted_at`, repaints the globe, frees quota, destroys nothing. `restore_trip()` exists for the 30-day window but has no UI yet |
 | 21 | Itinerary builder | ⬜ Not started | Tables not yet migrated |
 | 22 | Budget planner | ⬜ Not started | `expenses` table not yet migrated |
 | 23 | Packing / checklists | ⬜ Not started | Phase 1.1 |
@@ -112,7 +115,7 @@ Last updated: 2026-08-11
 | 26 | Media upload + quota meter | ⬜ Not started | Signed-upload route handler is the critical path |
 | 27 | Blog Studio (Tiptap) | ⬜ Not started | Tiptap installed, not wired |
 | 28 | My Blogs `/blogs` | 🔵 Stub | 4 posts seeded and counted on the dashboard |
-| 29 | Blog reader `/b/[slug]` | ⬜ Not started | Region modal links here and **currently 404s** |
+| 29 | **Blog reader** `/b/[slug]` | ✅ Done | Public route. Sanitised HTML, byline, reading time, linked trip, JSON-LD `Article`, `noindex` on anything unpublished, free-plan badge. The author sees their own drafts behind a notice; everyone else gets the same 404 as a slug that does not exist |
 | 30 | Wishlist `/wishlist` | 🔵 Stub | 3 items seeded; already painting `planned` on the globe |
 | 31 | Travel timeline `/timeline` | 🔵 Stub | |
 
@@ -155,24 +158,56 @@ Last updated: 2026-08-11
 | Empty states | 🟡 Partial | Globe, trips, dashboard activity |
 | Command palette (⌘K) | ⬜ Not started | |
 | Sidebar quota meter | ⬜ Not started | Needs `entitlements.ts` |
-| `error.tsx` / `not-found.tsx` per group | ⬜ Not started | |
+| `error.tsx` / `not-found.tsx` per group | 🟡 Partial | `not-found.tsx` for `/trips/[id]` and `/b/[slug]`; no `error.tsx` anywhere |
 | Toasts | ⬜ Not started | `sonner` installed and mounted |
 
 ---
 
+## Fixed on 2026-08-12
+
+The five gaps previously listed here, four of which are now closed, plus three
+bugs the work uncovered.
+
+1. **Trip edit and delete** — shipped, see screens 19–20 above.
+2. **The two 404s** — `/register` and `/b/[slug]` both exist.
+3. **Map picker** — still open, see below. It genuinely depends on the world-map screen.
+4. **pgTAP RLS tests** — 40 assertions, `npm run db:test`.
+5. **`rollUpToCountries` trip counting** — the aggregate now carries
+   `visit_trip_ids` (migration `20260812000100`) and the roll-up unions them, so a
+   country visited on four trips reads as 4 and one trip across three states still
+   reads as 1. Against the seed: India went 1 → 4, Nepal and Thailand 1 → 2, Japan
+   correctly stayed 1.
+
+Found while building the above:
+
+- **Soft delete was impossible for anyone.** On UPDATE, Postgres requires the new
+  row to satisfy the table's SELECT policies, and `trips_select_own` ends in
+  `deleted_at is null` — so setting `deleted_at` failed with 42501 for the owner
+  too. Fixed with the `soft_delete_trip()` / `restore_trip()` SECURITY DEFINER
+  pair rather than by loosening the policy (migration `20260812000200`). The test
+  suite now asserts both the refusal and the working path.
+- **Owner screens leaked other users' public data.** The dashboard, trips list,
+  globe and — worst — `checkTripQuota()` filtered by nothing, relying on RLS to
+  scope rows. RLS is a ceiling, not a scope: `trips` also exposes every published
+  public trip. A brand-new account opened on a dashboard reading "7 countries,
+  6 trips" and started life partway through its plan limit. Every owner-scoped
+  query now filters `user_id` explicitly.
+- **The account menu crashed on open**, taking sign-out with it: `DropdownMenuLabel`
+  maps to Base UI's `Menu.GroupLabel`, which throws outside a `Menu.Group`.
+
 ## Known gaps worth fixing next
 
-1. **Trips can be created and read, but not edited or deleted.** A typo in a title is
-   permanent through the UI, and there is no soft-delete path despite `deleted_at`
-   existing on the table. Edit + delete on `/trips/[id]` is the next step.
-2. **Two links still 404**: `/register` (linked from the landing page and login) and
-   `/b/[slug]` (linked from the region modal when a trip has a blog).
-3. **No map picker on create.** Places are country + free-text city, so `trip_places.location`
+1. **No map picker on create.** Places are country + free-text city, so `trip_places.location`
    (the PostGIS point) is left null. Distance-travelled and nearest-city snapping cannot be
-   computed until the world map screen lands and supplies coordinates.
-4. **No pgTAP RLS tests.** RLS was verified by hand against the running stack (owner sees
-   all trips, anon sees only public, 0 private leaked). That check should be automated
-   before real users exist.
-5. **`rollUpToCountries` uses `max(visit_count)`** rather than counting distinct trips, so
-   a country visited on four separate trips reports "1 trip" at country level. Existing
-   unit tests assert the current behaviour, so changing it means changing them too.
+   computed until the world map screen lands and supplies coordinates. Unchanged, and still
+   blocked on screen 16.
+2. **Deleted trips are unreachable.** `restore_trip()` keeps the 30-day promise the delete
+   dialog makes, but nothing calls it — there is no trash view. Either build one or the copy
+   is writing a cheque the UI cannot cash.
+3. **Blog Studio is still missing**, so the reader has nothing to read but seeded posts, and
+   `/blogs` remains a stub. This is the largest hole left in the MVP content loop.
+4. **`/register` has no email verification path in production.** Locally `enable_confirmations`
+   is off and sign-up returns a session; with confirmations on the form shows "check your
+   inbox", but there is no `/verify` route to land on afterwards.
+5. **Unlisted blogs have no share link.** `visibility = 'unlisted'` is readable only by the
+   author, because the `share_links` token flow is not built yet.

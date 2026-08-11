@@ -8,6 +8,7 @@
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "db:diff": "supabase db diff",
+    "db:test": "supabase test db",
     "db:types": "supabase gen types typescript --local > ../frontend/src/shared/types/database.ts"
   },
   "devDependencies": {

@@ -4,7 +4,7 @@ import { useActionState, useMemo, useState } from 'react'
 import { useFormStatus } from 'react-dom'
 import Link from 'next/link'
 import { AlertCircle, ArrowLeft, ArrowRight, Loader2, Plus, Sparkles, Trash2 } from 'lucide-react'
-import { createTrip, type CreateTripState } from '@/server/actions/trips'
+import { createTrip, updateTrip, type CreateTripState } from '@/server/actions/trips'
 import { TRIP_STATUSES, TRIP_TYPES, VISIBILITIES, suggestStatus } from '@/shared/validation/trip'
 import { ALL_COUNTRIES, countryFlag, countryName } from '@/shared/geo/countries'
 import { Button } from '@/client/components/ui/button'
@@ -26,6 +26,8 @@ const STEPS = [
 
 interface PlaceDraft {
   key: string
+  /** Set for places that already exist, so an edit updates rather than replaces. */
+  id?: string
   countryCode: string
   regionCode: string
   cityName: string
@@ -40,45 +42,75 @@ function emptyPlace(): PlaceDraft {
   }
 }
 
-function SubmitButton({ disabled }: { disabled: boolean }) {
+/** The stored trip, in the shape the form edits. */
+export interface TripFormInitial {
+  title: string
+  summary: string
+  tripType: string
+  travelerCount: string
+  startDate: string
+  endDate: string
+  status: string
+  visibility: string
+  budgetPlanned: string
+  places: { id: string; countryCode: string; regionCode: string; cityName: string }[]
+}
+
+function SubmitButton({ disabled, label }: { disabled: boolean; label: string }) {
   const { pending } = useFormStatus()
   return (
     <Button type="submit" disabled={pending || disabled}>
       {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
-      {pending ? 'Creating…' : 'Create trip'}
+      {pending ? 'Saving…' : label}
     </Button>
   )
 }
 
 /**
- * Multi-step create-trip flow: basics → dates → places → visibility.
+ * Multi-step trip form: basics → dates → places → visibility.
  *
  * All state is held client-side and submitted once at the end as a single JSON
  * payload, so a half-finished wizard never writes a partial trip. Steps are
  * navigation only — the server re-validates the whole payload regardless of
  * which steps the user actually visited.
+ *
+ * Create and edit share this component because they submit identical fields.
+ * Only the action, the labels and the starting values differ; keeping one form
+ * means a field added to a trip cannot be added to one path and forgotten on
+ * the other.
  */
-export function CreateTripForm({
+export function TripForm({
+  mode = 'create',
+  tripId,
+  initial,
   tripsUsed,
   tripLimit,
 }: {
-  tripsUsed: number
-  tripLimit: number | null
+  mode?: 'create' | 'edit'
+  tripId?: string
+  initial?: TripFormInitial
+  tripsUsed?: number
+  tripLimit?: number | null
 }) {
-  const [state, formAction] = useActionState(createTrip, initialState)
+  const isEdit = mode === 'edit'
+  const [state, formAction] = useActionState(isEdit ? updateTrip : createTrip, initialState)
   const [step, setStep] = useState(0)
 
-  const [title, setTitle] = useState('')
-  const [summary, setSummary] = useState('')
-  const [tripType, setTripType] = useState<string>('solo')
-  const [travelerCount, setTravelerCount] = useState('1')
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
-  const [statusTouched, setStatusTouched] = useState(false)
-  const [status, setStatus] = useState<string>('planning')
-  const [visibility, setVisibility] = useState<string>('private')
-  const [budget, setBudget] = useState('')
-  const [places, setPlaces] = useState<PlaceDraft[]>([emptyPlace()])
+  const [title, setTitle] = useState(initial?.title ?? '')
+  const [summary, setSummary] = useState(initial?.summary ?? '')
+  const [tripType, setTripType] = useState<string>(initial?.tripType || 'solo')
+  const [travelerCount, setTravelerCount] = useState(initial?.travelerCount ?? '1')
+  const [startDate, setStartDate] = useState(initial?.startDate ?? '')
+  const [endDate, setEndDate] = useState(initial?.endDate ?? '')
+  // An existing trip's status is a stored fact, not something to re-derive from
+  // its dates — a completed trip stays completed.
+  const [statusTouched, setStatusTouched] = useState(isEdit)
+  const [status, setStatus] = useState<string>(initial?.status ?? 'planning')
+  const [visibility, setVisibility] = useState<string>(initial?.visibility ?? 'private')
+  const [budget, setBudget] = useState(initial?.budgetPlanned ?? '')
+  const [places, setPlaces] = useState<PlaceDraft[]>(
+    initial?.places.length ? initial.places.map((p) => ({ key: p.id, ...p })) : [emptyPlace()]
+  )
 
   // Derived unless the user has overridden it — someone logging last year's
   // trip should not have to fight the form, but the common case is automatic.
@@ -100,6 +132,7 @@ export function CreateTripForm({
         budgetPlanned: budget,
         currency: 'INR',
         places: validPlaces.map((p) => ({
+          id: p.id,
           countryCode: p.countryCode,
           regionCode: p.regionCode,
           cityName: p.cityName,
@@ -131,6 +164,7 @@ export function CreateTripForm({
   return (
     <form action={formAction} className="space-y-6">
       <input type="hidden" name="payload" value={payload} />
+      {isEdit && tripId && <input type="hidden" name="tripId" value={tripId} />}
 
       {/* Step indicator */}
       <ol className="flex flex-wrap items-center gap-2 text-sm">
@@ -487,23 +521,32 @@ export function CreateTripForm({
         </Button>
 
         <div className="flex items-center gap-3">
-          {tripLimit !== null && (
+          {!isEdit && tripLimit != null && (
             <span className="text-xs text-muted-foreground tabular-nums">
               {tripsUsed}/{tripLimit} trips used
             </span>
           )}
 
-          {step < STEPS.length - 1 ? (
+          {step < STEPS.length - 1 && (
             <Button
               type="button"
+              variant={isEdit ? 'outline' : 'default'}
               onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}
               disabled={!stepValid[step]}
             >
               Next
               <ArrowRight className="size-4" aria-hidden />
             </Button>
-          ) : (
-            <SubmitButton disabled={!title.trim() || validPlaces.length === 0} />
+          )}
+
+          {/* Editing shows Save on every step: someone fixing a typo in the
+              title should not have to walk to the end of the wizard. Creating
+              keeps it on the last step, where the review summary is. */}
+          {(isEdit || step === STEPS.length - 1) && (
+            <SubmitButton
+              disabled={!title.trim() || validPlaces.length === 0}
+              label={isEdit ? 'Save changes' : 'Create trip'}
+            />
           )}
         </div>
       </div>

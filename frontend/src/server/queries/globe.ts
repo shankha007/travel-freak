@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { createClient } from '@/server/supabase/server'
+import { requireUser } from '@/server/auth'
 import { countryName } from '@/shared/geo/countries'
 import type {
   RegionDetail,
@@ -17,9 +18,10 @@ import type { Database } from '@/shared/types/database'
  * `refresh_visited_regions()` triggers, so the globe gets one small result set
  * instead of joining across every trip a user has ever taken.
  *
- * No `user_id` filter appears in these queries by design: RLS scopes every row
- * to the caller. Adding a redundant filter would hide a policy regression
- * rather than surface it.
+ * Every query filters on `user_id`. RLS is the ceiling, not the scope: the
+ * aggregate also has a policy exposing the rows of anyone with a public
+ * profile, which is what makes a shared globe possible — and what would
+ * otherwise paint strangers' countries onto your own globe.
  */
 
 type VisitedRegionRow = Database['public']['Tables']['visited_regions']['Row']
@@ -30,6 +32,7 @@ function toVisitedRegion(row: VisitedRegionRow): VisitedRegion {
     regionCode: row.region_code ?? '',
     state: row.state,
     visitCount: row.visit_count,
+    visitTripIds: row.visit_trip_ids ?? [],
     firstVisit: row.first_visit,
     lastVisit: row.last_visit,
     tripIds: row.trip_ids ?? [],
@@ -44,10 +47,12 @@ function toVisitedRegion(row: VisitedRegionRow): VisitedRegion {
 /** Every region row for the signed-in user, for the globe and region list. */
 export async function getVisitedRegions(): Promise<VisitedRegion[]> {
   const supabase = await createClient()
+  const user = await requireUser()
 
   const { data, error } = await supabase
     .from('visited_regions')
     .select('*')
+    .eq('user_id', user.id)
     .order('country_code', { ascending: true })
 
   if (error) {
@@ -66,10 +71,12 @@ export async function getVisitedRegions(): Promise<VisitedRegion[]> {
  */
 export async function getRegionDetail(countryCode: string): Promise<RegionDetail | null> {
   const supabase = await createClient()
+  const user = await requireUser()
 
   const { data: regions } = await supabase
     .from('visited_regions')
     .select('*')
+    .eq('user_id', user.id)
     .eq('country_code', countryCode)
 
   if (!regions?.length) return null
@@ -88,7 +95,9 @@ export async function getRegionDetail(countryCode: string): Promise<RegionDetail
       .filter(Boolean)
       .sort()
       .at(-1) ?? null
-  const visitCount = regions.reduce((sum, r) => sum + r.visit_count, 0)
+  // Distinct completed trips across the country's subdivision rows. Summing
+  // visit_count would count a single trip once per subdivision it crossed.
+  const visitCount = new Set(regions.flatMap((r) => r.visit_trip_ids ?? [])).size
 
   // 'current' outranks 'visited' outranks 'planned' — same precedence the
   // aggregate itself uses.
@@ -106,16 +115,22 @@ export async function getRegionDetail(countryCode: string): Promise<RegionDetail
       supabase
         .from('trips')
         .select('id, title, slug, summary, start_date, end_date, photo_count')
+        .eq('user_id', user.id)
         .in('id', tripIds)
         .is('deleted_at', null)
         .order('start_date', { ascending: false, nullsFirst: false }),
       supabase
         .from('memories')
         .select('id, kind, body, happened_at')
+        .eq('user_id', user.id)
         .in('trip_id', tripIds)
         .order('happened_at', { ascending: false, nullsFirst: false })
         .limit(10),
-      supabase.from('blog_posts').select('trip_id, slug').in('trip_id', tripIds),
+      supabase
+        .from('blog_posts')
+        .select('trip_id, slug')
+        .eq('user_id', user.id)
+        .in('trip_id', tripIds),
     ])
 
     const blogByTrip = new Map(

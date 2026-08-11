@@ -21,6 +21,12 @@ const optionalDate = z
   .transform((v) => (v === '' ? null : v))
 
 export const tripPlaceSchema = z.object({
+  /**
+   * Present only when editing. Rows are matched on it so an edit updates the
+   * places that already exist rather than replacing them — memories are pinned
+   * to `trip_place_id`, and a delete-and-reinsert would unpin every one.
+   */
+  id: z.uuid().optional(),
   countryCode: z
     .string()
     .trim()
@@ -71,6 +77,13 @@ export const createTripSchema = z
 
 export type CreateTripInput = z.input<typeof createTripSchema>
 export type CreateTripValues = z.output<typeof createTripSchema>
+
+/**
+ * An edit submits the same fields as a create, so it validates against the same
+ * schema. The difference is server-side: the slug is left alone (public URLs
+ * must not change under a reader) and places are matched by id.
+ */
+export const updateTripSchema = createTripSchema
 
 /**
  * Suggests a status from the dates, matching the nightly cron that keeps it

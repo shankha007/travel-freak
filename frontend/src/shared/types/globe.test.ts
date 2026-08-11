@@ -5,10 +5,13 @@ import type { RegionState } from '@/shared/geo/region-state'
 function region(
   overrides: Partial<VisitedRegion> & Pick<VisitedRegion, 'countryCode'>
 ): VisitedRegion {
+  const visitTripIds = overrides.visitTripIds ?? ['t1']
   return {
     regionCode: '',
     state: 'visited' as RegionState,
-    visitCount: 1,
+    visitTripIds,
+    // Mirrors the aggregate's invariant: the count is the size of the trip set.
+    visitCount: visitTripIds.length,
     firstVisit: null,
     lastVisit: null,
     tripIds: [],
@@ -102,18 +105,44 @@ describe('rollUpToCountries', () => {
     expect(rolled.cityNames.sort()).toEqual(['Bengaluru', 'Mysuru', 'Panaji'])
   })
 
-  it('takes the highest visit count and the first available hero photo', () => {
+  it('counts distinct trips across subdivisions, not the largest single count', () => {
+    // Four separate trips, each to a different state. The country was visited
+    // four times; the old max() roll-up reported one.
     const [rolled] = rollUpToCountries([
-      region({ countryCode: 'IND', regionCode: 'IN-KA', visitCount: 2, featuredMediaUrl: null }),
-      region({
-        countryCode: 'IND',
-        regionCode: 'IN-GA',
-        visitCount: 5,
-        featuredMediaUrl: '/a.jpg',
-      }),
+      region({ countryCode: 'IND', regionCode: 'IN-KA', visitTripIds: ['t1'] }),
+      region({ countryCode: 'IND', regionCode: 'IN-GA', visitTripIds: ['t2'] }),
+      region({ countryCode: 'IND', regionCode: 'IN-MH', visitTripIds: ['t3'] }),
+      region({ countryCode: 'IND', regionCode: 'IN-KL', visitTripIds: ['t4'] }),
     ])
 
-    expect(rolled.visitCount).toBe(5)
+    expect(rolled.visitCount).toBe(4)
+    expect(rolled.visitTripIds.sort()).toEqual(['t1', 't2', 't3', 't4'])
+  })
+
+  it('counts one trip once even when it crossed several subdivisions', () => {
+    // The failure mode a plain sum would have: one trip, three states.
+    const [rolled] = rollUpToCountries([
+      region({ countryCode: 'IND', regionCode: 'IN-KA', visitTripIds: ['t1'] }),
+      region({ countryCode: 'IND', regionCode: 'IN-GA', visitTripIds: ['t1'] }),
+      region({ countryCode: 'IND', regionCode: 'IN-MH', visitTripIds: ['t1'] }),
+    ])
+
+    expect(rolled.visitCount).toBe(1)
+  })
+
+  it('keeps a country-level row untouched', () => {
+    const [rolled] = rollUpToCountries([region({ countryCode: 'JPN', visitTripIds: ['t1', 't2'] })])
+
+    expect(rolled.visitCount).toBe(2)
+    expect(rolled.regionCode).toBe('')
+  })
+
+  it('takes the first available hero photo', () => {
+    const [rolled] = rollUpToCountries([
+      region({ countryCode: 'IND', regionCode: 'IN-KA', featuredMediaUrl: null }),
+      region({ countryCode: 'IND', regionCode: 'IN-GA', featuredMediaUrl: '/a.jpg' }),
+    ])
+
     expect(rolled.featuredMediaUrl).toBe('/a.jpg')
   })
 

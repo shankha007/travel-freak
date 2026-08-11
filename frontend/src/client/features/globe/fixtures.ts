@@ -9,103 +9,118 @@ import { countryName } from '@/shared/geo/countries'
  * live. Kept in its own module so it never leaks into an authenticated path by
  * accident — anything importing this is rendering a demo, not a user's data.
  */
+/**
+ * Synthetic ids for the trips behind a demo visit count.
+ *
+ * `visitCount` is derived from these rather than written by hand, so the demo
+ * data obeys the same invariant the aggregate does: the count is the size of
+ * the trip set.
+ */
+function demoVisits(countryCode: string, count: number): string[] {
+  return Array.from({ length: count }, (_, i) => `demo-${countryCode.toLowerCase()}-visit-${i + 1}`)
+}
+
+function demoRegion(region: Omit<VisitedRegion, 'visitCount'>): VisitedRegion {
+  return { ...region, visitCount: region.visitTripIds.length }
+}
+
 export const DEMO_REGIONS: VisitedRegion[] = [
-  {
+  demoRegion({
     countryCode: 'IND',
     regionCode: '',
     state: 'visited',
-    visitCount: 9,
+    visitTripIds: demoVisits('IND', 9),
     firstVisit: '2019-02-14',
     lastVisit: '2026-05-22',
     tripIds: ['demo-1', 'demo-2', 'demo-3'],
     cityNames: ['Bengaluru', 'Rishikesh', 'Goa', 'Leh', 'Kolkata'],
     featuredMediaId: null,
     featuredMediaUrl: null,
-  },
-  {
+  }),
+  demoRegion({
     countryCode: 'NPL',
     regionCode: '',
     state: 'visited',
-    visitCount: 2,
+    visitTripIds: demoVisits('NPL', 2),
     firstVisit: '2023-10-02',
     lastVisit: '2023-10-19',
     tripIds: ['demo-4'],
     cityNames: ['Kathmandu', 'Pokhara'],
     featuredMediaId: null,
     featuredMediaUrl: null,
-  },
-  {
+  }),
+  demoRegion({
     countryCode: 'JPN',
     regionCode: '',
     state: 'visited',
-    visitCount: 1,
+    visitTripIds: demoVisits('JPN', 1),
     firstVisit: '2025-04-01',
     lastVisit: '2025-04-14',
     tripIds: ['demo-5'],
     cityNames: ['Tokyo', 'Kyoto', 'Osaka'],
     featuredMediaId: null,
     featuredMediaUrl: null,
-  },
-  {
+  }),
+  demoRegion({
     countryCode: 'THA',
     regionCode: '',
     state: 'visited',
-    visitCount: 3,
+    visitTripIds: demoVisits('THA', 3),
     firstVisit: '2022-01-08',
     lastVisit: '2024-11-30',
     tripIds: ['demo-6'],
     cityNames: ['Bangkok', 'Chiang Mai'],
     featuredMediaId: null,
     featuredMediaUrl: null,
-  },
-  {
+  }),
+  demoRegion({
     countryCode: 'ARE',
     regionCode: '',
     state: 'visited',
-    visitCount: 1,
+    visitTripIds: demoVisits('ARE', 1),
     firstVisit: '2021-12-03',
     lastVisit: '2021-12-09',
     tripIds: ['demo-7'],
     cityNames: ['Dubai'],
     featuredMediaId: null,
     featuredMediaUrl: null,
-  },
-  {
+  }),
+  demoRegion({
     countryCode: 'SGP',
     regionCode: '',
     state: 'current',
-    visitCount: 1,
+    visitTripIds: demoVisits('SGP', 1),
     firstVisit: '2026-08-02',
     lastVisit: '2026-08-12',
     tripIds: ['demo-8'],
     cityNames: ['Singapore'],
     featuredMediaId: null,
     featuredMediaUrl: null,
-  },
-  {
+  }),
+  demoRegion({
     countryCode: 'BTN',
     regionCode: '',
     state: 'planned',
-    visitCount: 0,
+    visitTripIds: [],
     firstVisit: '2026-11-05',
     lastVisit: '2026-11-15',
     tripIds: ['demo-9'],
     cityNames: ['Thimphu', 'Paro'],
     featuredMediaId: null,
     featuredMediaUrl: null,
-  },
-  {
+  }),
+  demoRegion({
     countryCode: 'ISL',
     regionCode: '',
     state: 'planned',
-    visitCount: 0,
+    visitTripIds: [],
     firstVisit: null,
     lastVisit: null,
     tripIds: [],
     cityNames: [],
     featuredMediaId: null,
     featuredMediaUrl: null,
-  },
+  }),
 ]
 
 const DEMO_DETAIL: Record<string, Partial<RegionDetail>> = {
