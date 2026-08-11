@@ -1,15 +1,15 @@
 'use client'
 
 import { useTheme } from 'next-themes'
-import { useIsHydrated } from '@/frontend/hooks/use-is-hydrated'
+import { useIsHydrated } from '@/client/hooks/use-is-hydrated'
 import { Monitor, Moon, Sun } from 'lucide-react'
-import { Button } from '@/frontend/components/ui/button'
+import { Button } from '@/client/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/frontend/components/ui/dropdown-menu'
+} from '@/client/components/ui/dropdown-menu'
 
 const OPTIONS = [
   { value: 'light', label: 'Light', Icon: Sun },

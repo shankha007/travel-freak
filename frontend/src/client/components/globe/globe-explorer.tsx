@@ -10,7 +10,7 @@ import { TOTAL_COUNTRIES } from '@/shared/geo/countries'
 import { RegionLegend } from './region-legend'
 import { RegionList } from './region-list'
 import { RegionModal } from './region-modal'
-import { Skeleton } from '@/frontend/components/ui/skeleton'
+import { Skeleton } from '@/client/components/ui/skeleton'
 
 type GlobeViewComponent = typeof import('./globe-view').GlobeView
 

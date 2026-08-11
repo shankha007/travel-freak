@@ -13,9 +13,9 @@ import {
   type RegionState,
 } from '@/shared/geo/region-state'
 import { indexRegions, regionKey, type VisitedRegion } from '@/shared/types/globe'
-import { useReducedMotion } from '@/frontend/hooks/use-reduced-motion'
-import { useElementSize } from '@/frontend/hooks/use-element-size'
-import { Skeleton } from '@/frontend/components/ui/skeleton'
+import { useReducedMotion } from '@/client/hooks/use-reduced-motion'
+import { useElementSize } from '@/client/hooks/use-element-size'
+import { Skeleton } from '@/client/components/ui/skeleton'
 
 interface GlobeViewProps {
   regions: VisitedRegion[]

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
-import { GlobeExplorer } from '@/frontend/components/globe/globe-explorer'
-import { DEMO_REGIONS, demoRegionDetail } from '@/frontend/features/globe/fixtures'
+import { GlobeExplorer } from '@/client/components/globe/globe-explorer'
+import { DEMO_REGIONS, demoRegionDetail } from '@/client/features/globe/fixtures'
 
 export const metadata: Metadata = {
   title: 'Globe',

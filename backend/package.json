@@ -1,0 +1,16 @@
+{
+  "name": "travel-app-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Supabase database: schema migrations, local stack config and type generation.",
+  "scripts": {
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:diff": "supabase db diff",
+    "db:types": "supabase gen types typescript --local > ../frontend/src/shared/types/database.ts"
+  },
+  "devDependencies": {
+    "supabase": "^2.112.0"
+  }
+}

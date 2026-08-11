@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { BRAND, SITE_URL, pageTitle } from '@/shared/brand'
-import { Providers } from '@/frontend/providers'
+import { Providers } from '@/client/providers'
 import './globals.css'
 
 // Exposed as --font-sans / --font-mono to match the @theme mapping in globals.css.

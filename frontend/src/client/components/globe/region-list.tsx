@@ -5,8 +5,8 @@ import { Search } from 'lucide-react'
 import { countryFlag, countryName } from '@/shared/geo/countries'
 import { REGION_STATE_META } from '@/shared/geo/region-state'
 import type { VisitedRegion } from '@/shared/types/globe'
-import { Input } from '@/frontend/components/ui/input'
-import { ScrollArea } from '@/frontend/components/ui/scroll-area'
+import { Input } from '@/client/components/ui/input'
+import { ScrollArea } from '@/client/components/ui/scroll-area'
 import { cn } from '@/shared/utils'
 
 interface RegionListProps {

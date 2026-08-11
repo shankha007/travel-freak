@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TravelFreak
 
-## Getting Started
+Plan trips, document the ones you have taken, and watch your world map fill in.
 
-First, run the development server:
+## Repository layout
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+travel-freak-app/
+├─ frontend/    Next.js 16 application (App Router, React 19, Tailwind v4)
+└─ backend/     Supabase database — schema migrations and local stack config
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Each folder is independently installable and has its own `package.json`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Folder      | What it is                             | Install                       |
+| ----------- | -------------------------------------- | ----------------------------- |
+| `frontend/` | The app users load in a browser         | `npm install` in `frontend/`  |
+| `backend/`  | Postgres schema, RLS policies, storage  | `npm install` in `backend/`   |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Getting started
 
-## Learn More
+Install and run the app:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+cd frontend && npm install && npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Start the local database (requires Docker):
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+cd backend && npm install && npm run db:start
+```
 
-## Deploy on Vercel
+Then copy `frontend/.env.local.example` to `frontend/.env.local` and fill in the Supabase
+URL and keys that `db:start` prints.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Common commands
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Run these from `frontend/`:
+
+| Command             | What it does                          |
+| ------------------- | ------------------------------------- |
+| `npm run dev`       | Dev server on http://localhost:3000   |
+| `npm run build`     | Production build                      |
+| `npm test`          | Vitest suite                          |
+| `npm run lint`      | ESLint                                |
+| `npm run typecheck` | `next typegen` + `tsc --noEmit`       |
+| `npm run build:geo` | Regenerate the country polygon asset  |
+
+Run these from `backend/`:
+
+| Command             | What it does                                      |
+| ------------------- | ------------------------------------------------- |
+| `npm run db:start`  | Start the local Supabase stack                    |
+| `npm run db:reset`  | Drop and replay all migrations                    |
+| `npm run db:types`  | Regenerate TypeScript types into `frontend/`      |
+
+`db:types` writes to `frontend/src/shared/types/database.ts` — the one file that crosses
+the boundary, because both Supabase clients are typed against it.
+
+## Why the app is not split further
+
+`frontend/` is a full-stack Next.js app, so some of it genuinely runs on a server: Route
+Handlers, Server Components and the cookie-bound Supabase client. That code cannot be
+lifted into `backend/`, because Next.js has to bundle it. Instead the client/server line is
+drawn *inside* the app — see [frontend/src/README.md](frontend/src/README.md).
+
+So the split reads: **`frontend/` is the application, `backend/` is the database.**
+
+## Deploying
+
+Set the project root to `frontend/` in your host (on Vercel: Settings → General → Root
+Directory). Migrations in `backend/supabase/migrations` are applied with the Supabase CLI,
+not by the app build.

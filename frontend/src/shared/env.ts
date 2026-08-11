@@ -3,7 +3,7 @@ import { z } from 'zod'
 /**
  * Validated environment access for values that are safe in a browser bundle.
  *
- * Server-only secrets (the service-role key) live in `@/backend/env`, which is
+ * Server-only secrets (the service-role key) live in `@/server/env`, which is
  * marked `server-only` so it cannot be imported from a Client Component.
  *
  * Reading env vars through these helpers means a missing or malformed value

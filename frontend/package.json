@@ -12,11 +12,7 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "db:start": "supabase start",
-    "db:stop": "supabase stop",
-    "db:reset": "supabase db reset",
-    "db:types": "supabase gen types typescript --local > src/shared/types/database.ts"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -68,7 +64,6 @@
     "jsdom": "^29.1.1",
     "prettier": "^3.9.6",
     "prettier-plugin-tailwindcss": "^0.8.1",
-    "supabase": "^2.112.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.10"

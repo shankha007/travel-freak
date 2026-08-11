@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import { ThemeProvider } from 'next-themes'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { TooltipProvider } from '@/frontend/components/ui/tooltip'
-import { Toaster } from '@/frontend/components/ui/sonner'
+import { TooltipProvider } from '@/client/components/ui/tooltip'
+import { Toaster } from '@/client/components/ui/sonner'
 
 export function Providers({ children }: { children: React.ReactNode }) {
   // Created in state so each browser session gets one client, and it is never

@@ -4,7 +4,7 @@ import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { publicEnv } from '@/shared/env'
-import { serviceRoleKey } from '@/backend/env'
+import { serviceRoleKey } from '@/server/env'
 import type { Database } from '@/shared/types/database'
 
 /**

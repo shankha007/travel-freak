@@ -12,10 +12,10 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/frontend/components/ui/dialog'
-import { Badge } from '@/frontend/components/ui/badge'
-import { Button } from '@/frontend/components/ui/button'
-import { Skeleton } from '@/frontend/components/ui/skeleton'
+} from '@/client/components/ui/dialog'
+import { Badge } from '@/client/components/ui/badge'
+import { Button } from '@/client/components/ui/button'
+import { Skeleton } from '@/client/components/ui/skeleton'
 import { formatDateRange } from '@/shared/format'
 import { cn } from '@/shared/utils'
 
