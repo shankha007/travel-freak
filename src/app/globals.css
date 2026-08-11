@@ -1,26 +1,174 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Globe / map region states. See src/lib/geo/region-state.ts for the labels
+     that must always accompany these colours — colour is never the only signal. */
+  --color-globe-visited: var(--globe-visited);
+  --color-globe-current: var(--globe-current);
+  --color-globe-planned: var(--globe-planned);
+  --color-globe-unvisited: var(--globe-unvisited);
+  --color-globe-visited-foreground: var(--globe-visited-foreground);
+  --color-globe-current-foreground: var(--globe-current-foreground);
+  --color-globe-planned-foreground: var(--globe-planned-foreground);
+  --color-globe-unvisited-foreground: var(--globe-unvisited-foreground);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.52 0.104 196);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0.004 196);
+  --secondary-foreground: oklch(0.24 0.03 196);
+  --muted: oklch(0.968 0.003 220);
+  --muted-foreground: oklch(0.53 0.014 220);
+  --accent: oklch(0.955 0.02 196);
+  --accent-foreground: oklch(0.3 0.05 196);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.916 0.005 220);
+  --input: oklch(0.916 0.005 220);
+  --ring: oklch(0.52 0.104 196);
+  --chart-1: oklch(0.55 0.13 196);
+  --chart-2: oklch(0.63 0.14 155);
+  --chart-3: oklch(0.68 0.15 85);
+  --chart-4: oklch(0.6 0.16 25);
+  --chart-5: oklch(0.53 0.15 285);
+  --radius: 0.625rem;
+
+  /* Region states — tuned for contrast against both the light UI and the globe sphere. */
+  --globe-visited: oklch(0.63 0.145 155);
+  --globe-current: oklch(0.6 0.16 245);
+  --globe-planned: oklch(0.74 0.145 78);
+  --globe-unvisited: oklch(0.87 0.006 220);
+  --globe-visited-foreground: oklch(0.99 0 0);
+  --globe-current-foreground: oklch(0.99 0 0);
+  --globe-planned-foreground: oklch(0.26 0.05 78);
+  --globe-unvisited-foreground: oklch(0.42 0.01 220);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.72 0.115 196);
+  --primary-foreground: oklch(0.18 0.03 196);
+  --secondary: oklch(0.27 0.012 220);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.27 0.012 220);
+  --muted-foreground: oklch(0.71 0.012 220);
+  --accent: oklch(0.31 0.028 196);
+  --accent-foreground: oklch(0.95 0.02 196);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.72 0.115 196);
+  --chart-1: oklch(0.7 0.13 196);
+  --chart-2: oklch(0.72 0.14 155);
+  --chart-3: oklch(0.78 0.14 85);
+  --chart-4: oklch(0.68 0.16 25);
+  --chart-5: oklch(0.66 0.15 285);
+
+  /* Slightly lifted in dark mode so fills stay legible on the night-side sphere. */
+  --globe-visited: oklch(0.7 0.15 155);
+  --globe-current: oklch(0.68 0.16 245);
+  --globe-planned: oklch(0.8 0.145 78);
+  --globe-unvisited: oklch(0.34 0.008 220);
+  --globe-visited-foreground: oklch(0.16 0.03 155);
+  --globe-current-foreground: oklch(0.16 0.03 245);
+  --globe-planned-foreground: oklch(0.2 0.04 78);
+  --globe-unvisited-foreground: oklch(0.78 0.01 220);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
-}
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* Honour the OS motion preference globally. The globe reads this separately
+     to disable auto-rotation entirely — see components/globe. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
