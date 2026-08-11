@@ -1,0 +1,309 @@
+-- Dummy data for local development.
+--
+-- Loaded automatically by `npm run db:start` and `npm run db:reset` — see
+-- [db.seed] in config.toml. Never runs against a hosted project.
+--
+-- Mirrors the shape of the demo fixtures in
+-- frontend/src/client/features/globe/fixtures.ts, so the globe looks the same
+-- once the page swaps from fixtures to real queries.
+--
+-- Deliberately inserts NO rows into `media`. Media rows without matching objects
+-- in storage would resolve to broken image URLs; upload real files instead.
+-- `plans` is seeded by 20260807000300_plans_and_storage.sql, not here.
+
+-- ---------------------------------------------------------------------------
+-- Demo account
+--
+-- Sign in with demo@travelfreak.app / password123
+--
+-- Inserting into auth.users fires on_auth_user_created, which creates the
+-- profile, subscription and usage_counters rows. We update those afterwards
+-- rather than inserting them.
+-- ---------------------------------------------------------------------------
+
+-- crypt()/gen_salt() hash the demo password. Supabase ships pgcrypto in the
+-- `extensions` schema, but asserting it here keeps the seed self-contained.
+create extension if not exists pgcrypto with schema extensions;
+
+-- Idempotent: a re-run replaces the demo account, and every child row cascades.
+delete from auth.users where email = 'demo@travelfreak.app';
+
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password,
+  email_confirmed_at, last_sign_in_at,
+  raw_app_meta_data, raw_user_meta_data,
+  created_at, updated_at,
+  confirmation_token, email_change, email_change_token_new, recovery_token
+)
+values (
+  '00000000-0000-0000-0000-000000000000',
+  '11111111-1111-1111-1111-111111111111',
+  'authenticated',
+  'authenticated',
+  'demo@travelfreak.app',
+  extensions.crypt('password123', extensions.gen_salt('bf')),
+  now(), now(),
+  '{"provider":"email","providers":["email"]}'::jsonb,
+  '{"full_name":"Demo Traveller"}'::jsonb,
+  now() - interval '2 years', now(),
+  '', '', '', ''
+);
+
+-- Required for email/password sign-in to resolve the account.
+insert into auth.identities (
+  id, user_id, provider_id, identity_data, provider,
+  last_sign_in_at, created_at, updated_at
+)
+values (
+  gen_random_uuid(),
+  '11111111-1111-1111-1111-111111111111',
+  '11111111-1111-1111-1111-111111111111',
+  '{"sub":"11111111-1111-1111-1111-111111111111","email":"demo@travelfreak.app","email_verified":true}'::jsonb,
+  'email',
+  now(), now(), now()
+);
+
+update public.profiles
+set
+  username = 'demo',
+  display_name = 'Demo Traveller',
+  bio = 'Chasing mountains, monsoons and the occasional street-food detour.',
+  country_code = 'IND',
+  city = 'Bengaluru',
+  travel_interests = array['mountains', 'food', 'photography', 'road trips'],
+  is_public = true,
+  onboarded_at = now() - interval '2 years'
+where id = '11111111-1111-1111-1111-111111111111';
+
+-- Put the demo account on the paid tier so region detail and albums are visible.
+update public.subscriptions
+set plan_code = 'voyager', status = 'active', current_period_end = now() + interval '11 months'
+where user_id = '11111111-1111-1111-1111-111111111111';
+
+-- ---------------------------------------------------------------------------
+-- Trips
+--
+-- Statuses drive the globe colours: 'ongoing' paints 'current',
+-- 'completed' paints 'visited', anything else paints 'planned'.
+-- ---------------------------------------------------------------------------
+
+insert into public.trips (
+  id, user_id, title, slug, summary, start_date, end_date,
+  status, visibility, trip_type, traveler_count, budget_planned, currency, published_at
+)
+values
+  ('a0000001-0000-4000-8000-000000000001', '11111111-1111-1111-1111-111111111111',
+   'Ladakh on two wheels', 'ladakh-on-two-wheels',
+   'Manali to Leh over five passes, and the long quiet road to Pangong.',
+   '2026-05-08', '2026-05-22', 'completed', 'public', 'friends', 3, 85000, 'INR',
+   now() - interval '2 months'),
+
+  ('a0000001-0000-4000-8000-000000000002', '11111111-1111-1111-1111-111111111111',
+   'Monsoon in Rishikesh', 'monsoon-in-rishikesh',
+   'Rafting between downpours, and a week of not looking at a screen.',
+   '2025-07-19', '2025-07-26', 'completed', 'public', 'solo', 1, 24000, 'INR',
+   now() - interval '12 months'),
+
+  ('a0000001-0000-4000-8000-000000000003', '11111111-1111-1111-1111-111111111111',
+   'Goa, slowly', 'goa-slowly',
+   'The south beaches, no itinerary, and a rented scooter with bad brakes.',
+   '2024-12-21', '2024-12-30', 'completed', 'private', 'couple', 2, 46000, 'INR', null),
+
+  ('a0000001-0000-4000-8000-000000000004', '11111111-1111-1111-1111-111111111111',
+   'Kolkata for Durga Puja', 'kolkata-durga-puja',
+   'Pandal hopping until 3am, and more mishti than is strictly advisable.',
+   '2023-10-18', '2023-10-24', 'completed', 'public', 'family', 5, 38000, 'INR',
+   now() - interval '20 months'),
+
+  ('a0000001-0000-4000-8000-000000000005', '11111111-1111-1111-1111-111111111111',
+   'Cherry blossom chase', 'cherry-blossom-chase',
+   'Tokyo to Kyoto, timed badly and rescued by a late bloom in Osaka.',
+   '2025-04-01', '2025-04-14', 'completed', 'public', 'couple', 2, 320000, 'INR',
+   now() - interval '15 months'),
+
+  ('a0000001-0000-4000-8000-000000000006', '11111111-1111-1111-1111-111111111111',
+   'Annapurna base camp', 'annapurna-base-camp',
+   'Eleven days up and four back down, with dal bhat at every stop.',
+   '2024-03-09', '2024-03-24', 'completed', 'public', 'friends', 4, 95000, 'INR',
+   now() - interval '28 months'),
+
+  ('a0000001-0000-4000-8000-000000000007', '11111111-1111-1111-1111-111111111111',
+   'Kathmandu long weekend', 'kathmandu-long-weekend',
+   'Temples, thukpa and a very early flight home.',
+   '2022-11-04', '2022-11-08', 'completed', 'private', 'solo', 1, 28000, 'INR', null),
+
+  ('a0000001-0000-4000-8000-000000000008', '11111111-1111-1111-1111-111111111111',
+   'Bangkok street food crawl', 'bangkok-street-food-crawl',
+   'Six neighbourhoods, one very determined appetite.',
+   '2023-02-11', '2023-02-18', 'completed', 'public', 'friends', 4, 72000, 'INR',
+   now() - interval '30 months'),
+
+  ('a0000001-0000-4000-8000-000000000009', '11111111-1111-1111-1111-111111111111',
+   'Chiang Mai slow days', 'chiang-mai-slow-days',
+   'Old city cafés, a cooking class, and the elephant sanctuary up north.',
+   '2024-08-03', '2024-08-12', 'completed', 'private', 'couple', 2, 68000, 'INR', null),
+
+  ('a0000001-0000-4000-8000-000000000010', '11111111-1111-1111-1111-111111111111',
+   'Dubai stopover', 'dubai-stopover',
+   'Forty hours between flights, mostly spent in the old souk.',
+   '2025-01-16', '2025-01-18', 'completed', 'private', 'solo', 1, 40000, 'INR', null),
+
+  -- Ongoing: this is what paints Singapore as 'current' on the globe.
+  ('a0000001-0000-4000-8000-000000000011', '11111111-1111-1111-1111-111111111111',
+   'Singapore work week', 'singapore-work-week',
+   'Client onsite, with hawker centres for every meal that is not catered.',
+   '2026-08-08', '2026-08-15', 'ongoing', 'private', 'business', 1, 90000, 'INR', null),
+
+  -- Planning: paints Bhutan as 'planned'.
+  ('a0000001-0000-4000-8000-000000000012', '11111111-1111-1111-1111-111111111111',
+   'Bhutan in autumn', 'bhutan-in-autumn',
+   'Paro to Thimphu, and the hike up to Tiger''s Nest if the knees allow.',
+   '2026-11-02', '2026-11-12', 'planning', 'private', 'couple', 2, 150000, 'INR', null);
+
+-- ---------------------------------------------------------------------------
+-- Trip places
+--
+-- The single source of truth for the globe. Each insert fires
+-- trigger_refresh_visited_regions, so public.visited_regions is rebuilt from
+-- these rows — it is never written directly.
+-- ---------------------------------------------------------------------------
+
+insert into public.trip_places (
+  trip_id, user_id, country_code, region_code, city_name,
+  place_kind, arrival_date, departure_date, order_index, notes
+)
+values
+  -- India
+  ('a0000001-0000-4000-8000-000000000001', '11111111-1111-1111-1111-111111111111',
+   'IND', 'IN-LA', 'Leh', 'mountain', '2026-05-12', '2026-05-22', 0,
+   'Acclimatised two days before heading to Khardung La.'),
+  ('a0000001-0000-4000-8000-000000000002', '11111111-1111-1111-1111-111111111111',
+   'IND', 'IN-UT', 'Rishikesh', 'other', '2025-07-19', '2025-07-26', 0, ''),
+  ('a0000001-0000-4000-8000-000000000003', '11111111-1111-1111-1111-111111111111',
+   'IND', 'IN-GA', 'Goa', 'beach', '2024-12-21', '2024-12-30', 0, ''),
+  ('a0000001-0000-4000-8000-000000000004', '11111111-1111-1111-1111-111111111111',
+   'IND', 'IN-WB', 'Kolkata', 'city', '2023-10-18', '2023-10-24', 0, ''),
+
+  -- Japan
+  ('a0000001-0000-4000-8000-000000000005', '11111111-1111-1111-1111-111111111111',
+   'JPN', 'JP-13', 'Tokyo', 'city', '2025-04-01', '2025-04-06', 0, ''),
+  ('a0000001-0000-4000-8000-000000000005', '11111111-1111-1111-1111-111111111111',
+   'JPN', 'JP-26', 'Kyoto', 'city', '2025-04-06', '2025-04-11', 1, ''),
+  ('a0000001-0000-4000-8000-000000000005', '11111111-1111-1111-1111-111111111111',
+   'JPN', 'JP-27', 'Osaka', 'city', '2025-04-11', '2025-04-14', 2,
+   'The late bloom that saved the trip.'),
+
+  -- Nepal
+  ('a0000001-0000-4000-8000-000000000006', '11111111-1111-1111-1111-111111111111',
+   'NPL', 'NP-P4', 'Pokhara', 'mountain', '2024-03-09', '2024-03-24', 0, ''),
+  ('a0000001-0000-4000-8000-000000000007', '11111111-1111-1111-1111-111111111111',
+   'NPL', 'NP-P3', 'Kathmandu', 'city', '2022-11-04', '2022-11-08', 0, ''),
+
+  -- Thailand
+  ('a0000001-0000-4000-8000-000000000008', '11111111-1111-1111-1111-111111111111',
+   'THA', 'TH-10', 'Bangkok', 'city', '2023-02-11', '2023-02-18', 0, ''),
+  ('a0000001-0000-4000-8000-000000000009', '11111111-1111-1111-1111-111111111111',
+   'THA', 'TH-50', 'Chiang Mai', 'city', '2024-08-03', '2024-08-12', 0, ''),
+
+  -- UAE
+  ('a0000001-0000-4000-8000-000000000010', '11111111-1111-1111-1111-111111111111',
+   'ARE', 'AE-DU', 'Dubai', 'city', '2025-01-16', '2025-01-18', 0, ''),
+
+  -- Singapore (ongoing -> 'current')
+  ('a0000001-0000-4000-8000-000000000011', '11111111-1111-1111-1111-111111111111',
+   'SGP', '', 'Singapore', 'city', '2026-08-08', '2026-08-15', 0, ''),
+
+  -- Bhutan (planning -> 'planned')
+  ('a0000001-0000-4000-8000-000000000012', '11111111-1111-1111-1111-111111111111',
+   'BTN', 'BT-11', 'Paro', 'mountain', '2026-11-02', '2026-11-07', 0, ''),
+  ('a0000001-0000-4000-8000-000000000012', '11111111-1111-1111-1111-111111111111',
+   'BTN', 'BT-15', 'Thimphu', 'city', '2026-11-07', '2026-11-12', 1, '');
+
+-- ---------------------------------------------------------------------------
+-- Memories — what the globe's region modal shows under a country
+-- ---------------------------------------------------------------------------
+
+insert into public.memories (user_id, trip_id, kind, body, happened_at, order_index)
+values
+  ('11111111-1111-1111-1111-111111111111', 'a0000001-0000-4000-8000-000000000001',
+   'note', 'Khardung La at 5,359m. Colder than the forecast promised, and worth every minute.',
+   '2026-05-14 09:20+05:30', 0),
+  ('11111111-1111-1111-1111-111111111111', 'a0000001-0000-4000-8000-000000000001',
+   'favorite_location', 'Pangong Tso at first light, before the day-trippers arrive.',
+   '2026-05-18 06:05+05:30', 1),
+  ('11111111-1111-1111-1111-111111111111', 'a0000001-0000-4000-8000-000000000002',
+   'quote', '"The river does not hurry, yet it arrives." Painted on a wall near Laxman Jhula.',
+   '2025-07-22 17:40+05:30', 0),
+  ('11111111-1111-1111-1111-111111111111', 'a0000001-0000-4000-8000-000000000005',
+   'note', 'Missed peak bloom in Tokyo by four days. Osaka was still holding on.',
+   '2025-04-12 11:15+09:00', 0),
+  ('11111111-1111-1111-1111-111111111111', 'a0000001-0000-4000-8000-000000000006',
+   'note', 'Base camp at 4,130m in light snow. Ten of us in the dining hall, nobody talking.',
+   '2024-03-19 16:50+05:45', 0),
+  ('11111111-1111-1111-1111-111111111111', 'a0000001-0000-4000-8000-000000000008',
+   'note', 'Boat noodles at Victory Monument — four bowls each, and still the cheapest meal of the trip.',
+   '2023-02-13 13:30+07:00', 0),
+  ('11111111-1111-1111-1111-111111111111', 'a0000001-0000-4000-8000-000000000011',
+   'note', 'Tiong Bahru market before the 9am standup. Kaya toast is now the routine.',
+   '2026-08-10 07:45+08:00', 0);
+
+-- ---------------------------------------------------------------------------
+-- Blog posts
+-- ---------------------------------------------------------------------------
+
+insert into public.blog_posts (
+  user_id, trip_id, title, slug, content_html, excerpt,
+  reading_minutes, visibility, published_at
+)
+values
+  ('11111111-1111-1111-1111-111111111111', 'a0000001-0000-4000-8000-000000000001',
+   'Five passes, one very tired clutch hand', 'five-passes-one-tired-clutch-hand',
+   '<p>Manali to Leh is not a hard ride so much as a long one. The altitude does the work the gradient does not.</p><p>We budgeted two days to acclimatise in Leh and used both of them properly, which is the only reason the rest of the trip happened.</p>',
+   'Manali to Leh over five passes, what we got right, and the one thing we would change.',
+   7, 'public', now() - interval '2 months'),
+
+  ('11111111-1111-1111-1111-111111111111', 'a0000001-0000-4000-8000-000000000005',
+   'How to miss the cherry blossom and still have a good time', 'how-to-miss-the-cherry-blossom',
+   '<p>Sakura forecasts are a genre of fiction. We arrived in Tokyo four days after peak and spent a week chasing the bloom south.</p><p>Osaka, improbably, delivered.</p>',
+   'Chasing a bloom that had already moved on, and why the chase was the better trip.',
+   5, 'public', now() - interval '15 months'),
+
+  ('11111111-1111-1111-1111-111111111111', 'a0000001-0000-4000-8000-000000000006',
+   'Dal bhat power, twenty-four hour', 'dal-bhat-power-twenty-four-hour',
+   '<p>Eleven days up. Four back down. One meal, repeated, that somehow never got old.</p>',
+   'What eleven days on the Annapurna trail teaches you about pacing.',
+   9, 'public', now() - interval '28 months'),
+
+  ('11111111-1111-1111-1111-111111111111', null,
+   'Packing list, sixth revision', 'packing-list-sixth-revision',
+   '<p>Still a draft. Still too heavy.</p>',
+   'The list I keep rewriting and never actually follow.',
+   3, 'private', null);
+
+-- ---------------------------------------------------------------------------
+-- Wishlist
+--
+-- Paints 'planned' on the globe wherever no trip already claims the region,
+-- via the same refresh trigger.
+-- ---------------------------------------------------------------------------
+
+insert into public.wishlist_items (
+  user_id, country_code, region_code, title, notes, est_budget, currency, priority, best_season
+)
+values
+  ('11111111-1111-1111-1111-111111111111', 'ISL', null, 'Iceland ring road',
+   'Two weeks, camper van, ideally with a northern lights window.', 450000, 'INR', 1, 'Sep-Mar'),
+  ('11111111-1111-1111-1111-111111111111', 'GEO', null, 'Georgia and Svaneti',
+   'Tbilisi for a few days, then the mountains.', 180000, 'INR', 2, 'Jun-Sep'),
+  ('11111111-1111-1111-1111-111111111111', 'VNM', null, 'Vietnam north to south',
+   'Trains the whole way if the timings work.', 160000, 'INR', 3, 'Oct-Apr');
+
+-- ---------------------------------------------------------------------------
+-- Safety net
+--
+-- The triggers above rebuild visited_regions row by row. Running the refresh
+-- once more at the end guarantees a consistent aggregate regardless of the
+-- order rows happened to land in.
+-- ---------------------------------------------------------------------------
+
+select public.refresh_visited_regions('11111111-1111-1111-1111-111111111111');
