@@ -25,10 +25,16 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'outline'> = {
 
 function TripCard({ trip }: { trip: TripListItem }) {
   return (
-    <Card className="h-full">
+    <Card className="h-full transition-colors hover:border-foreground/20">
       <CardContent className="flex h-full flex-col gap-2 p-4">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="leading-tight font-medium">{trip.title}</h3>
+          <h3 className="leading-tight font-medium">
+            {/* Stretched link: the whole card is the target, but only the title
+                lands in the accessibility tree as the link text. */}
+            <Link href={`/trips/${trip.id}`} className="after:absolute after:inset-0">
+              {trip.title}
+            </Link>
+          </h3>
           <Badge variant={STATUS_VARIANT[trip.status] ?? 'outline'} className="shrink-0 capitalize">
             {trip.status}
           </Badge>
@@ -75,7 +81,8 @@ function TripGrid({ trips }: { trips: TripListItem[] }) {
   return (
     <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {trips.map((trip) => (
-        <li key={trip.id}>
+        // `relative` anchors the stretched link inside the card.
+        <li key={trip.id} className="relative">
           <TripCard trip={trip} />
         </li>
       ))}

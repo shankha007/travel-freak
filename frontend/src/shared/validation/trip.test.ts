@@ -119,9 +119,9 @@ describe('createTripSchema', () => {
 
   it('turns an empty budget into null and parses a filled one', () => {
     expect(createTripSchema.safeParse(validInput()).data?.budgetPlanned).toBeNull()
-    expect(createTripSchema.safeParse(validInput({ budgetPlanned: '45000' })).data?.budgetPlanned).toBe(
-      45000
-    )
+    expect(
+      createTripSchema.safeParse(validInput({ budgetPlanned: '45000' })).data?.budgetPlanned
+    ).toBe(45000)
   })
 
   it('rejects a negative budget', () => {

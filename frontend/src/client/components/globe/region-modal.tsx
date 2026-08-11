@@ -182,13 +182,16 @@ export function RegionModal({ countryCode, detail, isLoading, onClose }: RegionM
                   Read the blog
                 </Button>
               )}
+              {/* Points at the trip rather than /vault: the Memory Vault is not
+                  built, and a dead link is worse than a slightly broader one.
+                  Move this back once the vault exists. */}
               <Button
                 size="sm"
                 variant="outline"
                 nativeButton={false}
-                render={<Link href={`/trips/${detail.trips[0].id}/vault`} />}
+                render={<Link href={`/trips/${detail.trips[0].id}`} />}
               >
-                View gallery
+                View trip
               </Button>
             </div>
           )}

@@ -24,12 +24,12 @@ Last updated: 2026-08-11
 | Public / marketing | 1 | 1 | 0 | 8 |
 | Auth | 1 | 0 | 0 | 4 |
 | Dashboard & globe | 3 | 1 | 2 | 0 |
-| Trips & planner | 1 | 1 | 0 | 5 |
+| Trips & planner | 1 | 2 | 0 | 4 |
 | Memory & content | 0 | 0 | 1 | 4 |
 | Analytics & resume | 0 | 0 | 2 | 2 |
 | Public sharing | 0 | 0 | 0 | 3 |
 | Account | 0 | 0 | 1 | 5 |
-| **Total** | **15** | **3** | **6** | **35** |
+| **Total** | **15** | **4** | **6** | **34** |
 
 ---
 
@@ -98,7 +98,7 @@ Last updated: 2026-08-11
 |---|---|---|---|
 | 18 | **My Trips** `/trips` | ✅ Done | Tabs All/Past/Ongoing/Upcoming/Drafts with counts, flags, places, visibility |
 | 19 | **Create trip** `/trips/new` | 🟡 Partial | 4-step wizard (basics → dates → places → visibility), quota-gated, writes trip + places. **No map picker or cover image** — both need screens that do not exist yet |
-| 20 | Trip details `/trips/[id]` | ⬜ Not started | Dashboard activity links here and **currently 404s** |
+| 20 | **Trip details** `/trips/[id]` | 🟡 Partial | Hero, stats, route timeline, memories, linked blogs, gallery counts, details panel. **No route map** (no coordinates stored) and **no edit/delete** |
 | 21 | Itinerary builder | ⬜ Not started | Tables not yet migrated |
 | 22 | Budget planner | ⬜ Not started | `expenses` table not yet migrated |
 | 23 | Packing / checklists | ⬜ Not started | Phase 1.1 |
@@ -162,10 +162,11 @@ Last updated: 2026-08-11
 
 ## Known gaps worth fixing next
 
-1. **Trips can be created but not edited or deleted.** There is no `/trips/[id]`, so a
-   typo in a title is permanent through the UI. Trip detail + edit is the next screen.
-2. **Three links 404**: `/register`, `/trips/[id]`, `/b/[slug]`. All are linked from
-   shipped screens — `/register` from both the landing page and login.
+1. **Trips can be created and read, but not edited or deleted.** A typo in a title is
+   permanent through the UI, and there is no soft-delete path despite `deleted_at`
+   existing on the table. Edit + delete on `/trips/[id]` is the next step.
+2. **Two links still 404**: `/register` (linked from the landing page and login) and
+   `/b/[slug]` (linked from the region modal when a trip has a blog).
 3. **No map picker on create.** Places are country + free-text city, so `trip_places.location`
    (the PostGIS point) is left null. Distance-travelled and nearest-city snapping cannot be
    computed until the world map screen lands and supplies coordinates.
