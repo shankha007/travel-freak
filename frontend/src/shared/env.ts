@@ -20,12 +20,22 @@ const publicSchema = z.object({
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z
     .string()
     .min(1, { error: 'NEXT_PUBLIC_SUPABASE_ANON_KEY is required' }),
-  // Optional: the maps fall back to drawing polygons on a plain background when
-  // there is no tile key, which is a usable map rather than an error screen.
+  // Optional: the maps draw their own basemap from the theme when there is no
+  // tile key, which is a designed map rather than an error screen.
+  //
+  // The unset case is not only "" — `.env.local.example` ships the line as
+  // `NEXT_PUBLIC_MAPTILER_KEY=""`, and dotenv hands that through as two literal
+  // quote characters. Truthy, so the app spent every map load requesting tiles
+  // with a key MapTiler answers 403 to, and the fallback that exists for
+  // precisely this case never ran. Anything that is not a plausible key is
+  // treated as absent.
   NEXT_PUBLIC_MAPTILER_KEY: z
     .string()
     .optional()
-    .transform((v) => (v ? v : undefined)),
+    .transform((v) => {
+      const cleaned = v?.trim().replace(/^['"]|['"]$/g, '') ?? ''
+      return cleaned.length > 0 ? cleaned : undefined
+    }),
 })
 
 let cachedPublicEnv: z.infer<typeof publicSchema> | null = null

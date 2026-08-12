@@ -60,3 +60,47 @@ export function lineWidthExpression(
 ): ExpressionSpecification {
   return ['case', ['boolean', ['feature-state', 'hover'], false], hoverWidth, baseWidth]
 }
+
+/**
+ * The soft halo drawn just inside a region's border.
+ *
+ * Only regions with data get one — a glow on all 195 countries is a blur, not an
+ * accent — and the one under the cursor gets more of it, which is what makes the
+ * map feel like it is responding rather than repainting.
+ */
+export function glowOpacityExpression(
+  hoverOpacity = 0.55,
+  baseOpacity = 0.28
+): ExpressionSpecification {
+  return [
+    'case',
+    ['==', ['coalesce', ['feature-state', 'region'], 'unvisited'], 'unvisited'],
+    0,
+    ['boolean', ['feature-state', 'hover'], false],
+    hoverOpacity,
+    baseOpacity,
+  ]
+}
+
+/**
+ * Border colour that follows the region's own state.
+ *
+ * A single grey stroke over every polygon is what made the fills read as flat
+ * paper. A visited country outlined in its own colour reads as one object.
+ */
+export function lineColorExpression(
+  colors: Record<RegionState, string>,
+  unvisited: string
+): ExpressionSpecification {
+  return [
+    'match',
+    ['coalesce', ['feature-state', 'region'], 'unvisited'],
+    'visited',
+    colors.visited,
+    'current',
+    colors.current,
+    'planned',
+    colors.planned,
+    unvisited,
+  ]
+}

@@ -35,9 +35,9 @@ export default async function IndiaMapPage() {
   const indiaRegions = regions.filter((r) => r.countryCode === FREE_ADMIN1_COUNTRY)
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 p-4 md:p-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">India</h1>
+    <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 md:p-4">
+      <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-1">
+        <h1 className="text-xl font-semibold tracking-tight">India</h1>
         <p className="text-sm text-muted-foreground">
           {indiaRegions.length > 0
             ? 'State by state. Free on every plan, including the states you have not reached yet.'

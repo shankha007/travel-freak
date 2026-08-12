@@ -42,12 +42,14 @@ export default async function WorldMapPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 p-4 md:p-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">World map</h1>
+    /* Tight padding and a one-line header: the map is the screen, and every
+       pixel spent on chrome above it is a pixel not spent on the world. */
+    <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 md:p-4">
+      <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-1">
+        <h1 className="text-xl font-semibold tracking-tight">World map</h1>
         <p className="text-sm text-muted-foreground">
-          The same places as the globe, flat and zoomable. Toggle a layer to see one state at a
-          time.
+          The same places as the globe, flat and zoomable. Hover a country, or open one from the
+          list.
         </p>
       </header>
 

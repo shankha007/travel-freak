@@ -3,7 +3,6 @@ import Link from 'next/link'
 import {
   ArrowRight,
   BookOpen,
-  Check,
   Globe2,
   Heart,
   Images,
@@ -14,7 +13,7 @@ import {
 import { BRAND, pageTitle } from '@/shared/brand'
 import { DEMO_REGIONS } from '@/client/features/globe/fixtures'
 import { HeroGlobe } from '@/client/components/globe/hero-globe'
-import { ThemeToggle } from '@/client/components/theme-toggle'
+import { MarketingFooter, MarketingHeader } from '@/client/components/marketing/chrome'
 import { RegionLegend } from '@/client/components/globe/region-legend'
 import { Button } from '@/client/components/ui/button'
 import { Card, CardContent } from '@/client/components/ui/card'
@@ -58,64 +57,10 @@ const FEATURES = [
   },
 ]
 
-const PLANS = [
-  {
-    name: 'Explorer',
-    price: '₹0',
-    cadence: 'free forever',
-    highlights: [
-      '15 trips',
-      '5 photos per trip',
-      '3D globe, country level',
-      'Unlimited blogs and notes',
-      'Travel resume',
-    ],
-  },
-  {
-    name: 'Voyager',
-    price: '₹399',
-    cadence: 'per month',
-    featured: true,
-    highlights: [
-      'Unlimited trips',
-      '200 photos per trip · 30 GB',
-      'States and provinces on the globe',
-      'Full itinerary and budget',
-      '3 collaborators per trip',
-    ],
-  },
-  {
-    name: 'Nomad',
-    price: '₹799',
-    cadence: 'per month',
-    highlights: [
-      '500 photos per trip · 100 GB',
-      'Video and audio diaries',
-      'City pins, routes, timeline playback',
-      'Unlimited collaborators',
-      'Photobook and media export',
-    ],
-  },
-]
-
 export default function Home() {
   return (
     <div className="flex flex-1 flex-col">
-      <header className="flex h-14 shrink-0 items-center justify-between px-4 md:px-6">
-        <span className="font-semibold tracking-tight">{BRAND.name}</span>
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" nativeButton={false} render={<Link href="/changelog" />}>
-            Changelog
-          </Button>
-          <ThemeToggle />
-          <Button variant="ghost" nativeButton={false} render={<Link href="/login" />}>
-            Sign in
-          </Button>
-          <Button nativeButton={false} render={<Link href="/register" />}>
-            Get started
-          </Button>
-        </div>
-      </header>
+      <MarketingHeader />
 
       <main className="flex flex-1 flex-col">
         {/* Hero */}
@@ -189,78 +134,41 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Pricing */}
+        {/* Pricing lives at /pricing. What belongs here is the one sentence that
+            answers "can I afford this?", and a door to the page that details it —
+            the tiers themselves were three cards of small print between the
+            reader and the sign-up button. */}
         <section className="border-t">
-          <div className="mx-auto w-full max-w-6xl px-4 py-16 md:px-6">
-            <h2 className="text-2xl font-semibold tracking-tight">Simple pricing</h2>
-            <p className="mt-2 max-w-2xl text-muted-foreground">
-              The globe and unlimited writing are free. You pay for photos, storage and
-              collaboration — the parts that cost us money.
-            </p>
+          <div className="mx-auto flex w-full max-w-6xl flex-col items-start gap-6 px-4 py-16 md:flex-row md:items-center md:justify-between md:px-6">
+            <div>
+              <h2 className="font-heading text-2xl font-semibold tracking-tight">
+                Free where it counts
+              </h2>
+              <p className="mt-2 max-w-xl text-muted-foreground">
+                The globe, unlimited blogs and your travel resume cost nothing, forever. You pay
+                only for photos, storage and collaboration — the parts that cost us money.
+              </p>
+            </div>
 
-            <ul className="mt-8 grid gap-4 lg:grid-cols-3">
-              {PLANS.map((plan) => (
-                <li key={plan.name}>
-                  <Card className={plan.featured ? 'h-full border-primary' : 'h-full'}>
-                    <CardContent className="flex h-full flex-col gap-4 p-5">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-medium">{plan.name}</h3>
-                          {plan.featured && <Badge>Most popular</Badge>}
-                        </div>
-                        <p className="mt-2">
-                          <span className="text-3xl font-semibold tabular-nums">{plan.price}</span>{' '}
-                          <span className="text-sm text-muted-foreground">{plan.cadence}</span>
-                        </p>
-                      </div>
-
-                      <ul className="space-y-2 text-sm">
-                        {plan.highlights.map((h) => (
-                          <li key={h} className="flex items-start gap-2">
-                            <Check
-                              className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                              aria-hidden
-                            />
-                            {h}
-                          </li>
-                        ))}
-                      </ul>
-
-                      <Button
-                        variant={plan.featured ? 'default' : 'outline'}
-                        className="mt-auto w-full"
-                        nativeButton={false}
-                        render={<Link href="/register" />}
-                      >
-                        {plan.name === 'Explorer' ? 'Start free' : `Choose ${plan.name}`}
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </li>
-              ))}
-            </ul>
+            <div className="flex shrink-0 flex-wrap gap-3">
+              <Button size="lg" nativeButton={false} render={<Link href="/pricing" />}>
+                See the plans
+                <ArrowRight className="size-4" aria-hidden />
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                nativeButton={false}
+                render={<Link href="/register" />}
+              >
+                Start free
+              </Button>
+            </div>
           </div>
         </section>
       </main>
 
-      <footer className="border-t">
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-sm text-muted-foreground md:px-6">
-          <p>
-            {BRAND.name} — {BRAND.tagline}
-          </p>
-          <nav className="flex gap-4">
-            <Link href="/changelog" className="hover:text-foreground">
-              Changelog
-            </Link>
-            <Link href="/login" className="hover:text-foreground">
-              Sign in
-            </Link>
-            <Link href="/globe" className="hover:text-foreground">
-              Globe
-            </Link>
-          </nav>
-        </div>
-      </footer>
+      <MarketingFooter />
     </div>
   )
 }

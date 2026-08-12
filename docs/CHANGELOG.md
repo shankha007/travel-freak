@@ -86,6 +86,19 @@ their own line — nobody outside the repo ever saw them.
   the existing signed-upload route and inserts the photo at the cursor. What lands
   in the post is an EXIF-stripped WebP copy, generated at upload time: the
   original keeps its metadata and is never what a reader sees.
+- **Pricing has its own page** `/pricing` — the plans, a monthly/annual switch
+  that shows what paying for the year actually saves, and a full comparison
+  table. Every number on it is read from the `plans` row the server enforces
+  against, so the page and the quota that stops you uploading cannot disagree —
+  the old copy was hand-written on the landing page and free to drift. Linked
+  from the marketing nav and from every upgrade prompt inside the app, which
+  used to point at a settings screen that says nothing about plans.
+- **Six themes** — Light and Dark as before, plus **Ocean** (deep blue on cool
+  paper), **Sunset** (terracotta on sand), **Midnight** (indigo) and **Forest**
+  (deep green). Pick one from the palette menu in the header. Each retunes the
+  globe and the maps as well as the interface, and keeps the four region states
+  tellable apart: on Sunset "planned" moves off amber, because amber on sand is
+  not a distinction.
 - **Changelog parser** `shared/content/changelog.ts` — turns the markdown into
   typed releases, sections and inline segments, and throws on a malformed entry
   rather than rendering it wrong. Covered by unit tests plus a test that parses
@@ -114,8 +127,39 @@ their own line — nobody outside the repo ever saw them.
   re-encode. The cap is deliberate: each conversion is real work, and doing all
   of them at once would trade a slow page for a stalled server.
 
+- **The maps are the screen now.** `/maps/world` and `/maps/india` used to put a
+  420px-tall map next to a 320px list, which on a laptop made the sidebar bigger
+  than the world. The map now fills the page and everything else floats over it
+  as glass: the layer legend, the zoom control, and a places panel that opens
+  beside the map on a wide screen, over it on a phone, and closes either way.
+  The world is fitted to the space it can actually use, so it is no longer
+  centred underneath the panel.
+- **The map draws itself.** Land, coastlines and sea come from the theme rather
+  than from a tile server, so a build with no MapTiler key gets a designed map
+  instead of polygons floating in nothing — and the whole thing re-colours with
+  the palette. Countries you have been to carry a soft halo in their own state
+  colour, and the one under the cursor lifts its border.
+- **Pricing left the landing page**, which now says the one thing that belongs
+  there — the globe is free — and links to `/pricing` for the rest.
+
 ### Fixed
 
+- **A stripe ran across the world map.** Russia and Fiji arrive from Natural
+  Earth as rings holding both -180° and +180°, and a renderer joins those two
+  points the only way it can: straight across the map. It was always there,
+  hiding under a 25%-opacity wash; drawing land properly made it a band through
+  the Pacific. The build now splits such rings at the antimeridian into pieces
+  that each stay in one hemisphere. Antarctica is deliberately left whole — its
+  ring encircles a pole, and the line along the bottom of the map is how
+  Mercator is supposed to draw that.
+- **The map asked for tiles it could never get.** `NEXT_PUBLIC_MAPTILER_KEY=""`
+  reaches the app as two literal quote characters, which is truthy — so every
+  map load requested a basemap with a key the tile server answers 403 to, and
+  the built-in fallback that exists for exactly this case never ran.
+- **The zoom control was a white brick on dark themes**, because MapLibre's own
+  stylesheet is unlayered and beat ours whatever we set. It is glass now, in
+  whichever palette you are using, and it no longer sits under the places panel
+  on a phone.
 - **A trip's cover photo could vanish from its own page.** The hero was matched
   against the six photos the gallery card shows, so a cover chosen early and
   followed by six newer photos left the page with no image — while the vault
@@ -192,6 +236,16 @@ their own line — nobody outside the repo ever saw them.
   that preserves input order, with unit tests. Used for image derivatives.
 - `useLazyComponent()` replaces four near-identical copies of the effect-driven
   dynamic import behind the globe and the maps.
+- `shared/themes.ts` is the one list of palettes; `themes.test.ts` reads
+  `globals.css` and fails when a dark palette is missing from the `dark` variant
+  or from the shared dark base, which would otherwise ship as a palette with
+  every `dark:` utility stuck on its light value.
+- `scripts/lib/antimeridian.mjs` — unwrap, clip and split, with 20 unit tests.
+  The vitest config now covers `scripts/` for it: a wrong clip is a stripe
+  across the map, and nothing else would have caught it.
+- The four marketing pages share one `MarketingHeader` and `MarketingFooter`
+  instead of a copy each, which is what let the pricing link appear on all of
+  them at once.
 
 ## 0.11.0 — 2026-08-12 — Public trip pages and share links
 

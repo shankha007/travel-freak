@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url'
 import { feature } from 'topojson-client'
 import countries from 'i18n-iso-countries'
 import mapshaper from 'mapshaper'
+import { splitFeatureCollection } from './lib/antimeridian.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const outDir = resolve(here, '../public/geo')
@@ -42,6 +43,11 @@ for (const f of geo.features) {
   delete f.id
 }
 
+// Russia, Fiji and Antarctica arrive as rings holding both -180 and +180, which
+// a renderer draws as a segment straight across the map. Split them into pieces
+// that each stay in one hemisphere. See scripts/lib/antimeridian.mjs.
+const repaired = splitFeatureCollection(geo)
+
 mkdirSync(outDir, { recursive: true })
 const outFile = resolve(outDir, 'countries-110m.geo.json')
 writeFileSync(outFile, JSON.stringify(geo))
@@ -51,6 +57,9 @@ console.log(
   `Wrote ${geo.features.length} countries to public/geo/countries-110m.geo.json ` +
     `(${(bytes / 1024).toFixed(0)} KB)`
 )
+if (repaired > 0) {
+  console.log(`  Split ${repaired} feature(s) that crossed the antimeridian.`)
+}
 if (missing > 0) {
   // Natural Earth includes a few entities without an ISO code (e.g. N. Cyprus,
   // Somaliland). They render in the unvisited state and are not clickable.

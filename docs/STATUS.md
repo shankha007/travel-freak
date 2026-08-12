@@ -31,7 +31,7 @@ open, revoke and pull-back.
 | Area | Done | Partial | Stub | Not started |
 |---|---|---|---|---|
 | Infrastructure | 16 | 0 | 0 | 3 |
-| Public / marketing | 2 | 1 | 0 | 7 |
+| Public / marketing | 3 | 0 | 0 | 7 |
 | Auth | 5 | 0 | 0 | 2 |
 | Dashboard & globe | 5 | 2 | 0 | 0 |
 | Trips & planner | 5 | 1 | 0 | 4 |
@@ -39,7 +39,7 @@ open, revoke and pull-back.
 | Analytics & resume | 1 | 0 | 1 | 2 |
 | Public sharing | 5 | 0 | 0 | 0 |
 | Account | 0 | 0 | 1 | 6 |
-| **Total** | **43** | **5** | **4** | **24** |
+| **Total** | **44** | **4** | **4** | **24** |
 
 ---
 
@@ -72,7 +72,7 @@ open, revoke and pull-back.
 | # | Feature | Status | Notes |
 |---|---|---|---|
 | 1 | **Landing** `/` | ✅ Done | Hero with live demo globe, 6 feature cards, 3 pricing tiers, CTA |
-| 3 | Pricing | 🟡 Partial | Rendered on the landing page from hardcoded copy, not from `plans.limits`; no `/pricing` route or annual toggle |
+| 3 | **Pricing** `/pricing` | ✅ Done | Own route, read from `plans` — cards, monthly/annual toggle with the real saving, and a comparison table whose every cell is a function of `limits`, so it cannot drift from what `entitlements.ts` enforces. Landing keeps one line and a link; every in-app upgrade prompt points here |
 | 2 | Features `/features` | ⬜ Not started | |
 | 4 | Public blogs `/blogs` | ⬜ Not started | Marketing index, distinct from the authenticated `/blogs` |
 | 5 | About | ⬜ Not started | Phase 1.1 |
@@ -103,7 +103,7 @@ open, revoke and pull-back.
 | 15 | **Country/region modal** | ✅ Done | Trips, memories, dates, cities; deep-linkable `?region=IND` |
 | — | Globe region-detail paywall | ✅ Done | `showRegionDetail` from `planCode`, decided server-side |
 | — | Dashboard globe preview | 🟡 Partial | Query exists (`getGlobePreviewRegions`); card links to `/globe` instead of embedding |
-| 16 | **World map** `/maps/world` | 🟡 Partial | MapLibre 2D, country fills joined by `feature-state`, hover tooltip, click-through to the region modal, layer toggles for visited/current/planned, and the same keyboard-navigable region list as the globe. Subdivisions are gated on `globe_region_detail` and lazy-loaded per visited country. **Filters for year, continent and trip type are not built** |
+| 16 | **World map** `/maps/world` | 🟡 Partial | MapLibre 2D filling the page, with a basemap it draws itself — land, coastline and sea from the palette, no tile key needed. Country fills joined by `feature-state`, a halo on regions with data, hover lift, click-through to the region modal, layer toggles, and a floating places panel that is the keyboard-navigable equivalent. Subdivisions are gated on `globe_region_detail` and lazy-loaded only for the nine countries that have data. **Filters for year, continent and trip type are not built** |
 | 17 | **India map** `/maps/india` | ✅ Done | All 36 states and union territories, free on every plan, fitted to the country on load |
 
 ## Trips & planner
@@ -169,7 +169,7 @@ open, revoke and pull-back.
 | Feature | Status | Notes |
 |---|---|---|
 | Sidebar + mobile bottom nav | ✅ Done | Driven by `shared/navigation.ts`; stubs marked "soon" |
-| Light/dark toggle | ✅ Done | |
+| Theme picker | ✅ Done | Six palettes plus System, from `shared/themes.ts`. Dark palettes join the `dark` variant in `globals.css`, which `themes.test.ts` enforces; each retunes the region-state and map colours, not just the chrome |
 | Skeleton loaders | 🟡 Partial | Globe and login only |
 | Empty states | 🟡 Partial | Globe, trips, dashboard activity |
 | Command palette (⌘K) | ⬜ Not started | |

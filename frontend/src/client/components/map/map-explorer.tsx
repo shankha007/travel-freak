@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Lock, MapIcon } from 'lucide-react'
+import { Lock, MapIcon, X } from 'lucide-react'
 import type { RegionDetail, VisitedRegion } from '@/shared/types/globe'
 import { rollUpToCountries } from '@/shared/types/globe'
 import { REGION_STATES, REGION_STATE_META, type RegionState } from '@/shared/geo/region-state'
@@ -14,6 +14,7 @@ import { Button } from '@/client/components/ui/button'
 import { Skeleton } from '@/client/components/ui/skeleton'
 import { cn } from '@/shared/utils'
 import { useLazyComponent } from '@/client/hooks/use-lazy-component'
+import { useMediaQuery } from '@/client/hooks/use-media-query'
 
 interface MapExplorerProps {
   regions: VisitedRegion[]
@@ -47,6 +48,13 @@ export function MapExplorer({
   const [detail, setDetail] = useState<{ forCountry: string; data: RegionDetail | null } | null>(
     null
   )
+  // Open where there is room beside the map, closed where it would *be* the map
+  // — until the reader says otherwise, after which their choice sticks. That
+  // "default from the viewport, overridable" is why this is not a CSS
+  // breakpoint: `null` means nobody has expressed a preference yet.
+  const wideEnough = useMediaQuery('(min-width: 64rem)')
+  const [panelPreference, setPanelPreference] = useState<boolean | null>(null)
+  const panelOpen = panelPreference ?? wideEnough
 
   // Country mode shows one country's subdivisions; world mode shows them for
   // every country the user has actually been to, which is what keeps the
@@ -119,71 +127,99 @@ export function MapExplorer({
     )
   }, [])
 
+  const visitedCount = useMemo(
+    () => listRegions.filter((r) => r.state === 'visited' || r.state === 'current').length,
+    [listRegions]
+  )
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
-      <div className="relative flex min-h-[420px] flex-1 overflow-hidden rounded-xl border lg:min-h-0">
-        {MapView ? (
-          <MapView
-            regions={displayRegions}
-            admin1Countries={admin1Countries}
-            visibleStates={visibleStates}
-            onSelectCountry={selectCountry}
-            focusCountry={focusCountry}
-            className="absolute inset-0"
-          />
-        ) : failed ? (
-          <p className="m-auto max-w-xs px-6 text-center text-sm text-muted-foreground">
-            The map could not load. Your places are still listed alongside.
-          </p>
-        ) : (
-          <Skeleton className="absolute inset-0" />
-        )}
+    /* The map is the screen, not a panel on it: it fills the content area, and
+       everything else floats over it as glass. The places list used to take a
+       fixed 320px column beside a 420px-tall box, which left the actual map
+       smaller than the sidebar on a laptop. */
+    <div className="relative min-h-[32rem] flex-1 overflow-hidden rounded-2xl border shadow-sm">
+      {MapView ? (
+        <MapView
+          regions={displayRegions}
+          admin1Countries={admin1Countries}
+          visibleStates={visibleStates}
+          onSelectCountry={selectCountry}
+          focusCountry={focusCountry}
+          // The floating panel's width plus its margins, so the world is framed
+          // in the part of the map that is actually visible.
+          insetRight={panelOpen ? 316 : 0}
+          className="absolute inset-0"
+        />
+      ) : failed ? (
+        <p className="absolute inset-0 m-auto flex max-w-xs items-center justify-center px-6 text-center text-sm text-muted-foreground">
+          The map could not load. Your places are still listed alongside.
+        </p>
+      ) : (
+        <Skeleton className="absolute inset-0" />
+      )}
 
-        {/* Layer toggles double as the legend: each chip names its state, so the
-            colour is never the only thing carrying meaning. */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-wrap items-end justify-between gap-2 p-3">
-          <fieldset className="pointer-events-auto rounded-lg bg-white/90 px-3 py-2 backdrop-blur dark:bg-black/70">
-            <legend className="sr-only">Layers</legend>
-            <div className="flex flex-wrap gap-3">
-              {TOGGLEABLE.map((state) => {
-                const meta = REGION_STATE_META[state]
-                const checked = visibleStates.includes(state)
-                return (
-                  <label
-                    key={state}
-                    className="flex cursor-pointer items-center gap-1.5 text-xs select-none"
-                    title={meta.description}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleState(state)}
-                      className="size-3.5 accent-current"
-                    />
-                    <span
-                      className={cn(
-                        'size-2.5 rounded-full',
-                        meta.fillClass,
-                        !checked && 'opacity-30'
-                      )}
-                      aria-hidden
-                    />
-                    <span className={cn(!checked && 'text-muted-foreground line-through')}>
-                      {meta.label}
-                    </span>
-                  </label>
-                )
-              })}
-            </div>
-          </fieldset>
+      {/* Layer toggles double as the legend: each chip names its state, so the
+          colour is never the only thing carrying meaning. */}
+      <fieldset className="absolute bottom-3 left-3 z-10 rounded-xl border border-border/60 bg-card/80 px-3 py-2 shadow-lg backdrop-blur-md">
+        <legend className="sr-only">Layers</legend>
+        <div className="flex flex-wrap gap-3">
+          {TOGGLEABLE.map((state) => {
+            const meta = REGION_STATE_META[state]
+            const checked = visibleStates.includes(state)
+            return (
+              <label
+                key={state}
+                className="flex cursor-pointer items-center gap-1.5 text-xs select-none"
+                title={meta.description}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggleState(state)}
+                  className="size-3.5 accent-primary"
+                />
+                <span
+                  className={cn('size-2.5 rounded-full', meta.fillClass, !checked && 'opacity-30')}
+                  aria-hidden
+                />
+                <span className={cn(!checked && 'text-muted-foreground line-through')}>
+                  {meta.label}
+                </span>
+              </label>
+            )
+          })}
         </div>
-      </div>
+      </fieldset>
 
-      <aside className="flex min-h-0 shrink-0 flex-col gap-3 lg:w-80">
-        <h2 className="flex items-center gap-2 text-sm font-semibold">
-          <MapIcon className="size-4" aria-hidden />
-          Your places
-        </h2>
+      {/* The places panel. Open on a wide screen, where there is room beside the
+          map; closed on a phone, where it would be the map. Either way it is the
+          keyboard-navigable equivalent of the polygons, so it is always in the
+          DOM and always reachable — the button moves it, it does not create it. */}
+      <div
+        className={cn(
+          'absolute top-3 right-3 bottom-3 z-10 flex w-[19rem] max-w-[calc(100%-1.5rem)] flex-col gap-3',
+          'rounded-xl border border-border/60 bg-card/85 p-3 shadow-xl backdrop-blur-md',
+          'transition-transform duration-200 motion-reduce:transition-none',
+          panelOpen ? 'translate-x-0' : 'pointer-events-none translate-x-[calc(100%+0.75rem)]'
+        )}
+        // Hidden from assistive tech only when it is actually off-screen; the
+        // region list below is a duplicate of the map's content, not extra.
+        aria-hidden={!panelOpen}
+        inert={!panelOpen}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="flex items-center gap-2 text-sm font-semibold">
+            <MapIcon className="size-4" aria-hidden />
+            Your places
+            <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs font-normal tabular-nums">
+              {visitedCount}
+            </span>
+          </h2>
+          <Button variant="ghost" size="icon" onClick={() => setPanelPreference(false)}>
+            <X className="size-4" aria-hidden />
+            <span className="sr-only">Hide the places panel</span>
+          </Button>
+        </div>
 
         {/* The upgrade path, stated where the missing feature would appear rather
             than as a modal wall. India is free, so the country map never shows it. */}
@@ -197,12 +233,12 @@ export function MapExplorer({
               Your map fills in whole countries. Voyager adds state and province detail everywhere —
               the India map is free on every plan.
             </p>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
                 variant="outline"
                 nativeButton={false}
-                render={<Link href="/settings" />}
+                render={<Link href="/pricing" />}
               >
                 See plans
               </Button>
@@ -224,7 +260,19 @@ export function MapExplorer({
           onSelectCountry={selectCountry}
           className="min-h-0 flex-1"
         />
-      </aside>
+      </div>
+
+      {!panelOpen && (
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setPanelPreference(true)}
+          className="absolute top-3 right-3 z-10 gap-1.5 border border-border/60 bg-card/85 shadow-lg backdrop-blur-md"
+        >
+          <MapIcon className="size-4" aria-hidden />
+          Your places
+        </Button>
+      )}
 
       <RegionModal
         countryCode={selected}

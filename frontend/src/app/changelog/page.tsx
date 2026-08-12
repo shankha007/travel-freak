@@ -10,7 +10,7 @@ import {
   type Release,
 } from '@/shared/content/changelog'
 import { cn } from '@/shared/utils'
-import { ThemeToggle } from '@/client/components/theme-toggle'
+import { MarketingFooter, MarketingHeader } from '@/client/components/marketing/chrome'
 import { ReleaseIndex } from '@/client/components/changelog/release-index'
 import { ReleaseTimeline } from '@/client/components/changelog/release-timeline'
 import { Button } from '@/client/components/ui/button'
@@ -109,20 +109,7 @@ export default async function ChangelogPage() {
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="flex h-14 shrink-0 items-center justify-between px-4 md:px-6">
-        <Link href="/" className="font-semibold tracking-tight">
-          {BRAND.name}
-        </Link>
-        <div className="flex items-center gap-1">
-          <ThemeToggle />
-          <Button variant="ghost" nativeButton={false} render={<Link href="/login" />}>
-            Sign in
-          </Button>
-          <Button nativeButton={false} render={<Link href="/register" />}>
-            Get started
-          </Button>
-        </div>
-      </header>
+      <MarketingHeader current="/changelog" />
 
       <main className="flex-1">
         {/* Hero. The gradient is the same sky-to-slate pair as the landing globe,
@@ -170,24 +157,7 @@ export default async function ChangelogPage() {
         </div>
       </main>
 
-      <footer className="border-t">
-        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-sm text-muted-foreground md:px-6">
-          <p>
-            {BRAND.name} — {BRAND.tagline}
-          </p>
-          <nav className="flex gap-4">
-            <Link href="/" className="hover:text-foreground">
-              Home
-            </Link>
-            <Link href="/login" className="hover:text-foreground">
-              Sign in
-            </Link>
-            <Link href="/globe" className="hover:text-foreground">
-              Globe
-            </Link>
-          </nav>
-        </div>
-      </footer>
+      <MarketingFooter />
     </div>
   )
 }

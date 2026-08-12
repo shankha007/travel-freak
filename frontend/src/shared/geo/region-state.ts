@@ -102,8 +102,18 @@ export function toRgba(cssColor: string, alpha = 1): string {
  * re-read after a theme change.
  */
 export function resolveRegionStateColor(state: RegionState, alpha = 1): string {
+  return resolveThemeColor(REGION_STATE_META[state].cssVar, alpha)
+}
+
+/**
+ * The same resolution for any theme token, for the map's own surfaces.
+ *
+ * MapLibre paint properties take concrete colours, and the tokens are authored
+ * in oklch, so `--map-land` needs the same canvas round-trip a region colour
+ * does. Callers must re-read after a theme change.
+ */
+export function resolveThemeColor(cssVar: string, alpha = 1): string {
   if (typeof window === 'undefined') return `rgba(0, 0, 0, ${alpha})`
-  const { cssVar } = REGION_STATE_META[state]
   const raw = getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim()
   return toRgba(raw, alpha)
 }

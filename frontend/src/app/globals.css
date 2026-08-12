@@ -2,7 +2,11 @@
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 
-@custom-variant dark (&:is(.dark *));
+/* Every dark-family theme, not just `.dark`. A palette listed in
+   shared/themes.ts with mode 'dark' must appear here too, or its pages keep the
+   light value of every `dark:` utility on a dark background. themes.test.ts
+   fails when the two lists disagree. */
+@custom-variant dark (&:is(.dark *, .theme-midnight *, .theme-forest *));
 
 @theme inline {
   --color-background: var(--background);
@@ -66,6 +70,15 @@
   --color-globe-current-foreground: var(--globe-current-foreground);
   --color-globe-planned-foreground: var(--globe-planned-foreground);
   --color-globe-unvisited-foreground: var(--globe-unvisited-foreground);
+
+  /* The 2D map's own surfaces: sea, landmass and coastline. Read by
+     shared/geo/map-style.ts, which builds the basemap out of them so the map is
+     part of the theme rather than a grey rectangle inside it. */
+  --color-map-water: var(--map-water);
+  --color-map-water-deep: var(--map-water-deep);
+  --color-map-land: var(--map-land);
+  --color-map-coast: var(--map-coast);
+  --color-map-graticule: var(--map-graticule);
 }
 
 :root {
@@ -112,6 +125,15 @@
   --change-removed: oklch(0.52 0.16 25);
   --change-security: oklch(0.52 0.13 200);
   --change-infra: oklch(0.48 0.03 240);
+
+  /* Map surfaces. The sea is a touch cooler and darker than the page so the
+     coastline reads without a stroke doing all the work. */
+  --map-water: oklch(0.95 0.021 232);
+  --map-water-deep: oklch(0.9 0.035 235);
+  --map-land: oklch(0.985 0.003 220);
+  --map-coast: oklch(0.72 0.02 220);
+  --map-graticule: oklch(0.88 0.012 225);
+
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -122,7 +144,12 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
-.dark {
+/* The dark base. Every dark palette starts here and then overrides only the
+   handful of variables that make it that palette, so a change to the neutral
+   dark surface reaches all of them. */
+.dark,
+.theme-midnight,
+.theme-forest {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -164,6 +191,14 @@
   --change-removed: oklch(0.75 0.15 25);
   --change-security: oklch(0.78 0.11 200);
   --change-infra: oklch(0.75 0.03 240);
+
+  /* Night sea: dark enough that a landmass reads as lighter, not louder. */
+  --map-water: oklch(0.24 0.028 240);
+  --map-water-deep: oklch(0.19 0.03 245);
+  --map-land: oklch(0.32 0.012 220);
+  --map-coast: oklch(0.48 0.02 220);
+  --map-graticule: oklch(0.3 0.02 235);
+
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -172,6 +207,181 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+}
+
+/* ---------------------------------------------------------------------------
+   Palettes
+   ---------------------------------------------------------------------------
+   Each block overrides only what makes it itself: the light ones sit on top of
+   `:root`, the dark ones on top of the dark base above. Region-state colours are
+   re-tuned per palette because the map and globe are the product — `visited`
+   staying green on a green background would be the one place a theme could
+   destroy meaning rather than just change the mood.
+
+   The four states must stay tellable apart in every palette. They are also
+   always labelled in words next to the colour; see shared/geo/region-state.ts.
+   --------------------------------------------------------------------------- */
+
+.theme-ocean {
+  --background: oklch(0.99 0.005 240);
+  --card: oklch(1 0.003 240);
+  --popover: oklch(1 0.003 240);
+  --primary: oklch(0.5 0.145 250);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.96 0.014 245);
+  --secondary-foreground: oklch(0.26 0.06 250);
+  --muted: oklch(0.96 0.012 240);
+  --muted-foreground: oklch(0.52 0.03 245);
+  --accent: oklch(0.94 0.03 245);
+  --accent-foreground: oklch(0.3 0.08 250);
+  --border: oklch(0.9 0.015 240);
+  --input: oklch(0.9 0.015 240);
+  --ring: oklch(0.5 0.145 250);
+  --chart-1: oklch(0.52 0.15 250);
+  --chart-2: oklch(0.62 0.13 200);
+  --chart-3: oklch(0.66 0.14 160);
+  --chart-4: oklch(0.6 0.15 300);
+  --chart-5: oklch(0.68 0.14 90);
+
+  /* Current-trip blue would vanish into an all-blue map, so it moves to violet
+     and visited keeps the green. */
+  --globe-visited: oklch(0.62 0.15 162);
+  --globe-current: oklch(0.58 0.19 300);
+  --globe-planned: oklch(0.72 0.15 70);
+  --globe-unvisited: oklch(0.88 0.015 240);
+  --globe-planned-foreground: oklch(0.26 0.05 70);
+  --globe-unvisited-foreground: oklch(0.42 0.02 240);
+
+  --map-water: oklch(0.93 0.035 240);
+  --map-water-deep: oklch(0.86 0.055 243);
+  --map-land: oklch(0.98 0.006 240);
+  --map-coast: oklch(0.68 0.04 245);
+  --map-graticule: oklch(0.86 0.025 240);
+}
+
+.theme-sunset {
+  --background: oklch(0.99 0.008 70);
+  --card: oklch(1 0.005 70);
+  --popover: oklch(1 0.005 70);
+  --primary: oklch(0.57 0.16 40);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.96 0.02 65);
+  --secondary-foreground: oklch(0.3 0.07 40);
+  --muted: oklch(0.96 0.015 65);
+  --muted-foreground: oklch(0.52 0.035 50);
+  --accent: oklch(0.94 0.04 60);
+  --accent-foreground: oklch(0.34 0.09 40);
+  --border: oklch(0.9 0.02 60);
+  --input: oklch(0.9 0.02 60);
+  --ring: oklch(0.57 0.16 40);
+  --chart-1: oklch(0.6 0.16 40);
+  --chart-2: oklch(0.68 0.15 75);
+  --chart-3: oklch(0.6 0.15 15);
+  --chart-4: oklch(0.62 0.13 160);
+  --chart-5: oklch(0.55 0.14 300);
+
+  /* Planned amber sits too close to the warm ground, so it moves to violet. */
+  --globe-visited: oklch(0.6 0.15 158);
+  --globe-current: oklch(0.58 0.17 250);
+  --globe-planned: oklch(0.6 0.17 320);
+  --globe-unvisited: oklch(0.89 0.018 65);
+  --globe-planned-foreground: oklch(0.99 0 0);
+  --globe-unvisited-foreground: oklch(0.42 0.03 60);
+
+  --map-water: oklch(0.94 0.025 220);
+  --map-water-deep: oklch(0.88 0.04 225);
+  --map-land: oklch(0.98 0.012 70);
+  --map-coast: oklch(0.7 0.04 55);
+  --map-graticule: oklch(0.88 0.02 60);
+}
+
+.theme-midnight {
+  --background: oklch(0.17 0.025 275);
+  --foreground: oklch(0.96 0.01 275);
+  --card: oklch(0.22 0.03 275);
+  --card-foreground: oklch(0.96 0.01 275);
+  --popover: oklch(0.22 0.03 275);
+  --popover-foreground: oklch(0.96 0.01 275);
+  --primary: oklch(0.72 0.15 285);
+  --primary-foreground: oklch(0.18 0.05 285);
+  --secondary: oklch(0.29 0.035 275);
+  --secondary-foreground: oklch(0.96 0.01 275);
+  --muted: oklch(0.28 0.03 275);
+  --muted-foreground: oklch(0.73 0.03 275);
+  --accent: oklch(0.33 0.055 285);
+  --accent-foreground: oklch(0.94 0.03 285);
+  --border: oklch(0.85 0.05 285 / 14%);
+  --input: oklch(0.85 0.05 285 / 18%);
+  --ring: oklch(0.72 0.15 285);
+  --chart-1: oklch(0.72 0.15 285);
+  --chart-2: oklch(0.72 0.14 200);
+  --chart-3: oklch(0.75 0.14 155);
+  --chart-4: oklch(0.72 0.15 340);
+  --chart-5: oklch(0.78 0.14 85);
+
+  --globe-visited: oklch(0.72 0.16 160);
+  --globe-current: oklch(0.72 0.15 250);
+  --globe-planned: oklch(0.8 0.15 80);
+  --globe-unvisited: oklch(0.33 0.03 275);
+  --globe-unvisited-foreground: oklch(0.8 0.02 275);
+
+  --map-water: oklch(0.22 0.04 268);
+  --map-water-deep: oklch(0.17 0.045 272);
+  --map-land: oklch(0.31 0.03 278);
+  --map-coast: oklch(0.5 0.06 282);
+  --map-graticule: oklch(0.3 0.04 275);
+
+  --sidebar: oklch(0.2 0.028 275);
+  --sidebar-foreground: oklch(0.96 0.01 275);
+  --sidebar-accent: oklch(0.27 0.035 275);
+  --sidebar-accent-foreground: oklch(0.96 0.01 275);
+  --sidebar-border: oklch(0.85 0.05 285 / 14%);
+}
+
+.theme-forest {
+  --background: oklch(0.18 0.022 160);
+  --foreground: oklch(0.95 0.012 160);
+  --card: oklch(0.23 0.026 160);
+  --card-foreground: oklch(0.95 0.012 160);
+  --popover: oklch(0.23 0.026 160);
+  --popover-foreground: oklch(0.95 0.012 160);
+  --primary: oklch(0.72 0.14 162);
+  --primary-foreground: oklch(0.17 0.04 162);
+  --secondary: oklch(0.29 0.03 160);
+  --secondary-foreground: oklch(0.95 0.012 160);
+  --muted: oklch(0.28 0.026 160);
+  --muted-foreground: oklch(0.73 0.028 160);
+  --accent: oklch(0.33 0.045 162);
+  --accent-foreground: oklch(0.93 0.03 162);
+  --border: oklch(0.85 0.05 162 / 14%);
+  --input: oklch(0.85 0.05 162 / 18%);
+  --ring: oklch(0.72 0.14 162);
+  --chart-1: oklch(0.72 0.14 162);
+  --chart-2: oklch(0.76 0.14 110);
+  --chart-3: oklch(0.74 0.13 200);
+  --chart-4: oklch(0.76 0.15 75);
+  --chart-5: oklch(0.7 0.14 300);
+
+  /* Green ground: visited moves to a bright lime that reads against it, and
+     the sea stays teal rather than competing with the land. */
+  --globe-visited: oklch(0.83 0.18 130);
+  --globe-current: oklch(0.72 0.14 235);
+  --globe-planned: oklch(0.8 0.15 65);
+  --globe-unvisited: oklch(0.32 0.025 160);
+  --globe-visited-foreground: oklch(0.2 0.05 130);
+  --globe-unvisited-foreground: oklch(0.8 0.02 160);
+
+  --map-water: oklch(0.23 0.033 205);
+  --map-water-deep: oklch(0.18 0.035 208);
+  --map-land: oklch(0.3 0.028 160);
+  --map-coast: oklch(0.48 0.05 175);
+  --map-graticule: oklch(0.29 0.03 180);
+
+  --sidebar: oklch(0.21 0.024 160);
+  --sidebar-foreground: oklch(0.95 0.012 160);
+  --sidebar-accent: oklch(0.27 0.03 160);
+  --sidebar-accent-foreground: oklch(0.95 0.012 160);
+  --sidebar-border: oklch(0.85 0.05 162 / 14%);
 }
 
 @layer base {
@@ -202,6 +412,73 @@
    The Placeholder extension only sets `data-placeholder` on the empty node —
    showing it is the stylesheet's job. `pointer-events: none` keeps a click on
    the hint from landing anywhere but the editor. */
+/* MapLibre's own chrome.
+   The library ships white boxes with a hard border, which is a 2015 map on a
+   themed page — on a dark palette it is a white brick floating over a night
+   sea. These rules restyle the zoom control and attribution to the app's
+   tokens.
+
+   Deliberately outside `@layer` and written with the `.maplibregl-map`
+   ancestor: maplibre-gl.css is imported by the map component at runtime and is
+   unlayered, and an unlayered rule beats a layered one whatever its
+   specificity. Two class selectors is how these win instead. */
+.maplibregl-map .maplibregl-ctrl-group {
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+  background: color-mix(in oklch, var(--card) 80%, transparent);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 6px 20px -8px oklch(0 0 0 / 0.35);
+  overflow: hidden;
+}
+
+.maplibregl-map .maplibregl-ctrl-group button {
+  width: 2rem;
+  height: 2rem;
+  background: transparent;
+}
+
+.maplibregl-map .maplibregl-ctrl-group button + button {
+  border-top: 1px solid color-mix(in oklch, var(--border) 60%, transparent);
+}
+
+.maplibregl-map .maplibregl-ctrl-group button:hover:not(:disabled) {
+  background: color-mix(in oklch, var(--accent) 70%, transparent);
+}
+
+.maplibregl-map .maplibregl-ctrl-group button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+  box-shadow: none;
+}
+
+/* The control glyphs are inline SVG with a baked-in dark fill, invisible on a
+   dark theme. Inverting them on the dark palettes is the one-line fix. */
+.dark .maplibregl-map .maplibregl-ctrl-icon,
+.theme-midnight .maplibregl-map .maplibregl-ctrl-icon,
+.theme-forest .maplibregl-map .maplibregl-ctrl-icon {
+  filter: invert(1) brightness(1.6);
+}
+
+.maplibregl-map .maplibregl-ctrl-attrib {
+  border-radius: var(--radius-md);
+  background: color-mix(in oklch, var(--card) 75%, transparent);
+  backdrop-filter: blur(6px);
+  color: var(--muted-foreground);
+  font-size: 10px;
+}
+
+.maplibregl-map .maplibregl-ctrl-attrib a {
+  color: var(--muted-foreground);
+}
+
+/* On a phone the legend runs the width of the map, and the zoom control lands
+   on top of its last chip. Lift the bottom-right controls clear of it. */
+@media (width < 40rem) {
+  .maplibregl-map .maplibregl-ctrl-bottom-right {
+    margin-bottom: 2.75rem;
+  }
+}
+
 @layer components {
   .tiptap p.is-editor-empty:first-child::before {
     content: attr(data-placeholder);

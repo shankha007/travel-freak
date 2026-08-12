@@ -273,7 +273,7 @@ export function PhotoUploader({
             size="sm"
             variant="outline"
             nativeButton={false}
-            render={<Link href="/settings" />}
+            render={<Link href="/pricing" />}
           >
             See plans
           </Button>
