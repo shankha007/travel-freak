@@ -41,6 +41,8 @@ export interface BlogDraft {
   readingMinutes: number
   publishedAt: string | null
   updatedAt: string
+  /** Active share token, when the author has created one. */
+  shareToken: string | null
 }
 
 /** One option in the studio's "which trip is this about?" picker. */
@@ -104,6 +106,17 @@ export async function getBlogDraft(id: string): Promise<BlogDraft | null> {
 
   if (!data) return null
 
+  // Owner-only by RLS, which is what the share panel needs. Fetched after the
+  // post rather than alongside it: there is nothing to look up until the post
+  // is known to exist and be this user's.
+  const { data: share } = await supabase
+    .from('share_links')
+    .select('token')
+    .eq('post_id', id)
+    .is('revoked_at', null)
+    .limit(1)
+    .maybeSingle()
+
   return {
     id: data.id,
     title: data.title,
@@ -118,6 +131,7 @@ export async function getBlogDraft(id: string): Promise<BlogDraft | null> {
     readingMinutes: data.reading_minutes,
     publishedAt: data.published_at,
     updatedAt: data.updated_at,
+    shareToken: share?.token ?? null,
   }
 }
 

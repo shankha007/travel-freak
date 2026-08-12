@@ -88,3 +88,15 @@ export const ALL_COUNTRIES: CountryOption[] = Object.entries(
 export function isKnownCountry(alpha3: string): boolean {
   return countries.alpha3ToAlpha2(alpha3) !== undefined
 }
+
+/**
+ * Alpha-2 to the alpha-3 every table stores.
+ *
+ * Geocoders answer in alpha-2, so the conversion has to happen somewhere; it
+ * happens here, next to the rest of the code knowledge, rather than in whichever
+ * component is talking to a provider today.
+ */
+export function alpha2ToAlpha3(alpha2: string | null | undefined): string | null {
+  if (!alpha2 || alpha2.length !== 2) return null
+  return countries.alpha2ToAlpha3(alpha2.toUpperCase()) ?? null
+}

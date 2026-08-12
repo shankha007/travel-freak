@@ -6,6 +6,7 @@ import { createClient } from '@/server/supabase/server'
 import { requireUser } from '@/server/auth'
 import { checkTripQuota } from '@/server/entitlements'
 import { slugify, updateTripSchema } from '@/shared/validation/trip'
+import { toPointEwkt } from '@/shared/geo/point'
 import type { CreateTripValues } from '@/shared/validation/trip'
 
 export interface CreateTripState {
@@ -29,6 +30,19 @@ function candidateSlugs(title: string): string[] {
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * The `location` value for one submitted place.
+ *
+ * Null when the writer set no pin, which is also how a pin is removed: the
+ * update writes null and PostGIS forgets it, rather than the old coordinate
+ * quietly outliving the place it described.
+ */
+function locationOf(place: CreateTripValues['places'][number]): string | null {
+  return place.lng !== null && place.lat !== null
+    ? toPointEwkt({ lng: place.lng, lat: place.lat })
+    : null
+}
 
 type ParseResult = { ok: true; values: CreateTripValues } | { ok: false; state: CreateTripState }
 
@@ -142,6 +156,7 @@ export async function createTrip(
       country_code: place.countryCode,
       region_code: place.regionCode || null,
       city_name: place.cityName || null,
+      location: locationOf(place),
       arrival_date: values.startDate,
       departure_date: values.endDate,
       order_index: index,
@@ -278,6 +293,7 @@ async function syncPlaces(tripId: string, values: CreateTripValues): Promise<str
         country_code: place.countryCode,
         region_code: place.regionCode || null,
         city_name: place.cityName || null,
+        location: locationOf(place),
         order_index: index,
       })
       .eq('id', place.id as string)
@@ -299,6 +315,7 @@ async function syncPlaces(tripId: string, values: CreateTripValues): Promise<str
         country_code: place.countryCode,
         region_code: place.regionCode || null,
         city_name: place.cityName || null,
+        location: locationOf(place),
         // New places inherit the trip's dates, matching what create does.
         arrival_date: values.startDate,
         departure_date: values.endDate,
@@ -363,5 +380,62 @@ export async function deleteTrip(
   revalidatePath('/trips')
   revalidatePath('/globe')
   revalidatePath('/dashboard')
+  revalidatePath('/trash')
   redirect('/trips')
+}
+
+export interface RestoreTripResult {
+  ok: boolean
+  error?: string
+  /** Set when the refusal is a plan limit, so the UI can offer an upgrade. */
+  quotaExceeded?: boolean
+}
+
+/**
+ * Restores a soft-deleted trip.
+ *
+ * The quota check is the interesting part. Deleting a trip frees a slot, so
+ * someone at their limit can delete one trip and create another — which means a
+ * restore can be the write that takes them over. It is refused here rather than
+ * silently allowed, because the alternative is an account quietly over its plan
+ * with no screen able to explain why.
+ *
+ * `restore_trip()` enforces the 30-day window; this does not re-check it. One
+ * copy of that rule, in the place that does the write.
+ */
+export async function restoreTrip(tripId: string): Promise<RestoreTripResult> {
+  await requireUser()
+
+  if (!UUID_RE.test(tripId)) {
+    return { ok: false, error: 'Something went wrong. Please try again.' }
+  }
+
+  const quota = await checkTripQuota()
+  if (!quota.allowed) {
+    return {
+      ok: false,
+      error: `Restoring this trip would put you over your plan's ${quota.limit} trips. Upgrade, or delete another trip first — this one stays in the trash either way.`,
+      quotaExceeded: true,
+    }
+  }
+
+  const supabase = await createClient()
+  const { data: restored, error } = await supabase.rpc('restore_trip', { p_trip_id: tripId })
+
+  if (error) {
+    return { ok: false, error: `Could not restore the trip: ${error.message}` }
+  }
+
+  // False means the function matched nothing: not yours, not deleted, or past
+  // the retention window. The screen only offers trips inside the window, so in
+  // practice this is a race with the window closing.
+  if (!restored) {
+    return { ok: false, error: 'That trip can no longer be restored.' }
+  }
+
+  revalidatePath('/trips')
+  revalidatePath('/globe')
+  revalidatePath('/dashboard')
+  revalidatePath('/trash')
+  return { ok: true }
 }

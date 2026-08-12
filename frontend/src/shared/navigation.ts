@@ -134,6 +134,18 @@ export const NAV_ITEMS: NavItem[] = [
     screen: 39,
     summary: 'Profile, account and security, privacy including the EXIF-strip toggle.',
   },
+  {
+    href: '/trash',
+    label: 'Trash',
+    icon: 'Trash2',
+    status: 'live',
+    phase: 'M',
+    screen: 18,
+    summary: 'Trips deleted in the last 30 days, and the button that brings one back.',
+    // Reached from a delete dialog or from Settings, not from the sidebar: a bin
+    // does not deserve permanent billing next to the globe.
+    secondary: true,
+  },
 ]
 
 /** Sidebar entries, in order. */

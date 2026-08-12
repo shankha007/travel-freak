@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/server/supabase/server'
 import { getSessionUser } from '@/server/auth'
-import { checkPhotoQuota } from '@/server/entitlements'
-import { MAX_UPLOAD_BYTES, isAllowedImageMime, storagePath } from '@/shared/media'
+import { checkPhotoQuota, checkStorageQuota } from '@/server/entitlements'
+import { MAX_UPLOAD_BYTES, isAllowedImageMime, postImagePath, storagePath } from '@/shared/media'
 
 /**
  * Issues a short-lived signed upload URL for one photo.
@@ -19,11 +19,26 @@ import { MAX_UPLOAD_BYTES, isAllowedImageMime, storagePath } from '@/shared/medi
  * under-reports gains nothing but a rejected upload.
  */
 
-const signRequest = z.object({
-  tripId: z.uuid(),
-  mime: z.string().min(1),
-  bytes: z.number().int().positive().max(MAX_UPLOAD_BYTES),
-})
+/**
+ * Exactly one target, and the union is what enforces it.
+ *
+ * A trip photo is capped per trip *and* against the pool; an image inside a post
+ * belongs to no trip, so only the pool applies. Accepting both ids in one object
+ * would leave a request that names neither — and one that names both — as
+ * something this handler had to decide about at runtime.
+ */
+const signRequest = z.union([
+  z.object({
+    tripId: z.uuid(),
+    mime: z.string().min(1),
+    bytes: z.number().int().positive().max(MAX_UPLOAD_BYTES),
+  }),
+  z.object({
+    postId: z.uuid(),
+    mime: z.string().min(1),
+    bytes: z.number().int().positive().max(MAX_UPLOAD_BYTES),
+  }),
+])
 
 export async function POST(request: Request) {
   const user = await getSessionUser()
@@ -46,7 +61,9 @@ export async function POST(request: Request) {
     )
   }
 
-  const { tripId, mime, bytes } = parsed.data
+  const { mime, bytes } = parsed.data
+  const tripId = 'tripId' in parsed.data ? parsed.data.tripId : null
+  const postId = 'postId' in parsed.data ? parsed.data.postId : null
 
   if (!isAllowedImageMime(mime)) {
     return NextResponse.json(
@@ -59,20 +76,32 @@ export async function POST(request: Request) {
 
   // Ownership, not just readability: a collaborator on someone else's trip must
   // not be able to spend the owner's storage, and RLS on `trips` would happily
-  // return a public trip belonging to a stranger.
-  const { data: trip } = await supabase
-    .from('trips')
-    .select('id')
-    .eq('id', tripId)
-    .eq('user_id', user.id)
-    .is('deleted_at', null)
-    .maybeSingle()
+  // return a public trip belonging to a stranger. The same reasoning applies to
+  // a post, which RLS will return to anyone once it is published.
+  const owned = tripId
+    ? await supabase
+        .from('trips')
+        .select('id')
+        .eq('id', tripId)
+        .eq('user_id', user.id)
+        .is('deleted_at', null)
+        .maybeSingle()
+    : await supabase
+        .from('blog_posts')
+        .select('id')
+        .eq('id', postId as string)
+        .eq('user_id', user.id)
+        .is('deleted_at', null)
+        .maybeSingle()
 
-  if (!trip) {
-    return NextResponse.json({ error: 'That trip is not yours to add photos to.' }, { status: 404 })
+  if (!owned.data) {
+    return NextResponse.json(
+      { error: tripId ? 'That trip is not yours to add photos to.' : 'That post is not yours.' },
+      { status: 404 }
+    )
   }
 
-  const quota = await checkPhotoQuota(tripId, bytes)
+  const quota = tripId ? await checkPhotoQuota(tripId, bytes) : await checkStorageQuota(bytes)
   if (!quota.allowed) {
     // 402 rather than 403: this is a plan limit, not a permission problem, and
     // the uploader shows an upgrade card rather than an error.
@@ -85,7 +114,9 @@ export async function POST(request: Request) {
   // The media id is minted here so the storage key and the future row agree,
   // and so a client cannot choose its own path inside another user's folder.
   const mediaId = crypto.randomUUID()
-  const path = storagePath(user.id, tripId, mediaId, mime)
+  const path = tripId
+    ? storagePath(user.id, tripId, mediaId, mime)
+    : postImagePath(user.id, postId as string, mediaId, mime)
 
   const { data, error } = await supabase.storage.from('media').createSignedUploadUrl(path)
 

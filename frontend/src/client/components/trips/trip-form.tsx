@@ -3,10 +3,21 @@
 import { useActionState, useMemo, useState } from 'react'
 import { useFormStatus } from 'react-dom'
 import Link from 'next/link'
-import { AlertCircle, ArrowLeft, ArrowRight, Loader2, Plus, Sparkles, Trash2 } from 'lucide-react'
+import {
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  Loader2,
+  MapPin,
+  Plus,
+  Sparkles,
+  Trash2,
+} from 'lucide-react'
 import { createTrip, updateTrip, type CreateTripState } from '@/server/actions/trips'
 import { TRIP_STATUSES, TRIP_TYPES, VISIBILITIES, suggestStatus } from '@/shared/validation/trip'
 import { ALL_COUNTRIES, countryFlag, countryName } from '@/shared/geo/countries'
+import { formatLngLat } from '@/shared/geo/point'
+import { PlacePicker } from '@/client/components/trips/place-picker'
 import { Button } from '@/client/components/ui/button'
 import { Input } from '@/client/components/ui/input'
 import { Label } from '@/client/components/ui/label'
@@ -31,6 +42,9 @@ interface PlaceDraft {
   countryCode: string
   regionCode: string
   cityName: string
+  /** Set from the map picker. Null means the place has no pin, which is allowed. */
+  lng: number | null
+  lat: number | null
 }
 
 function emptyPlace(): PlaceDraft {
@@ -39,6 +53,8 @@ function emptyPlace(): PlaceDraft {
     countryCode: '',
     regionCode: '',
     cityName: '',
+    lng: null,
+    lat: null,
   }
 }
 
@@ -53,7 +69,14 @@ export interface TripFormInitial {
   status: string
   visibility: string
   budgetPlanned: string
-  places: { id: string; countryCode: string; regionCode: string; cityName: string }[]
+  places: {
+    id: string
+    countryCode: string
+    regionCode: string
+    cityName: string
+    lng: number | null
+    lat: number | null
+  }[]
 }
 
 function SubmitButton({ disabled, label }: { disabled: boolean; label: string }) {
@@ -111,6 +134,8 @@ export function TripForm({
   const [places, setPlaces] = useState<PlaceDraft[]>(
     initial?.places.length ? initial.places.map((p) => ({ key: p.id, ...p })) : [emptyPlace()]
   )
+  /** Key of the place whose map picker is open, or null. One at a time. */
+  const [pickerFor, setPickerFor] = useState<string | null>(null)
 
   // Derived unless the user has overridden it — someone logging last year's
   // trip should not have to fight the form, but the common case is automatic.
@@ -136,6 +161,8 @@ export function TripForm({
           countryCode: p.countryCode,
           regionCode: p.regionCode,
           cityName: p.cityName,
+          lng: p.lng,
+          lat: p.lat,
         })),
       }),
     [
@@ -160,6 +187,30 @@ export function TripForm({
   ]
 
   const err = (path: string) => state.fieldErrors?.[path]
+
+  const picking = places.find((p) => p.key === pickerFor) ?? null
+
+  /** Applies a picked pin to one place, filling in what it can. */
+  const applyPin = (
+    key: string,
+    pick: { lng: number; lat: number; countryCode: string | null; cityName: string | null }
+  ) =>
+    setPlaces((prev) =>
+      prev.map((p) =>
+        p.key === key
+          ? {
+              ...p,
+              lng: pick.lng,
+              lat: pick.lat,
+              // The map knows the country under the pin, and a search result
+              // knows the city. Neither overwrites something already typed —
+              // the writer's own words win over a provider's.
+              countryCode: p.countryCode || (pick.countryCode ?? ''),
+              cityName: p.cityName || (pick.cityName ?? ''),
+            }
+          : p
+      )
+    )
 
   return (
     <form action={formAction} className="space-y-6">
@@ -344,7 +395,7 @@ export function TripForm({
                 </p>
               </div>
 
-              <ul className="space-y-3">
+              <ul className="space-y-4">
                 {places.map((place, i) => (
                   <li key={place.key} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
                     <div className="space-y-1">
@@ -400,6 +451,30 @@ export function TripForm({
                         <Trash2 className="size-4" aria-hidden />
                       </Button>
                     </div>
+
+                    {/* The pin. Optional, and the copy says what it buys rather
+                        than nagging: an unpinned place still paints the globe. */}
+                    <div className="flex flex-wrap items-center gap-2 sm:col-span-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPickerFor(place.key)}
+                      >
+                        <MapPin className="size-3.5" aria-hidden />
+                        {hasPin(place) ? 'Move pin' : 'Set on map'}
+                      </Button>
+
+                      {hasPin(place) ? (
+                        <span className="text-xs text-muted-foreground tabular-nums">
+                          {formatLngLat({ lng: place.lng as number, lat: place.lat as number })}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          No coordinates — distance stays unmeasured
+                        </span>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -415,10 +490,13 @@ export function TripForm({
               </Button>
 
               {err('places') && <p className="text-sm text-destructive">{err('places')}</p>}
+              {err('places.0.lat') && (
+                <p className="text-sm text-destructive">{err('places.0.lat')}</p>
+              )}
 
               <p className="text-xs text-muted-foreground">
-                A map picker with search and coordinates comes with the world map screen. For now
-                country and city are enough to paint the globe.
+                Pins are optional. With them, the trip gets a measured distance and its photos can
+                be matched to places; without them, the country still fills in.
               </p>
             </>
           )}
@@ -550,6 +628,35 @@ export function TripForm({
           )}
         </div>
       </div>
+
+      {/* One picker for the whole list. Rendering it per row would mount a
+          MapLibre instance per place, which is a lot of WebGL for one dialog. */}
+      {picking && (
+        <PlacePicker
+          open={pickerFor !== null}
+          onOpenChange={(open) => !open && setPickerFor(null)}
+          initial={
+            picking.lng !== null && picking.lat !== null
+              ? { lng: picking.lng, lat: picking.lat }
+              : null
+          }
+          label={
+            picking.cityName ||
+            (picking.countryCode ? countryName(picking.countryCode) : 'this place')
+          }
+          onPick={(pick) => applyPin(picking.key, pick)}
+          onClear={() =>
+            setPlaces((prev) =>
+              prev.map((p) => (p.key === picking.key ? { ...p, lng: null, lat: null } : p))
+            )
+          }
+        />
+      )}
     </form>
   )
+}
+
+/** True when a draft place carries a complete coordinate. */
+function hasPin(place: PlaceDraft): boolean {
+  return place.lng !== null && place.lat !== null
 }

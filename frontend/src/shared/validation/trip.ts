@@ -20,22 +20,38 @@ const optionalDate = z
   .refine((v) => v === '' || /^\d{4}-\d{2}-\d{2}$/.test(v), { error: 'Use the date picker' })
   .transform((v) => (v === '' ? null : v))
 
-export const tripPlaceSchema = z.object({
-  /**
-   * Present only when editing. Rows are matched on it so an edit updates the
-   * places that already exist rather than replacing them — memories are pinned
-   * to `trip_place_id`, and a delete-and-reinsert would unpin every one.
-   */
-  id: z.uuid().optional(),
-  countryCode: z
-    .string()
-    .trim()
-    .length(3, { error: 'Pick a country' })
-    .refine(isKnownCountry, { error: 'That is not a country code we recognise' }),
-  /** ISO 3166-2, e.g. 'IN-KA'. Optional — country-level is a valid trip. */
-  regionCode: z.string().trim().max(10).optional().default(''),
-  cityName: z.string().trim().max(120).optional().default(''),
-})
+export const tripPlaceSchema = z
+  .object({
+    /**
+     * Present only when editing. Rows are matched on it so an edit updates the
+     * places that already exist rather than replacing them — memories are pinned
+     * to `trip_place_id`, and a delete-and-reinsert would unpin every one.
+     */
+    id: z.uuid().optional(),
+    countryCode: z
+      .string()
+      .trim()
+      .length(3, { error: 'Pick a country' })
+      .refine(isKnownCountry, { error: 'That is not a country code we recognise' }),
+    /** ISO 3166-2, e.g. 'IN-KA'. Optional — country-level is a valid trip. */
+    regionCode: z.string().trim().max(10).optional().default(''),
+    cityName: z.string().trim().max(120).optional().default(''),
+    /**
+     * The pin, when the writer set one on the map.
+     *
+     * Optional on purpose: a country and a city name are still a valid place, and
+     * demanding a coordinate would make logging an old trip harder than
+     * remembering it. What coordinates unlock is distance travelled and the vault's
+     * map — both of which simply stay unmeasured without them.
+     */
+    lng: z.number().min(-180).max(180).nullable().optional().default(null),
+    lat: z.number().min(-90).max(90).nullable().optional().default(null),
+  })
+  // A single coordinate is a bug in whatever sent it, not half a location.
+  .refine((p) => (p.lng === null) === (p.lat === null), {
+    error: 'A pin needs both a latitude and a longitude',
+    path: ['lat'],
+  })
 
 export const createTripSchema = z
   .object({

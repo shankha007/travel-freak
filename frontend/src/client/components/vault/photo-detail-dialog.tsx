@@ -35,6 +35,8 @@ export function PhotoDetailDialog({ photo, onClose }: { photo: VaultPhoto; onClo
   const [saving, setSaving] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /** Second press deletes. See the button for why this one asks. */
+  const [confirming, setConfirming] = useState(false)
 
   async function save() {
     setSaving(true)
@@ -143,16 +145,54 @@ export function PhotoDetailDialog({ photo, onClose }: { photo: VaultPhoto; onClo
             </p>
           )}
 
+          {confirming && (
+            <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+              This removes the file from storage straight away, which is what frees the space it was
+              using. A photo is the one thing the trash cannot bring back.
+            </p>
+          )}
+
           <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" size="sm" onClick={() => void makeCover()} disabled={busy}>
                 <Star className={photo.isFeatured ? 'size-4 fill-current' : 'size-4'} aria-hidden />
                 {photo.isFeatured ? 'Cover photo' : 'Make cover'}
               </Button>
-              <Button variant="destructive" size="sm" onClick={() => void remove()} disabled={busy}>
-                <Trash2 className="size-4" aria-hidden />
-                Delete
-              </Button>
+
+              {/* Deleting a photo releases its bytes from storage immediately, so
+                  unlike a trip it cannot be restored from the trash. That makes
+                  this the one destructive action in the vault, and it asks. */}
+              {confirming ? (
+                <>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => void remove()}
+                    disabled={busy}
+                  >
+                    {busy && <Loader2 className="size-4 animate-spin" aria-hidden />}
+                    Delete for good
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setConfirming(false)}
+                    disabled={busy}
+                  >
+                    Keep it
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setConfirming(true)}
+                  disabled={busy}
+                >
+                  <Trash2 className="size-4" aria-hidden />
+                  Delete
+                </Button>
+              )}
             </div>
 
             <Button size="sm" onClick={() => void save()} disabled={saving}>

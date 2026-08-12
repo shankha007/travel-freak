@@ -47,15 +47,34 @@ their own line — nobody outside the repo ever saw them.
 
 <!-- releases -->
 
-## Unreleased — Changelog
+## Unreleased — The changelog, and four gaps closed
 
-> The history of the product becomes part of the product.
+> Four of the things the product was quietly not doing: places had no
+> coordinates, deleting made a promise nothing kept, unlisted posts were
+> unshareable, and posts could not hold a photograph.
 
 ### Added
 
 - **Public changelog page** `/changelog` — a timeline of every release, rendered
   from `docs/CHANGELOG.md` at build time. No login, no database read: the page is
   static, so it costs nothing to serve and cannot drift from this file.
+- **Map picker on trips** — every place in the create and edit wizard can now
+  carry a pin, set by clicking the map or by searching for the place by name.
+  Coordinates are what distance travelled is computed from, so a trip pinned
+  properly finally measures. Pins stay optional: an unpinned place still fills in
+  its country.
+- **Trash** `/trash` — trips and posts deleted in the last 30 days, with a
+  restore button, a countdown, and a count of what comes back with each trip.
+  `restore_trip()` has existed since the trip screens shipped with nothing calling
+  it; this is the screen that keeps the promise the delete dialogs make.
+- **Share links for posts** — an unlisted post can be handed to someone as
+  `/b/[slug]?k=<token>`, created and revoked from the Blog Studio. The reader
+  tells the visitor the post is unlisted rather than letting them assume it is a
+  public page worth linking to.
+- **Images inside posts** — an image button in the studio toolbar uploads through
+  the existing signed-upload route and inserts the photo at the cursor. What lands
+  in the post is an EXIF-stripped WebP copy, generated at upload time: the
+  original keeps its metadata and is never what a reader sees.
 - **Changelog parser** `shared/content/changelog.ts` — turns the markdown into
   typed releases, sections and inline segments, and throws on a malformed entry
   rather than rendering it wrong. Covered by unit tests plus a test that parses
@@ -65,7 +84,45 @@ their own line — nobody outside the repo ever saw them.
 
 ### Changed
 
-- `docs/STATUS.md` marks screen 12 (Changelog) as done.
+- **The delete dialogs now say where things go.** Trips and posts link to the
+  trash; the photo dialog asks for confirmation and says plainly that a photo
+  cannot be brought back. Deleting a photo releases its bytes from storage
+  immediately, which is what stops it counting against the plan — so there is no
+  copy left to restore, and pretending otherwise was the actual bug.
+- **Restoring a trip is refused when it would breach the plan's trip limit**,
+  rather than quietly putting the account over. The trip stays in the trash and
+  the screen offers the upgrade.
+- A post's branding badge is decided by `post_shows_branding_badge()` instead of
+  the profile-shaped question, which returned the free-plan default — and so
+  badged a paying customer — whenever the author's profile was private.
+- `docs/STATUS.md` marks screen 12 (Changelog) as done, and no longer accumulates
+  release notes: history lives here now.
+
+### Security
+
+- **A post token is not a trip token.** The two resolvers read the same table and
+  neither will resolve the other's rows; a `share_links` row now points at exactly
+  one of the two, enforced by a check constraint. Both are asserted in the pgTAP
+  suite.
+- **A post share link does not open the private trip behind it.** On the token
+  path RLS is not filtering, so the linked trip is named only when it is itself
+  published — even its title is more than the link was handed out to share.
+- **Nor does it name a private author.** The same elevated read returned the
+  author's profile whatever its visibility, which would have put a byline on a
+  page the public route keeps anonymous. The rule RLS would have applied is now
+  applied by hand on that path, matching what the public trip page does.
+- An unlisted post is never indexed, and neither is any page reached with a
+  token.
+
+### Infrastructure
+
+- `share_links` gains `post_id`, `resolve_post_share_link()` and
+  `post_shows_branding_badge()` (migration `20260813000200`);
+  `list_deleted_trips()` lets an owner read their own deleted trips, which
+  `trips_select_own` otherwise hides from them (migration `20260813000100`).
+- `@tiptap/extension-image` is pinned to 3.29.2 rather than ranged: its 3.30
+  release peer-depends on a `@tiptap/core` newer than the one the starter kit
+  installs, and npm refuses the tree.
 
 ## 0.11.0 — 2026-08-12 — Public trip pages and share links
 

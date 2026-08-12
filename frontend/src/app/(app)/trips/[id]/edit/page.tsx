@@ -40,6 +40,8 @@ export default async function EditTripPage({ params }: PageProps<'/trips/[id]/ed
       countryCode: p.countryCode,
       regionCode: p.regionCode ?? '',
       cityName: p.cityName ?? '',
+      lng: p.lng,
+      lat: p.lat,
     })),
   }
 

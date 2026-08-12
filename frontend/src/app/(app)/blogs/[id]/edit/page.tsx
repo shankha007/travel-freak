@@ -5,6 +5,7 @@ import { ArrowLeft } from 'lucide-react'
 import { getBlogDraft, getTripOptions } from '@/server/queries/blogs'
 import { BlogStudio } from '@/client/components/blogs/blog-studio'
 import { Button } from '@/client/components/ui/button'
+import { SITE_URL } from '@/shared/brand'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,7 +34,7 @@ export default async function EditBlogPage({ params }: PageProps<'/blogs/[id]/ed
         </Button>
       </div>
 
-      <BlogStudio post={post} trips={trips} />
+      <BlogStudio post={post} trips={trips} siteUrl={SITE_URL} />
     </div>
   )
 }

@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { CalendarDays, Clock, EyeOff, Luggage } from 'lucide-react'
-import { getBlogPost } from '@/server/queries/blog'
+import { CalendarDays, Clock, EyeOff, Link2, Luggage } from 'lucide-react'
+import { getBlogPost, getSharedBlogPost } from '@/server/queries/blog'
 import { BRAND, SITE_URL } from '@/shared/brand'
 import { formatDateRange } from '@/shared/format'
 import { PROSE_CLASS } from '@/shared/content/prose'
@@ -21,9 +21,35 @@ import { Button } from '@/client/components/ui/button'
  */
 export const dynamic = 'force-dynamic'
 
-export async function generateMetadata({ params }: PageProps<'/b/[slug]'>): Promise<Metadata> {
-  const { slug } = await params
-  const post = await getBlogPost(slug)
+/**
+ * Resolves the post from the URL: the slug, or the token when one is present.
+ *
+ * The token wins when supplied, because a `?k=` link is what an unlisted post is
+ * reachable by at all — falling back to the slug would show the author's own
+ * preview to the author and a 404 to everyone they sent it to.
+ */
+async function resolvePost(
+  params: Promise<{ slug: string }>,
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+) {
+  const [{ slug }, query] = await Promise.all([params, searchParams])
+  const token = typeof query.k === 'string' ? query.k : null
+
+  if (token) {
+    const shared = await getSharedBlogPost(token)
+    // A token that no longer resolves falls through to the slug, so the author
+    // still sees their own post rather than a 404 on their own link.
+    if (shared) return shared
+  }
+
+  return getBlogPost(slug)
+}
+
+export async function generateMetadata({
+  params,
+  searchParams,
+}: PageProps<'/b/[slug]'>): Promise<Metadata> {
+  const post = await resolvePost(params, searchParams)
   if (!post) return { title: 'Post not found' }
 
   const isPublic = post.visibility === 'public' && post.publishedAt !== null
@@ -32,9 +58,9 @@ export async function generateMetadata({ params }: PageProps<'/b/[slug]'>): Prom
     title: post.seoTitle || post.title,
     description: post.seoDescription || post.excerpt,
     alternates: { canonical: `${SITE_URL}/b/${post.slug}` },
-    // Drafts and private posts are reachable by their author; they must never
-    // end up in an index.
-    robots: isPublic ? undefined : { index: false, follow: false },
+    // Drafts, private posts and anything opened with a share token must never
+    // end up in an index. Unlisted means unlisted.
+    robots: isPublic && !post.viaShareLink ? undefined : { index: false, follow: false },
     openGraph: {
       type: 'article',
       title: post.seoTitle || post.title,
@@ -53,12 +79,11 @@ function formatDate(iso: string): string {
   })
 }
 
-export default async function BlogPostPage({ params }: PageProps<'/b/[slug]'>) {
-  const { slug } = await params
-  const post = await getBlogPost(slug)
+export default async function BlogPostPage({ params, searchParams }: PageProps<'/b/[slug]'>) {
+  const post = await resolvePost(params, searchParams)
 
-  // Covers "no such post", "still a draft" and "someone else's private post"
-  // identically — RLS returns nothing for all three.
+  // Covers "no such post", "still a draft", "someone else's private post" and a
+  // revoked token identically — all four return nothing.
   if (!post) notFound()
 
   const published = post.publishedAt !== null
@@ -85,13 +110,21 @@ export default async function BlogPostPage({ params }: PageProps<'/b/[slug]'>) {
       </header>
 
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-10 md:px-6">
-        {/* Only ever rendered for the author — everyone else gets a 404 above. */}
+        {/* Rendered for the author, and for a visitor holding a share link — who
+            should know they are reading something unlisted rather than assume it
+            is a public page they could link to. */}
         {!isPublic && (
           <p className="mb-6 flex items-center gap-2 rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-            <EyeOff className="size-4 shrink-0" aria-hidden />
-            {published
-              ? `This post is ${post.visibility}. Only you and anyone with the link can read it.`
-              : 'This is a draft. Only you can see it.'}
+            {post.viaShareLink ? (
+              <Link2 className="size-4 shrink-0" aria-hidden />
+            ) : (
+              <EyeOff className="size-4 shrink-0" aria-hidden />
+            )}
+            {post.viaShareLink
+              ? 'Shared with you by its author. This post is unlisted — it is not indexed and has no public URL, so pass on this link rather than the page.'
+              : published
+                ? `This post is ${post.visibility}. Only you and anyone with the link can read it.`
+                : 'This is a draft. Only you can see it.'}
           </p>
         )}
 
@@ -139,9 +172,9 @@ export default async function BlogPostPage({ params }: PageProps<'/b/[slug]'>) {
                   {formatDateRange(post.trip.startDate, post.trip.endDate)}
                 </p>
               </div>
-              {/* Public trip pages do not exist yet; the author still gets a way
-                  back into their own trip. */}
-              {post.isOwner && (
+              {/* The author goes back to their own trip; a reader goes to the
+                  public page, which only exists when the trip is published. */}
+              {post.isOwner ? (
                 <Button
                   variant="outline"
                   size="sm"
@@ -150,6 +183,17 @@ export default async function BlogPostPage({ params }: PageProps<'/b/[slug]'>) {
                 >
                   Open trip
                 </Button>
+              ) : (
+                post.trip.visibility === 'public' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    nativeButton={false}
+                    render={<Link href={`/t/${post.trip.slug}`} />}
+                  >
+                    Read the trip
+                  </Button>
+                )
               )}
             </div>
           </aside>

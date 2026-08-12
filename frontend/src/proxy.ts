@@ -32,6 +32,7 @@ const PROTECTED = [
   '/analytics',
   '/resume',
   '/settings',
+  '/trash',
 ]
 
 /** Auth pages a signed-in user has no reason to see. */

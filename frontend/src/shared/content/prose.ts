@@ -16,6 +16,8 @@ export const PROSE_CLASS = [
   '[&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-muted [&_pre]:p-4',
   '[&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.9em]',
   '[&_pre_code]:bg-transparent [&_pre_code]:p-0',
-  '[&_img]:rounded-lg',
+  // Derivatives are up to 1600px wide and the reader's column is far narrower,
+  // so an unconstrained image would run off the page.
+  '[&_img]:rounded-lg [&_img]:max-w-full [&_img]:h-auto',
   '[&_hr]:my-8',
 ].join(' ')

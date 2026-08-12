@@ -5,12 +5,16 @@ import { createClient } from '@/server/supabase/server'
 import { requireUser } from '@/server/auth'
 
 /**
- * Share links for unlisted trips.
+ * Share links for unlisted trips and posts.
  *
- * A link is a capability: whoever holds it can read the trip, so creating one
+ * A link is a capability: whoever holds it can read the thing, so creating one
  * is a deliberate act and revoking it has to be immediate. `share_links` rows
  * are never deleted — `revoked_at` is set instead, so a link that was handed
  * out can be traced later rather than vanishing from the record.
+ *
+ * One row points at either a trip or a post, never both: see the
+ * `share_links_one_target` constraint. A token that opened two things would make
+ * revoking it a decision about something the user was not thinking about.
  */
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -100,5 +104,87 @@ export async function revokeShareLinks(tripId: string): Promise<ShareLinkResult>
   }
 
   revalidatePath(`/trips/${tripId}`)
+  return { ok: true }
+}
+
+/**
+ * Creates a link for a post, or returns the one that already exists.
+ *
+ * The trip twin of `createShareLink`, and it stays a separate function for the
+ * same reason the SQL resolvers are separate: the ownership check is a different
+ * table, and one function branching on a "kind" argument would make both paths
+ * harder to read than either is alone.
+ *
+ * As with trips, making a link publishes nothing: `resolve_post_share_link()`
+ * honours the token only while the post is unlisted or public *and* published.
+ */
+export async function createPostShareLink(postId: string): Promise<ShareLinkResult> {
+  const user = await requireUser()
+
+  if (!UUID_RE.test(postId)) {
+    return { ok: false, error: 'Something went wrong. Please try again.' }
+  }
+
+  const supabase = await createClient()
+
+  const { data: post } = await supabase
+    .from('blog_posts')
+    .select('id')
+    .eq('id', postId)
+    .eq('user_id', user.id)
+    .is('deleted_at', null)
+    .maybeSingle()
+
+  if (!post) {
+    return { ok: false, error: 'That post is not yours to share.' }
+  }
+
+  const { data: existing } = await supabase
+    .from('share_links')
+    .select('token')
+    .eq('post_id', postId)
+    .eq('user_id', user.id)
+    .is('revoked_at', null)
+    .limit(1)
+    .maybeSingle()
+
+  if (existing) return { ok: true, token: existing.token }
+
+  const { data, error } = await supabase
+    .from('share_links')
+    .insert({ post_id: postId, user_id: user.id })
+    .select('token')
+    .single()
+
+  if (error) {
+    return { ok: false, error: `Could not create a link: ${error.message}` }
+  }
+
+  revalidatePath(`/blogs/${postId}/edit`)
+  return { ok: true, token: data.token }
+}
+
+/** Revokes every active link for a post. The URL stops working immediately. */
+export async function revokePostShareLinks(postId: string): Promise<ShareLinkResult> {
+  const user = await requireUser()
+
+  if (!UUID_RE.test(postId)) {
+    return { ok: false, error: 'Something went wrong. Please try again.' }
+  }
+
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('share_links')
+    .update({ revoked_at: new Date().toISOString() })
+    .eq('post_id', postId)
+    .eq('user_id', user.id)
+    .is('revoked_at', null)
+
+  if (error) {
+    return { ok: false, error: `Could not revoke the link: ${error.message}` }
+  }
+
+  revalidatePath(`/blogs/${postId}/edit`)
   return { ok: true }
 }

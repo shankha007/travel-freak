@@ -7,6 +7,7 @@ import { requireUser } from '@/server/auth'
 import { sanitizePostHtml } from '@/shared/content/sanitize'
 import { excerptFrom, readingMinutes } from '@/shared/content/reading'
 import { blogPostSchema, slugifyTitle, type BlogPostInput } from '@/shared/validation/blog'
+import { retentionCutoff } from '@/shared/retention'
 import type { Database } from '@/shared/types/database'
 
 /**
@@ -257,5 +258,57 @@ export async function deleteBlogPost(
 
   revalidatePath('/blogs')
   revalidatePath('/dashboard')
+  revalidatePath('/trash')
   redirect('/blogs')
+}
+
+export interface RestorePostResult {
+  ok: boolean
+  error?: string
+}
+
+/**
+ * Restores a soft-deleted post.
+ *
+ * A plain update, for the same reason the delete is one: the post's write policy
+ * has no `deleted_at` clause, so the owner can still see and change the row.
+ * That is also why posts need no `list_deleted_*` function the way trips do.
+ *
+ * `published_at` is left alone, so restoring a post that was live puts it back
+ * where it was. The trash screen says as much before the button is pressed —
+ * quietly re-publishing something would be the wrong kind of surprise.
+ *
+ * The 30-day window is applied here rather than in a policy: it is the promise
+ * the delete dialog makes, and this is the only path that keeps it.
+ */
+export async function restoreBlogPost(postId: string): Promise<RestorePostResult> {
+  const user = await requireUser()
+
+  if (!UUID_RE.test(postId)) {
+    return { ok: false, error: 'Something went wrong. Please try again.' }
+  }
+
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('blog_posts')
+    .update({ deleted_at: null })
+    .eq('id', postId)
+    .eq('user_id', user.id)
+    .not('deleted_at', 'is', null)
+    .gt('deleted_at', retentionCutoff())
+    .select('id')
+
+  if (error) {
+    return { ok: false, error: `Could not restore the post: ${error.message}` }
+  }
+
+  if (!data?.length) {
+    return { ok: false, error: 'That post can no longer be restored.' }
+  }
+
+  revalidatePath('/blogs')
+  revalidatePath('/dashboard')
+  revalidatePath('/trash')
+  return { ok: true }
 }

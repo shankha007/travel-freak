@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import { getTripOptions } from '@/server/queries/blogs'
 import { BlogStudio } from '@/client/components/blogs/blog-studio'
 import { Button } from '@/client/components/ui/button'
+import { SITE_URL } from '@/shared/brand'
 
 export const metadata: Metadata = {
   title: 'New post',
@@ -29,7 +30,7 @@ export default async function NewBlogPage() {
         </Button>
       </div>
 
-      <BlogStudio trips={trips} />
+      <BlogStudio trips={trips} siteUrl={SITE_URL} />
     </div>
   )
 }

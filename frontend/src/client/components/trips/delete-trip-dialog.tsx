@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import { useFormStatus } from 'react-dom'
+import Link from 'next/link'
 import { AlertCircle, Loader2, Trash2 } from 'lucide-react'
 import { deleteTrip, type DeleteTripState } from '@/server/actions/trips'
 import { Button } from '@/client/components/ui/button'
@@ -50,7 +51,11 @@ export function DeleteTripDialog({ tripId, title }: { tripId: string; title: str
             <DialogTitle>Delete “{title}”?</DialogTitle>
             <DialogDescription>
               It disappears from your trips and your globe, and stops counting against your plan.
-              Nothing is erased — the photos, memories and blogs stay recoverable for 30 days.
+              Nothing is erased — the photos, memories and blogs come back with it from{' '}
+              <Link href="/trash" className="underline underline-offset-4">
+                Trash
+              </Link>{' '}
+              for the next 30 days.
             </DialogDescription>
           </DialogHeader>
 

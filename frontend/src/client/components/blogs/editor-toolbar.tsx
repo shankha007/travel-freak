@@ -7,11 +7,13 @@ import {
   Code,
   Heading2,
   Heading3,
+  ImagePlus,
   Italic,
   Link2,
   Link2Off,
   List,
   ListOrdered,
+  Loader2,
   Minus,
   Quote,
   Redo2,
@@ -28,7 +30,18 @@ import { cn } from '@/shared/utils'
  * Every control maps to a mark or node the sanitiser's allowlist keeps, so the
  * toolbar cannot produce formatting that is silently stripped on save.
  */
-export function EditorToolbar({ editor }: { editor: Editor }) {
+export function EditorToolbar({
+  editor,
+  onInsertImage,
+  imageBusy = false,
+  imageDisabled = false,
+}: {
+  editor: Editor
+  /** Omitted before the post exists — there is nowhere to upload to yet. */
+  onInsertImage?: () => void
+  imageBusy?: boolean
+  imageDisabled?: boolean
+}) {
   const setLink = useCallback(() => {
     const previous = editor.getAttributes('link').href as string | undefined
     const url = window.prompt('Link URL', previous ?? 'https://')
@@ -52,6 +65,8 @@ export function EditorToolbar({ editor }: { editor: Editor }) {
         run: () => void
         active?: boolean
         disabled?: boolean
+        /** Spins the icon — used while an upload is in flight. */
+        spin?: boolean
       }
   )[] = [
     {
@@ -124,6 +139,20 @@ export function EditorToolbar({ editor }: { editor: Editor }) {
       icon: Minus,
       run: () => editor.chain().focus().setHorizontalRule().run(),
     },
+    // Only offered once there is a post to attach an upload to. The studio
+    // passes no handler until the first autosave has produced an id.
+    ...(onInsertImage
+      ? [
+          {
+            type: 'button' as const,
+            label: imageBusy ? 'Uploading image…' : 'Insert image',
+            icon: imageBusy ? Loader2 : ImagePlus,
+            run: onInsertImage,
+            disabled: imageBusy || imageDisabled,
+            spin: imageBusy,
+          },
+        ]
+      : []),
     { type: 'separator' },
     {
       type: 'button',
@@ -182,7 +211,7 @@ export function EditorToolbar({ editor }: { editor: Editor }) {
             onClick={item.run}
             className={cn(item.active && 'bg-muted text-foreground')}
           >
-            <item.icon className="size-4" aria-hidden />
+            <item.icon className={cn('size-4', item.spin && 'animate-spin')} aria-hidden />
           </Button>
         )
       )}

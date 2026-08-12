@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import { useFormStatus } from 'react-dom'
+import Link from 'next/link'
 import { AlertCircle, Loader2, Trash2 } from 'lucide-react'
 import { deleteBlogPost, type DeleteBlogState } from '@/server/actions/blogs'
 import { Button } from '@/client/components/ui/button'
@@ -43,8 +44,12 @@ export function DeleteBlogDialog({ postId, title }: { postId: string; title: str
           <DialogHeader>
             <DialogTitle>Delete “{title}”?</DialogTitle>
             <DialogDescription>
-              It comes off your blog list and, if it was published, off the web. The text is kept
-              and recoverable for 30 days.
+              It comes off your blog list and, if it was published, off the web. The text is kept —
+              restore it from{' '}
+              <Link href="/trash" className="underline underline-offset-4">
+                Trash
+              </Link>{' '}
+              within 30 days and a published post goes back live.
             </DialogDescription>
           </DialogHeader>
 

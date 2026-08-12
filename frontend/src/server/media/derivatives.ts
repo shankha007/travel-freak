@@ -27,9 +27,20 @@ export interface DerivativeResult {
   error?: string
 }
 
-/** Object key for a photo's public derivative. */
+/** Object key for a trip photo's public derivative. */
 export function derivativePath(userId: string, tripId: string, mediaId: string): string {
   return `${userId}/${tripId}/${mediaId}.webp`
+}
+
+/**
+ * Object key for an image placed inside a post.
+ *
+ * A separate shape because a post image belongs to no trip: its `media.trip_id`
+ * is null, so there is no trip folder to put it in. The `posts/` segment keeps
+ * the two kinds of derivative from ever colliding on a key.
+ */
+export function postDerivativePath(userId: string, postId: string, mediaId: string): string {
+  return `${userId}/posts/${postId}/${mediaId}.webp`
 }
 
 /**
@@ -37,20 +48,22 @@ export function derivativePath(userId: string, tripId: string, mediaId: string):
  *
  * Uses the service role for both the read and the write, because the caller is
  * generating something on behalf of a visitor who has no rights to the
- * original. **Callers must have already established that this photo belongs to
- * a trip the visitor may see** — this function checks nothing.
+ * original. **Callers must have already established that the visitor may see
+ * this image** — this function checks nothing, including where `target` points,
+ * which is why the two path builders above are the only things that produce one.
  */
 export async function ensurePublicDerivative(media: {
   id: string
   userId: string
-  tripId: string
   storagePath: string
   publicPath: string | null
+  /** Object key to write to, from `derivativePath` or `postDerivativePath`. */
+  target: string
 }): Promise<DerivativeResult> {
   if (media.publicPath) return { path: media.publicPath }
 
   const admin = createAdminClient()
-  const target = derivativePath(media.userId, media.tripId, media.id)
+  const target = media.target
 
   const { data: original, error: downloadError } = await admin.storage
     .from('media')

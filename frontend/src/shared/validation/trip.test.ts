@@ -136,3 +136,49 @@ describe('createTripSchema', () => {
     expect(createTripSchema.safeParse(validInput({ visibility: 'everyone' })).success).toBe(false)
   })
 })
+
+describe('place pins', () => {
+  it('defaults a place with no pin to null coordinates', () => {
+    const result = createTripSchema.safeParse(validInput())
+    expect(result.success).toBe(true)
+    expect(result.data?.places[0].lng).toBeNull()
+    expect(result.data?.places[0].lat).toBeNull()
+  })
+
+  it('accepts a complete pin', () => {
+    const result = createTripSchema.safeParse(
+      validInput({
+        places: [
+          { countryCode: 'VNM', regionCode: '', cityName: 'Hanoi', lng: 105.8342, lat: 21.0278 },
+        ],
+      })
+    )
+    expect(result.success).toBe(true)
+    expect(result.data?.places[0]).toMatchObject({ lng: 105.8342, lat: 21.0278 })
+  })
+
+  it('rejects half a pin', () => {
+    // A lone latitude is a bug in whatever built the payload, not a location.
+    const result = createTripSchema.safeParse(
+      validInput({ places: [{ countryCode: 'VNM', regionCode: '', cityName: '', lat: 21.0278 }] })
+    )
+    expect(result.success).toBe(false)
+  })
+
+  it('rejects coordinates off the earth', () => {
+    expect(
+      createTripSchema.safeParse(
+        validInput({
+          places: [{ countryCode: 'VNM', regionCode: '', cityName: '', lng: 200, lat: 21 }],
+        })
+      ).success
+    ).toBe(false)
+    expect(
+      createTripSchema.safeParse(
+        validInput({
+          places: [{ countryCode: 'VNM', regionCode: '', cityName: '', lng: 105, lat: 91 }],
+        })
+      ).success
+    ).toBe(false)
+  })
+})

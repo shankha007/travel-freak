@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { Camera, MapPin, Plus, Users } from 'lucide-react'
+import { Camera, MapPin, Plus, Trash2, Users } from 'lucide-react'
 import { Button } from '@/client/components/ui/button'
 import { getTrips, groupTrips, type TripListItem } from '@/server/queries/trips'
 import { countryFlag } from '@/shared/geo/countries'
@@ -111,10 +111,18 @@ export default async function TripsPage() {
             {trips.length} {trips.length === 1 ? 'trip' : 'trips'} recorded.
           </p>
         </div>
-        <Button nativeButton={false} render={<Link href="/trips/new" />}>
-          <Plus className="size-4" aria-hidden />
-          New trip
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* The only way into the trash that does not require having just
+              deleted something. */}
+          <Button variant="ghost" nativeButton={false} render={<Link href="/trash" />}>
+            <Trash2 className="size-4" aria-hidden />
+            Trash
+          </Button>
+          <Button nativeButton={false} render={<Link href="/trips/new" />}>
+            <Plus className="size-4" aria-hidden />
+            New trip
+          </Button>
+        </div>
       </header>
 
       <Tabs defaultValue="all">

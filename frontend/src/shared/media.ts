@@ -57,6 +57,22 @@ export function storagePath(userId: string, tripId: string, mediaId: string, mim
 }
 
 /**
+ * Object key for an image uploaded into a post.
+ *
+ * A post image belongs to no trip — `media.trip_id` is null — so it needs a
+ * folder of its own. The first segment is still the owner's id, which is the only
+ * part the storage policies read, so the same policies cover it unchanged.
+ */
+export function postImagePath(
+  userId: string,
+  postId: string,
+  mediaId: string,
+  mime: string
+): string {
+  return `${userId}/posts/${postId}/${mediaId}.${extensionFor(mime)}`
+}
+
+/**
  * Identifies an image from its leading bytes.
  *
  * A file's declared content type is a claim by whoever uploaded it — storage

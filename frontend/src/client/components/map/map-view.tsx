@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Map, {
   Layer,
+  Marker,
   NavigationControl,
   Source,
   type MapLayerMouseEvent,
@@ -17,6 +18,7 @@ import { fillColorExpression, fillOpacityExpression } from '@/shared/geo/map-pai
 import { REGION_STATE_META, resolveRegionStateColor } from '@/shared/geo/region-state'
 import type { RegionState } from '@/shared/geo/region-state'
 import { indexRegions, regionKey, type VisitedRegion } from '@/shared/types/globe'
+import type { LngLat } from '@/shared/geo/point'
 import { publicEnv } from '@/shared/env'
 import { Skeleton } from '@/client/components/ui/skeleton'
 
@@ -36,6 +38,12 @@ import { Skeleton } from '@/client/components/ui/skeleton'
  * renders the same data.
  */
 
+/** What a click produced: where, and which country was under it. */
+export interface PickedPoint extends LngLat {
+  /** ISO alpha-3 of the polygon clicked, or null in open water. */
+  countryCode: string | null
+}
+
 interface MapViewProps {
   regions: VisitedRegion[]
   /** Draw subdivision polygons for these countries, in ISO alpha-3. */
@@ -45,6 +53,13 @@ interface MapViewProps {
   onSelectCountry: (countryCode: string) => void
   /** Starting view. Country mode fits to the country's polygons on load. */
   focusCountry?: string
+  /**
+   * Pick mode. When set, a click reports coordinates instead of selecting a
+   * country, and `pin` is drawn where one has been placed. This is what the trip
+   * form uses; the browsing maps leave both undefined and behave as before.
+   */
+  onPickPoint?: (point: PickedPoint) => void
+  pin?: LngLat | null
   className?: string
 }
 
@@ -61,6 +76,8 @@ export function MapView({
   visibleStates,
   onSelectCountry,
   focusCountry,
+  onPickPoint,
+  pin,
   className,
 }: MapViewProps) {
   const mapRef = useRef<MapRef | null>(null)
@@ -232,9 +249,22 @@ export function MapView({
   const handleClick = useCallback(
     (event: MapLayerMouseEvent) => {
       const props = event.features?.[0]?.properties as Record<string, string> | undefined
+
+      // In pick mode every click is a coordinate, including one in open water —
+      // a place can be at sea, and refusing the click would leave the user
+      // clicking a map that appears not to work.
+      if (onPickPoint) {
+        onPickPoint({
+          lng: event.lngLat.lng,
+          lat: event.lngLat.lat,
+          countryCode: props?.iso_a3 ?? null,
+        })
+        return
+      }
+
       if (props?.iso_a3) onSelectCountry(props.iso_a3)
     },
-    [onSelectCountry]
+    [onPickPoint, onSelectCountry]
   )
 
   if (failed) {
@@ -280,7 +310,7 @@ export function MapView({
         onMouseMove={handleHover}
         onMouseOut={() => setHover(null)}
         onClick={handleClick}
-        cursor="pointer"
+        cursor={onPickPoint ? 'crosshair' : 'pointer'}
         style={{ width: '100%', height: '100%' }}
       >
         <NavigationControl position="top-right" showCompass={false} />
@@ -311,6 +341,15 @@ export function MapView({
               paint={{ 'line-color': 'rgba(0,0,0,0.25)', 'line-width': 0.4 }}
             />
           </Source>
+        )}
+
+        {/* The pin is drawn rather than added as a source: it is one point that
+            moves on every click, and a GeoJSON source would be re-uploaded each
+            time. `anchor="bottom"` puts the tip on the coordinate. */}
+        {pin && (
+          <Marker longitude={pin.lng} latitude={pin.lat} anchor="bottom">
+            <span className="block size-4 -translate-y-1 rounded-full border-2 border-white bg-primary shadow-md" />
+          </Marker>
         )}
       </Map>
 

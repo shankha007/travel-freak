@@ -2,6 +2,7 @@ import 'server-only'
 
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 import { createClient } from '@/server/supabase/server'
+import { parsePoint } from '@/shared/geo/point'
 import type { Database } from '@/shared/types/database'
 
 /**
@@ -27,6 +28,9 @@ export interface TripPlaceDetail {
   departureDate: string | null
   notes: string
   orderIndex: number
+  /** The pin, when one was set. Null for a place recorded by name alone. */
+  lng: number | null
+  lat: number | null
 }
 
 export interface TripMemory {
@@ -112,7 +116,7 @@ export async function getTripDetail(id: string): Promise<TripDetail | null> {
     supabase
       .from('trip_places')
       .select(
-        'id, country_code, region_code, city_name, place_kind, arrival_date, departure_date, notes, order_index'
+        'id, country_code, region_code, city_name, place_kind, arrival_date, departure_date, notes, order_index, location'
       )
       .eq('trip_id', id)
       .order('order_index', { ascending: true }),
@@ -158,17 +162,22 @@ export async function getTripDetail(id: string): Promise<TripDetail | null> {
     : { data: [] }
   const urlByPath = new Map((signed.data ?? []).map((s) => [s.path, s.signedUrl]))
 
-  const places = (placesResult.data ?? []).map((p) => ({
-    id: p.id,
-    countryCode: p.country_code,
-    regionCode: p.region_code,
-    cityName: p.city_name,
-    placeKind: p.place_kind,
-    arrivalDate: p.arrival_date,
-    departureDate: p.departure_date,
-    notes: p.notes,
-    orderIndex: p.order_index,
-  }))
+  const places = (placesResult.data ?? []).map((p) => {
+    const point = parsePoint(p.location)
+    return {
+      id: p.id,
+      countryCode: p.country_code,
+      regionCode: p.region_code,
+      cityName: p.city_name,
+      placeKind: p.place_kind,
+      arrivalDate: p.arrival_date,
+      departureDate: p.departure_date,
+      notes: p.notes,
+      orderIndex: p.order_index,
+      lng: point?.lng ?? null,
+      lat: point?.lat ?? null,
+    }
+  })
 
   return {
     id: trip.id,

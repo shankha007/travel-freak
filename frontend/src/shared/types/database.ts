@@ -424,6 +424,7 @@ export type Database = {
           created_at: string
           expires_at: string | null
           id: string
+          post_id: string | null
           revoked_at: string | null
           token: string
           trip_id: string | null
@@ -433,6 +434,7 @@ export type Database = {
           created_at?: string
           expires_at?: string | null
           id?: string
+          post_id?: string | null
           revoked_at?: string | null
           token?: string
           trip_id?: string | null
@@ -442,6 +444,7 @@ export type Database = {
           created_at?: string
           expires_at?: string | null
           id?: string
+          post_id?: string | null
           revoked_at?: string | null
           token?: string
           trip_id?: string | null
@@ -453,6 +456,13 @@ export type Database = {
             columns: ["trip_id"]
             isOneToOne: false
             referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "share_links_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "blog_posts"
             referencedColumns: ["id"]
           },
         ]
@@ -1232,10 +1242,28 @@ export type Database = {
         Returns: undefined
       }
       restore_trip: { Args: { p_trip_id: string }; Returns: boolean }
+      list_deleted_trips: {
+        Args: never
+        Returns: {
+          id: string
+          title: string
+          slug: string
+          summary: string
+          start_date: string | null
+          end_date: string | null
+          visibility: Database["public"]["Enums"]["visibility"]
+          deleted_at: string
+          place_count: number
+          photo_count: number
+          post_count: number
+        }[]
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       resolve_share_link: { Args: { p_token: string }; Returns: string | null }
+      resolve_post_share_link: { Args: { p_token: string }; Returns: string | null }
       trip_shows_branding_badge: { Args: { p_trip_id: string }; Returns: boolean }
+      post_shows_branding_badge: { Args: { p_post_id: string }; Returns: boolean }
       public_place_counts: {
         Args: { p_user_id: string }
         Returns: { place_kind: string; place_count: number }[]

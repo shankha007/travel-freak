@@ -2,7 +2,7 @@ import 'server-only'
 
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 import { createAdminClient, createClient } from '@/server/supabase/server'
-import { ensurePublicDerivative, publicMediaUrl } from '@/server/media/derivatives'
+import { derivativePath, ensurePublicDerivative, publicMediaUrl } from '@/server/media/derivatives'
 import { publicEnv } from '@/shared/env'
 import type { Database } from '@/shared/types/database'
 
@@ -224,9 +224,9 @@ async function loadTrip(
     const { path } = await ensurePublicDerivative({
       id: row.id,
       userId: row.user_id,
-      tripId: row.trip_id,
       storagePath: row.storage_path,
       publicPath: row.public_path,
+      target: derivativePath(row.user_id, row.trip_id, row.id),
     })
 
     // A photo that cannot be safely converted is left out rather than served

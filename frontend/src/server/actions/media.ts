@@ -4,8 +4,14 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createAdminClient, createClient } from '@/server/supabase/server'
 import { requireUser } from '@/server/auth'
-import { checkPhotoQuota } from '@/server/entitlements'
-import { isAllowedImageMime, sniffImageMime, storagePath } from '@/shared/media'
+import { checkPhotoQuota, checkStorageQuota } from '@/server/entitlements'
+import {
+  ensurePublicDerivative,
+  postDerivativePath,
+  publicMediaUrl,
+} from '@/server/media/derivatives'
+import { isAllowedImageMime, postImagePath, sniffImageMime, storagePath } from '@/shared/media'
+import { publicEnv } from '@/shared/env'
 
 /**
  * Media Server Actions.
@@ -170,6 +176,144 @@ async function sniffStoredImage(path: string) {
   }
 }
 
+const postImageInput = z.object({
+  mediaId: z.uuid(),
+  postId: z.uuid(),
+  mime: z.string().min(1),
+  width: z.number().int().positive().max(100_000).nullable(),
+  height: z.number().int().positive().max(100_000).nullable(),
+  altText: z.string().trim().max(300),
+})
+
+export interface PostImageResult {
+  ok: boolean
+  /** Public URL of the stripped derivative, ready to insert into the document. */
+  url?: string
+  error?: string
+}
+
+/**
+ * Records an image uploaded into a post and returns a URL the post can use.
+ *
+ * The checks are the ones `confirmUpload` makes — real size from storage, magic
+ * bytes rather than the declared type, quota re-run against what actually landed
+ * — because the client's word is worth the same here as it is there.
+ *
+ * Two things differ, both because a post image is not a trip photo:
+ *
+ *  - **`trip_id` stays null.** The image belongs to a post, and counting it
+ *    against a trip's photo cap would charge the wrong quota for it. The storage
+ *    pool still applies, which is the limit that costs money.
+ *  - **The derivative is generated now, not on first publication.** A post's HTML
+ *    has to contain a URL that keeps working, and a signed URL expires in an
+ *    hour. So the image is re-encoded immediately — which strips the EXIF, GPS
+ *    included — and the document references the stripped copy. The original stays
+ *    private and is never what a reader sees.
+ *
+ * That means the bytes are readable by anyone holding the derivative's URL before
+ * the post is published. The key contains a random uuid and is never listed, so
+ * it is exactly as exposed as an unlisted link — which is what the studio tells
+ * the writer next to the button.
+ */
+export async function confirmPostImage(
+  input: z.input<typeof postImageInput>
+): Promise<PostImageResult> {
+  const user = await requireUser()
+
+  const parsed = postImageInput.safeParse(input)
+  if (!parsed.success) {
+    return { ok: false, error: 'Something went wrong finishing that upload.' }
+  }
+
+  const { mediaId, postId, mime, width, height, altText } = parsed.data
+
+  if (!isAllowedImageMime(mime)) {
+    return { ok: false, error: 'That file type is not allowed.' }
+  }
+
+  const supabase = await createClient()
+  const path = postImagePath(user.id, postId, mediaId, mime)
+
+  const { data: post } = await supabase
+    .from('blog_posts')
+    .select('id')
+    .eq('id', postId)
+    .eq('user_id', user.id)
+    .is('deleted_at', null)
+    .maybeSingle()
+
+  if (!post) {
+    return { ok: false, error: 'That post is not yours.' }
+  }
+
+  const { data: objects } = await supabase.storage
+    .from('media')
+    .list(`${user.id}/posts/${postId}`, { search: `${mediaId}.` })
+
+  const object = objects?.[0]
+  if (!object) {
+    return { ok: false, error: 'That upload did not arrive. Try again.' }
+  }
+
+  const actualBytes = Number(object.metadata?.size ?? 0)
+
+  const sniffed = await sniffStoredImage(path)
+  if (!sniffed) {
+    await removeObject(path)
+    return { ok: false, error: 'That file is not an image the app can store.' }
+  }
+
+  const quota = await checkStorageQuota(actualBytes)
+  if (!quota.allowed) {
+    await removeObject(path)
+    return { ok: false, error: quota.reason ?? 'That image does not fit in your plan.' }
+  }
+
+  const { error } = await supabase.from('media').insert({
+    id: mediaId,
+    user_id: user.id,
+    trip_id: null,
+    kind: 'image',
+    storage_path: path,
+    mime: sniffed,
+    bytes: actualBytes,
+    width,
+    height,
+    alt_text: altText,
+    processing_status: 'ready',
+  })
+
+  if (error) {
+    await removeObject(path)
+    return { ok: false, error: `Could not save that image: ${error.message}` }
+  }
+
+  const { path: publicPath, error: derivativeError } = await ensurePublicDerivative({
+    id: mediaId,
+    userId: user.id,
+    storagePath: path,
+    publicPath: null,
+    target: postDerivativePath(user.id, postId, mediaId),
+  })
+
+  if (!publicPath) {
+    // Nothing readable came out of the transform, so there is no URL to insert.
+    // The row and the original are removed rather than left as a file the writer
+    // can neither see nor account for.
+    await supabase.from('media').delete().eq('id', mediaId).eq('user_id', user.id)
+    await removeObject(path)
+    return {
+      ok: false,
+      error: derivativeError
+        ? `Could not prepare that image: ${derivativeError}`
+        : 'Could not prepare that image.',
+    }
+  }
+
+  revalidatePath(`/blogs/${postId}/edit`)
+  return { ok: true, url: publicMediaUrl(publicEnv().NEXT_PUBLIC_SUPABASE_URL, publicPath) }
+}
+
 const detailsInput = z.object({
   mediaId: z.uuid(),
   caption: z.string().trim().max(300),
@@ -268,9 +412,13 @@ export async function setCoverPhoto(mediaId: string): Promise<MediaActionResult>
 /**
  * Soft-deletes a photo and removes the stored object.
  *
- * The row is kept — the counters and the 30-day restore window depend on it —
- * but the bytes go immediately, because storage is the thing being paid for and
- * "deleted" should stop costing the user their pool.
+ * The row is kept so the counters can be recomputed and the trip's history still
+ * knows a photo was there, but the bytes go immediately, because storage is the
+ * thing being paid for and "deleted" should stop costing the user their pool.
+ *
+ * That trade is why a photo is **not** restorable while a trip is: there is no
+ * object left to point at. `/trash` says so rather than offering a button that
+ * would produce a broken image, and the vault asks before it deletes.
  *
  * It goes through `soft_delete_media()` for the same reason trips do: a direct
  * update setting `deleted_at` is refused by RLS, because the updated row no

@@ -12,6 +12,7 @@ import {
   type ResumePlace,
 } from '@/shared/resume'
 import { TOTAL_COUNTRIES } from '@/shared/geo/countries'
+import { parsePoint } from '@/shared/geo/point'
 import type { Database } from '@/shared/types/database'
 
 /**
@@ -343,21 +344,4 @@ function toVisitedRegion(row: VisitedRegionRow): VisitedRegion {
     // it from signing URLs nobody is going to look at.
     featuredMediaUrl: null,
   }
-}
-
-/**
- * Reads a PostGIS point out of whatever PostgREST hands back.
- *
- * `geography(Point,4326)` arrives as GeoJSON when the column is selected
- * directly, but the shape is not guaranteed, so anything unrecognised becomes
- * "no coordinates" rather than a crash on someone's resume.
- */
-function parsePoint(value: unknown): { lng: number; lat: number } | null {
-  if (!value || typeof value !== 'object') return null
-  const point = value as { type?: string; coordinates?: unknown }
-  if (point.type !== 'Point' || !Array.isArray(point.coordinates)) return null
-
-  const [lng, lat] = point.coordinates
-  if (typeof lng !== 'number' || typeof lat !== 'number') return null
-  return { lng, lat }
 }

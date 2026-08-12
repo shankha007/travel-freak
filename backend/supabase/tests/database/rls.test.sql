@@ -80,13 +80,18 @@ values
   ('d2222222-0000-4000-8000-000000000002', 'bbbbbbbb-0000-4000-8000-000000000002',
    'b2222222-0000-4000-8000-000000000001', 'image', 'rls/bob/1.jpg', 'image/jpeg', 100);
 
-insert into public.blog_posts (user_id, trip_id, title, slug, visibility, published_at)
+-- Ids are fixed for the same reason the media ids are: the post share-link
+-- tests name these rows without reading them.
+insert into public.blog_posts (id, user_id, trip_id, title, slug, visibility, published_at)
 values
-  ('aaaaaaaa-0000-4000-8000-000000000001', 'a1111111-0000-4000-8000-000000000001',
+  ('c1111111-0000-4000-8000-000000000001', 'aaaaaaaa-0000-4000-8000-000000000001',
+   'a1111111-0000-4000-8000-000000000001',
    'Alice draft', 'rls-alice-draft', 'private', null),
-  ('aaaaaaaa-0000-4000-8000-000000000001', 'a1111111-0000-4000-8000-000000000002',
+  ('c1111111-0000-4000-8000-000000000002', 'aaaaaaaa-0000-4000-8000-000000000001',
+   'a1111111-0000-4000-8000-000000000002',
    'Alice published', 'rls-alice-published', 'public', now()),
-  ('bbbbbbbb-0000-4000-8000-000000000002', 'b2222222-0000-4000-8000-000000000001',
+  ('c2222222-0000-4000-8000-000000000001', 'bbbbbbbb-0000-4000-8000-000000000002',
+   'b2222222-0000-4000-8000-000000000001',
    'Bob draft', 'rls-bob-draft', 'private', null);
 
 insert into public.wishlist_items (user_id, country_code)
@@ -636,6 +641,162 @@ select is(
    and deleted_at is null)::int,
   1,
   'bob''s trip was never touched'
+);
+
+-- ---------------------------------------------------------------------------
+-- Post share links
+--
+-- Same capability model as trips, with one extra condition: a post has to be
+-- published as well as unlisted, because publishing is the act that says the
+-- text is ready for someone else to read.
+-- ---------------------------------------------------------------------------
+
+reset role;
+
+-- One unlisted-and-published post, and one that is unlisted but still a draft.
+update public.blog_posts
+   set visibility = 'unlisted', published_at = now()
+ where id = 'c1111111-0000-4000-8000-000000000002';
+
+update public.blog_posts
+   set visibility = 'unlisted', published_at = null
+ where id = 'c1111111-0000-4000-8000-000000000001';
+
+insert into public.share_links (id, post_id, user_id, token)
+values
+  ('e2222222-0000-4000-8000-000000000001', 'c1111111-0000-4000-8000-000000000002',
+   'aaaaaaaa-0000-4000-8000-000000000001', 'post-token-live'),
+  ('e2222222-0000-4000-8000-000000000002', 'c1111111-0000-4000-8000-000000000001',
+   'aaaaaaaa-0000-4000-8000-000000000001', 'post-token-draft'),
+  ('e2222222-0000-4000-8000-000000000003', 'c1111111-0000-4000-8000-000000000002',
+   'aaaaaaaa-0000-4000-8000-000000000001', 'post-token-revoked');
+
+update public.share_links set revoked_at = now() where token = 'post-token-revoked';
+
+-- The constraint is what stops one token being two capabilities.
+select throws_ok(
+  $$ insert into public.share_links (trip_id, post_id, user_id, token)
+     values ('a1111111-0000-4000-8000-000000000002', 'c1111111-0000-4000-8000-000000000002',
+             'aaaaaaaa-0000-4000-8000-000000000001', 'token-both') $$,
+  '23514',
+  null,
+  'a share link cannot point at a trip and a post at once'
+);
+
+select throws_ok(
+  $$ insert into public.share_links (user_id, token)
+     values ('aaaaaaaa-0000-4000-8000-000000000001', 'token-neither') $$,
+  '23514',
+  null,
+  'and cannot point at nothing'
+);
+
+select set_config('request.jwt.claims', '{"role":"anon"}', true);
+set local role anon;
+
+select is(
+  (select public.resolve_post_share_link('post-token-live')),
+  'c1111111-0000-4000-8000-000000000002'::uuid,
+  'a live post token resolves to its post'
+);
+
+select is(
+  (select public.resolve_post_share_link('post-token-draft')),
+  null::uuid,
+  'an unpublished post resolves to nothing, even with a token'
+);
+
+select is(
+  (select public.resolve_post_share_link('post-token-revoked')),
+  null::uuid,
+  'a revoked post token resolves to nothing'
+);
+
+select is(
+  (select public.resolve_post_share_link('no-such-post-token')),
+  null::uuid,
+  'and an invented one is indistinguishable from a revoked one'
+);
+
+-- A trip token is not a post token. The two functions read the same table, so
+-- this is worth stating: neither can be used to resolve the other's rows.
+select is(
+  (select public.resolve_post_share_link('token-for-alices-public-trip')),
+  null::uuid,
+  'a trip token does not resolve as a post token'
+);
+
+select is(
+  (select public.resolve_share_link('post-token-live')),
+  null::uuid,
+  'and a post token does not resolve as a trip token'
+);
+
+-- Resolving does not hand over the post: RLS still refuses the read, which is
+-- why the app does that part with the service role scoped to this one id.
+select is_empty(
+  $$ select id from public.blog_posts where id = 'c1111111-0000-4000-8000-000000000002' $$,
+  'resolving a post token does not make the post readable through RLS'
+);
+
+reset role;
+
+-- The badge question a public post page asks. Defaults to true, so it can never
+-- accidentally reveal that someone is not paying.
+select is(
+  (select public.post_shows_branding_badge('c1111111-0000-4000-8000-000000000002')),
+  true,
+  'a free-plan post shows the branding badge'
+);
+
+select is(
+  (select public.post_shows_branding_badge('00000000-0000-4000-8000-000000000000')),
+  true,
+  'and an unknown post defaults to showing it'
+);
+
+-- ---------------------------------------------------------------------------
+-- The trash
+--
+-- A deleted trip is invisible to its own owner under RLS, which is what
+-- list_deleted_trips() exists to work around — for the caller's own rows only.
+-- ---------------------------------------------------------------------------
+
+select set_config('request.jwt.claims',
+  '{"sub":"aaaaaaaa-0000-4000-8000-000000000001","role":"authenticated"}', true);
+set local role authenticated;
+
+select is(
+  (select public.soft_delete_trip('a1111111-0000-4000-8000-000000000002')),
+  true,
+  'alice deletes a second trip'
+);
+
+select is(
+  (select count(*) from public.list_deleted_trips())::int,
+  1,
+  'and it is the only thing in her trash'
+);
+
+select is(
+  (select id from public.list_deleted_trips()),
+  'a1111111-0000-4000-8000-000000000002'::uuid,
+  'listed by id, so the restore button has something to name'
+);
+
+select is(
+  (select place_count from public.list_deleted_trips()),
+  1,
+  'with a count of what comes back with it'
+);
+
+select set_config('request.jwt.claims',
+  '{"sub":"bbbbbbbb-0000-4000-8000-000000000002","role":"authenticated"}', true);
+set local role authenticated;
+
+select is_empty(
+  $$ select id from public.list_deleted_trips() $$,
+  'bob cannot see alice''s deleted trip in his trash'
 );
 
 select * from finish();

@@ -5,12 +5,16 @@ import Link from 'next/link'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { Placeholder } from '@tiptap/extensions'
-import { AlertCircle, Check, ExternalLink, Loader2, Save } from 'lucide-react'
+import Image from '@tiptap/extension-image'
+import { AlertCircle, Check, ExternalLink, ImageOff, Loader2, Save } from 'lucide-react'
 import { saveBlogPost, setBlogPublished } from '@/server/actions/blogs'
+import { confirmPostImage } from '@/server/actions/media'
+import { createClient } from '@/client/supabase/client'
 import type { BlogDraft, TripOption } from '@/server/queries/blogs'
 import { UNTITLED } from '@/shared/validation/blog'
 import { VISIBILITIES } from '@/shared/validation/trip'
 import { countWords, htmlToText, readingMinutes } from '@/shared/content/reading'
+import { ALLOWED_IMAGE_MIME } from '@/shared/media'
 import { PROSE_CLASS } from '@/shared/content/prose'
 import { Button } from '@/client/components/ui/button'
 import { Input } from '@/client/components/ui/input'
@@ -20,6 +24,7 @@ import { Card, CardContent } from '@/client/components/ui/card'
 import { Badge } from '@/client/components/ui/badge'
 import { DeleteBlogDialog } from '@/client/components/blogs/delete-blog-dialog'
 import { EditorToolbar } from '@/client/components/blogs/editor-toolbar'
+import { SharePostCard } from '@/client/components/blogs/share-post-card'
 import { cn } from '@/shared/utils'
 
 type Visibility = (typeof VISIBILITIES)[number]
@@ -42,7 +47,15 @@ type SaveStatus = 'idle' | 'unsaved' | 'saving' | 'saved' | 'error'
  * to diff, and Tiptap's JSON goes along with it so the post reopens exactly as
  * it was left.
  */
-export function BlogStudio({ post, trips }: { post?: BlogDraft; trips: TripOption[] }) {
+export function BlogStudio({
+  post,
+  trips,
+  siteUrl,
+}: {
+  post?: BlogDraft
+  trips: TripOption[]
+  siteUrl: string
+}) {
   const [id, setId] = useState(post?.id)
   const [slug, setSlug] = useState(post?.slug ?? '')
   // An untitled draft is stored under a placeholder title; show the writer an
@@ -69,6 +82,10 @@ export function BlogStudio({ post, trips }: { post?: BlogDraft; trips: TripOptio
       Placeholder.configure({
         placeholder: 'Start where the story starts. The road, the meal, the moment.',
       }),
+      // `allowBase64` stays off: a pasted data URI would go into content_html,
+      // where the sanitiser drops `data:` schemes anyway, and would bloat the row
+      // rather than upload a file. Images arrive through the toolbar button.
+      Image.configure({ inline: false, allowBase64: false }),
     ],
     content: initialContent(post),
     // Required for SSR: rendering immediately would produce markup on the
@@ -182,6 +199,78 @@ export function BlogStudio({ post, trips }: { post?: BlogDraft; trips: TripOptio
     return () => window.removeEventListener('beforeunload', onBeforeUnload)
   }, [serialized])
 
+  const fileInput = useRef<HTMLInputElement | null>(null)
+  const [imageBusy, setImageBusy] = useState(false)
+  // One client for the lifetime of the studio: createClient() builds a new one
+  // on every call, and this component re-renders on every keystroke.
+  const supabase = useMemo(() => createClient(), [])
+
+  /**
+   * Uploads one image and inserts it at the cursor.
+   *
+   * The same two-step the vault uses — signed URL from the Route Handler, PUT
+   * straight to storage — so the file never passes through this app's server. What
+   * comes back is the URL of an EXIF-stripped copy, which is what goes in the
+   * document: a signed URL to the original would stop working within the hour,
+   * and the original carries the GPS of wherever the photo was taken.
+   */
+  const insertImage = useCallback(
+    async (file: File) => {
+      if (!id) return
+
+      setImageBusy(true)
+      setError(null)
+
+      try {
+        const signResponse = await fetch('/api/uploads/sign', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ postId: id, mime: file.type, bytes: file.size }),
+        })
+
+        const signed: { mediaId?: string; path?: string; token?: string; error?: string } =
+          await signResponse.json()
+
+        if (!signResponse.ok || !signed.path || !signed.token || !signed.mediaId) {
+          setError(signed.error ?? 'Could not start that upload.')
+          return
+        }
+
+        const upload = await supabase.storage
+          .from('media')
+          .uploadToSignedUrl(signed.path, signed.token, file, { contentType: file.type })
+
+        if (upload.error) {
+          setError(`Could not upload that image: ${upload.error.message}`)
+          return
+        }
+
+        const dimensions = await readDimensions(file)
+
+        const result = await confirmPostImage({
+          mediaId: signed.mediaId,
+          postId: id,
+          mime: file.type,
+          width: dimensions?.width ?? null,
+          height: dimensions?.height ?? null,
+          // Alt text is written afterwards, in the document, where the writer can
+          // see what they are describing.
+          altText: '',
+        })
+
+        if (!result.ok || !result.url) {
+          setError(result.error ?? 'Could not add that image.')
+          return
+        }
+
+        editor?.chain().focus().setImage({ src: result.url, alt: '' }).run()
+      } finally {
+        setImageBusy(false)
+      }
+    },
+    [id, editor, supabase]
+  )
+
   const [publishing, setPublishing] = useState(false)
 
   const togglePublished = useCallback(async () => {
@@ -280,12 +369,43 @@ export function BlogStudio({ post, trips }: { post?: BlogDraft; trips: TripOptio
           {fieldErrors.title && <p className="text-sm text-destructive">{fieldErrors.title}</p>}
 
           <Card className="overflow-hidden p-0">
-            {editor && <EditorToolbar editor={editor} />}
+            {editor && (
+              <EditorToolbar
+                editor={editor}
+                // No id means no post row yet, so there is nothing to attach an
+                // upload to. The button appears after the first autosave.
+                onInsertImage={id ? () => fileInput.current?.click() : undefined}
+                imageBusy={imageBusy}
+              />
+            )}
             <EditorContent editor={editor} />
           </Card>
 
-          <p className="text-xs text-muted-foreground tabular-nums">
-            {words} {words === 1 ? 'word' : 'words'} · {readingMinutes(contentHtml)} min read
+          {/* Outside the toolbar so a re-render of the button row cannot reset a
+              file selection that is mid-flight. */}
+          <input
+            ref={fileInput}
+            type="file"
+            accept={ALLOWED_IMAGE_MIME.join(',')}
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0]
+              // Cleared so choosing the same file twice fires onChange again.
+              event.target.value = ''
+              if (file) void insertImage(file)
+            }}
+          />
+
+          <p className="flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
+            <span className="tabular-nums">
+              {words} {words === 1 ? 'word' : 'words'} · {readingMinutes(contentHtml)} min read
+            </span>
+            {id && (
+              <span className="flex items-center gap-1.5">
+                <ImageOff className="size-3" aria-hidden />
+                Images are published as copies with their location data removed.
+              </span>
+            )}
           </p>
         </div>
 
@@ -310,7 +430,7 @@ export function BlogStudio({ post, trips }: { post?: BlogDraft; trips: TripOptio
                 <p className="text-xs text-muted-foreground">
                   {visibility === 'private' && 'Only you. Publishing needs unlisted or public.'}
                   {visibility === 'unlisted' &&
-                    'Anyone with the link, once share links exist. For now, only you.'}
+                    'Anyone with the share link below, once the post is published. Never indexed.'}
                   {visibility === 'public' && 'Anyone, and search engines, once published.'}
                 </p>
               </div>
@@ -379,6 +499,19 @@ export function BlogStudio({ post, trips }: { post?: BlogDraft; trips: TripOptio
             </CardContent>
           </Card>
 
+          {/* Only once the post exists: a share link needs a row to point at,
+              and a new post has none until the first autosave. */}
+          {id && slug && (
+            <SharePostCard
+              postId={id}
+              slug={slug}
+              visibility={visibility}
+              published={published}
+              existingToken={post?.shareToken ?? null}
+              siteUrl={siteUrl}
+            />
+          )}
+
           {!canPublish && !published && (
             <p className="text-xs text-muted-foreground">
               Set this post to unlisted or public to publish it.
@@ -388,6 +521,23 @@ export function BlogStudio({ post, trips }: { post?: BlogDraft; trips: TripOptio
       </div>
     </div>
   )
+}
+
+/**
+ * Pixel dimensions from the decoded image.
+ *
+ * Nice to have, not required: a browser that cannot decode the format returns
+ * nothing and the row stores nulls, exactly as the vault's uploader does.
+ */
+async function readDimensions(file: File): Promise<{ width: number; height: number } | null> {
+  try {
+    const bitmap = await createImageBitmap(file)
+    const size = { width: bitmap.width, height: bitmap.height }
+    bitmap.close()
+    return size
+  } catch {
+    return null
+  }
 }
 
 /** Tiptap's own JSON when there is one, falling back to stored HTML. */

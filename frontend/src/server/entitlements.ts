@@ -199,6 +199,52 @@ export async function checkPhotoQuota(tripId: string, bytes: number): Promise<Me
   return { allowed: true, used: quota.photosUsed, limit: quota.photosLimit, quota }
 }
 
+/**
+ * Whether `bytes` fit in what is left of the account's storage pool.
+ *
+ * The pool without the per-trip photo cap, for images that belong to no trip:
+ * one placed inside a post costs storage like any other file, but "photos per
+ * trip" is not a question a standalone post can answer. The pool is the limit the
+ * plan actually charges for, so it is the one that has to hold.
+ */
+export async function checkStorageQuota(bytes: number): Promise<MediaQuotaCheck> {
+  const supabase = await createClient()
+  const user = await requireUser()
+  const { limits, planName } = await getEntitlements()
+
+  const { data } = await supabase
+    .from('media')
+    .select('bytes')
+    .eq('user_id', user.id)
+    .is('deleted_at', null)
+
+  const storageUsed = (data ?? []).reduce((sum, m) => sum + (m.bytes ?? 0), 0)
+  const storageLimit = limits.storage_bytes ?? null
+  const bytesRemaining = storageLimit === null ? null : Math.max(0, storageLimit - storageUsed)
+
+  const quota: MediaQuota = {
+    // No trip, so no per-trip count to report. Null limit reads as "not
+    // applicable" to the meter rather than as "unlimited photos".
+    photosUsed: 0,
+    photosLimit: null,
+    storageUsed,
+    storageLimit,
+    bytesRemaining,
+  }
+
+  if (bytesRemaining !== null && bytes > bytesRemaining) {
+    return {
+      allowed: false,
+      used: storageUsed,
+      limit: storageLimit,
+      quota,
+      reason: `That image does not fit in what is left of your ${planName} storage. Free some space or upgrade — nothing is deleted either way.`,
+    }
+  }
+
+  return { allowed: true, used: storageUsed, limit: storageLimit, quota }
+}
+
 /** Convenience for read paths that only need the boolean. */
 export async function canUseRegionDetail(): Promise<boolean> {
   const { limits } = await getEntitlements()
