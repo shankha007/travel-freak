@@ -47,14 +47,25 @@ their own line — nobody outside the repo ever saw them.
 
 <!-- releases -->
 
-## Unreleased — The changelog, and four gaps closed
+## Unreleased — Onboarding, the changelog, and four gaps closed
 
-> Four of the things the product was quietly not doing: places had no
-> coordinates, deleting made a promise nothing kept, unlisted posts were
-> unshareable, and posts could not hold a photograph.
+> A new account used to land on an empty grey globe with no idea what this was
+> for. Now the first thing it does is tap the countries it has already been to
+> and watch them fill in.
 
 ### Added
 
+- **Onboarding** `/welcome` — three steps for a new account: your username and
+  where you are based, then the one that matters — tap every country you have
+  already been to, on a map that turns green as you go, with a searchable list
+  beside it for anyone who would rather type than hunt. Each step saves before
+  the next, so a closed tab resumes where it left off, and finishing lands on the
+  globe you just filled in.
+- **"Been there" without a trip** — marking a country records exactly that and
+  nothing more. It costs no trip quota, appears in no list, and the moment you
+  log a real trip for that country the trip's dates, cities and photos take over.
+  Previously the only ways to paint a country green were to invent a whole trip
+  for it or to lie about wanting to go.
 - **Public changelog page** `/changelog` — a timeline of every release, rendered
   from `docs/CHANGELOG.md` at build time. No login, no database read: the page is
   static, so it costs nothing to serve and cannot drift from this file.
@@ -139,6 +150,11 @@ their own line — nobody outside the repo ever saw them.
 
 ### Infrastructure
 
+- `visited_countries` is a third source for the `visited_regions` aggregate,
+  after `trip_places` and `wishlist_items` (migration `20260813000600`).
+  Precedence runs richest-first and is the whole design: a mark never displaces
+  what a trip knows — including when the trip was recorded at state level and the
+  mark at country level, which a conflict clause alone would have missed.
 - `share_links` gains `post_id`, `resolve_post_share_link()` and
   `post_shows_branding_badge()` (migration `20260813000200`);
   `list_deleted_trips()` lets an owner read their own deleted trips, which

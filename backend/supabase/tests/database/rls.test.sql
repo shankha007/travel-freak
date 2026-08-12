@@ -799,6 +799,152 @@ select is_empty(
   'bob cannot see alice''s deleted trip in his trash'
 );
 
+-- ---------------------------------------------------------------------------
+-- visited_countries — bare "been there" marks
+--
+-- A third source for the aggregate, and the reason it exists is precedence: a
+-- mark must never overwrite what a real trip knows, and must never be mistaken
+-- for a plan.
+-- ---------------------------------------------------------------------------
+
+reset role;
+
+-- Clear the decks: earlier sections left trips and wishlist rows for alice.
+delete from public.wishlist_items where user_id = 'aaaaaaaa-0000-4000-8000-000000000001';
+delete from public.trip_places where user_id = 'aaaaaaaa-0000-4000-8000-000000000001';
+delete from public.visited_countries where user_id = 'aaaaaaaa-0000-4000-8000-000000000001';
+
+select set_config('request.jwt.claims',
+  '{"sub":"aaaaaaaa-0000-4000-8000-000000000001","role":"authenticated"}', true);
+set local role authenticated;
+
+-- A tapped country with no trip behind it.
+insert into public.visited_countries (user_id, country_code)
+values ('aaaaaaaa-0000-4000-8000-000000000001', 'ISL');
+
+select is(
+  (select state::text from public.visited_regions
+   where user_id = 'aaaaaaaa-0000-4000-8000-000000000001' and country_code = 'ISL'),
+  'visited',
+  'a bare mark paints the country visited'
+);
+
+select is(
+  (select visit_count from public.visited_regions
+   where user_id = 'aaaaaaaa-0000-4000-8000-000000000001' and country_code = 'ISL'),
+  0,
+  'and counts zero trips, because none were recorded'
+);
+
+-- A wishlist entry for the same country must not downgrade it to planned.
+insert into public.wishlist_items (user_id, country_code)
+values ('aaaaaaaa-0000-4000-8000-000000000001', 'ISL');
+
+select is(
+  (select state::text from public.visited_regions
+   where user_id = 'aaaaaaaa-0000-4000-8000-000000000001' and country_code = 'ISL'),
+  'visited',
+  'a mark outranks a wishlist plan for the same country'
+);
+
+-- A real completed trip must outrank the mark, bringing its count with it.
+reset role;
+insert into public.trips (id, user_id, title, slug, status, visibility, published_at)
+values ('a1111111-0000-4000-8000-000000000009', 'aaaaaaaa-0000-4000-8000-000000000001',
+        'Iceland for real', 'rls-alice-iceland', 'completed', 'private', null);
+insert into public.trip_places (trip_id, user_id, country_code, city_name, order_index)
+values ('a1111111-0000-4000-8000-000000000009', 'aaaaaaaa-0000-4000-8000-000000000001',
+        'ISL', 'Reykjavik', 0);
+
+select is(
+  (select visit_count from public.visited_regions
+   where user_id = 'aaaaaaaa-0000-4000-8000-000000000001' and country_code = 'ISL'),
+  1,
+  'a logged trip outranks the mark and contributes its visit count'
+);
+
+select is(
+  (select city_names from public.visited_regions
+   where user_id = 'aaaaaaaa-0000-4000-8000-000000000001' and country_code = 'ISL'),
+  array['Reykjavik'],
+  'and the trip''s cities survive, which a mark could not have supplied'
+);
+
+-- Removing the mark leaves the trip-derived row untouched.
+select set_config('request.jwt.claims',
+  '{"sub":"aaaaaaaa-0000-4000-8000-000000000001","role":"authenticated"}', true);
+set local role authenticated;
+
+delete from public.visited_countries
+where user_id = 'aaaaaaaa-0000-4000-8000-000000000001' and country_code = 'ISL';
+
+select is(
+  (select visit_count from public.visited_regions
+   where user_id = 'aaaaaaaa-0000-4000-8000-000000000001' and country_code = 'ISL'),
+  1,
+  'un-marking a country the user has actually been to changes nothing'
+);
+
+-- Subdivision-level trips: the trap the conflict clause alone does not catch.
+-- Alice's Iceland trip is country-level, so mark a country recorded by region
+-- instead and confirm no bare row appears beside the detailed ones.
+reset role;
+-- The wishlist row from the assertion above would add a second, country-level
+-- ISL row and muddy what this is measuring. (It is harmless in the product:
+-- rollUpToCountries takes the strongest state, so visited still wins on the
+-- globe.) Removed here so the count below is only about marks.
+delete from public.wishlist_items
+where user_id = 'aaaaaaaa-0000-4000-8000-000000000001' and country_code = 'ISL';
+
+update public.trip_places set region_code = 'IS-1'
+where trip_id = 'a1111111-0000-4000-8000-000000000009';
+
+select set_config('request.jwt.claims',
+  '{"sub":"aaaaaaaa-0000-4000-8000-000000000001","role":"authenticated"}', true);
+set local role authenticated;
+
+insert into public.visited_countries (user_id, country_code)
+values ('aaaaaaaa-0000-4000-8000-000000000001', 'ISL');
+
+select is(
+  (select count(*) from public.visited_regions
+   where user_id = 'aaaaaaaa-0000-4000-8000-000000000001' and country_code = 'ISL')::int,
+  1,
+  'a mark adds no row beside a country already recorded at subdivision level'
+);
+
+select is(
+  (select region_code from public.visited_regions
+   where user_id = 'aaaaaaaa-0000-4000-8000-000000000001' and country_code = 'ISL'),
+  'IS-1',
+  'and the row that survives is the one that knows the trip'
+);
+
+delete from public.visited_countries
+where user_id = 'aaaaaaaa-0000-4000-8000-000000000001' and country_code = 'ISL';
+
+-- Cross-user: bob cannot mark a country for alice, nor read hers.
+select set_config('request.jwt.claims',
+  '{"sub":"bbbbbbbb-0000-4000-8000-000000000002","role":"authenticated"}', true);
+set local role authenticated;
+
+select throws_ok(
+  $$ insert into public.visited_countries (user_id, country_code)
+     values ('aaaaaaaa-0000-4000-8000-000000000001', 'PER') $$,
+  '42501',
+  null,
+  'bob cannot mark a country on alice''s behalf'
+);
+
+insert into public.visited_countries (user_id, country_code)
+values ('bbbbbbbb-0000-4000-8000-000000000002', 'PER');
+
+select is(
+  (select count(*) from public.visited_countries)::int,
+  1,
+  'and sees only his own marks'
+);
+
 select * from finish();
 
 rollback;

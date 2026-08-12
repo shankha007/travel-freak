@@ -27,14 +27,14 @@ Last updated: 2026-08-13
 |---|---|---|---|---|
 | Infrastructure | 16 | 0 | 0 | 3 |
 | Public / marketing | 2 | 1 | 0 | 7 |
-| Auth | 4 | 0 | 0 | 3 |
+| Auth | 5 | 0 | 0 | 2 |
 | Dashboard & globe | 5 | 2 | 0 | 0 |
 | Trips & planner | 5 | 1 | 0 | 4 |
 | Memory & content | 4 | 1 | 2 | 0 |
 | Analytics & resume | 1 | 0 | 1 | 2 |
 | Public sharing | 5 | 0 | 0 | 0 |
 | Account | 0 | 0 | 1 | 6 |
-| **Total** | **42** | **5** | **4** | **25** |
+| **Total** | **43** | **5** | **4** | **24** |
 
 ---
 
@@ -47,13 +47,13 @@ Last updated: 2026-08-13
 | — | Light/dark theming | ✅ Done | `next-themes`, system default, no flash |
 | — | Supabase local stack | ✅ Done | Docker; API 54321, DB 54322, Studio 54323 |
 | — | Postgres schema + RLS | ✅ Done | 14 tables, PostGIS, policies on every table. `trip_places.location` is written as EWKT and read back through generated `latitude`/`longitude` columns, because PostgREST returns geography as hex EWKB — see `shared/geo/point.ts` |
-| — | `visited_regions` aggregate + triggers | ✅ Done | Rebuilt from `trip_places` / `wishlist_items` |
+| — | `visited_regions` aggregate + triggers | ✅ Done | Rebuilt from `trip_places` / `visited_countries` / `wishlist_items`, in that precedence — a bare "been there" mark never displaces what a logged trip knows |
 | — | Data API grants | ✅ Done | Migration `20260811000100` for `anon`/`authenticated`, `20260813000400` for `service_role` — without the latter every elevated read (share tokens, derivatives) 42501s |
 | — | Seed data | ✅ Done | 12 trips, 8 countries, 1 demo account |
 | — | Generated DB types | ✅ Done | `npm run db:types` → `shared/types/database.ts` |
 | — | `brand.ts` rename safety | ✅ Done | No component hardcodes the product name |
 | — | **`entitlements.ts`** | ✅ Done | Reads `plans.limits`; `checkTripQuota()` counts the caller's own live rows rather than trusting the denormalised counter. Gates both `/trips/new` and the create action |
-| — | **pgTAP RLS tests** | ✅ Done | `backend/supabase/tests/database/rls.test.sql`, 76 assertions, `npm run db:test`. Two users, cross-user reads and writes, anon visibility, unpublish, soft delete, trip and post share tokens, and the trash listing |
+| — | **pgTAP RLS tests** | ✅ Done | `backend/supabase/tests/database/rls.test.sql`, 86 assertions, `npm run db:test`. Two users, cross-user reads and writes, anon visibility, unpublish, soft delete, trip and post share tokens, and the trash listing |
 | — | HTML sanitisation | ✅ Done | `shared/content/sanitize.ts` — allowlist applied on read, so stored post markup cannot execute on the app's origin |
 | — | **Storage + signed uploads** | ✅ Done | Private `media` bucket, keys `<user>/<trip>/<media>.<ext>` — or `<user>/posts/<post>/<media>.<ext>` for post images — matching the storage policies, which only read the first segment. Reads go out as one-hour signed URLs; `next/image` is allow-listed to the storage host only |
 | — | **Geo assets** | ✅ Done | `npm run build:geo` writes country outlines plus admin-1 split one file per country, simplified 4% with mapshaper. Natural Earth 50m carries ISO 3166-2 for nine large countries, India among them |
@@ -86,7 +86,7 @@ Last updated: 2026-08-13
 | — | Sign out | ✅ Done | Server Action, clears httpOnly cookies |
 | 7 | **Register** `/register` | ✅ Done | Email + password + optional name, shared Zod schema, 8-character minimum matching `config.toml`. Handles both projects that require email confirmation and local, where sign-up returns a session immediately. Profile, `explorer` subscription and usage row come from the `on_auth_user_created` trigger |
 | 9 | Forgot / reset / verify | ⬜ Not started | |
-| 10 | Onboarding wizard `/welcome` | ⬜ Not started | "Tap countries you've visited" is the instant-payoff moment |
+| 10 | **Onboarding wizard** `/welcome` | ✅ Done | Username, home country, then tap the countries you have been to on a map that fills in as you go, with a searchable list beside it. Each step saves before advancing, so it resumes; only the last sets `onboarded_at`, which is what the app shell gates on |
 | — | Google OAuth | ⬜ Not started | |
 
 ## Dashboard & signature views

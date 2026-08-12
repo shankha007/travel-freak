@@ -766,6 +766,27 @@ export type Database = {
         }
         Relationships: []
       }
+      visited_countries: {
+        Row: {
+          country_code: string
+          created_at: string
+          region_code: string
+          user_id: string
+        }
+        Insert: {
+          country_code: string
+          created_at?: string
+          region_code?: string
+          user_id: string
+        }
+        Update: {
+          country_code?: string
+          created_at?: string
+          region_code?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       visited_regions: {
         Row: {
           city_names: string[]

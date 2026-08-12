@@ -18,6 +18,8 @@ export interface SessionUser {
   displayName: string
   avatarUrl: string | null
   planCode: string
+  /** Null until the onboarding wizard is finished. The app shell gates on it. */
+  onboardedAt: string | null
 }
 
 /** The signed-in user with their profile and plan, or null. */
@@ -34,7 +36,7 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('username, display_name, avatar_url')
+    .select('username, display_name, avatar_url, onboarded_at')
     .eq('id', user.id)
     .single()
 
@@ -50,6 +52,7 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
     username: profile?.username ?? '',
     displayName: profile?.display_name || profile?.username || 'Traveller',
     avatarUrl: profile?.avatar_url ?? null,
+    onboardedAt: profile?.onboarded_at ?? null,
     planCode: subscription?.plan_code ?? 'explorer',
   }
 })

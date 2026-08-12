@@ -33,6 +33,10 @@ const PROTECTED = [
   '/resume',
   '/settings',
   '/trash',
+  // Onboarding is behind a login but outside the app shell, so it needs its own
+  // entry here. Whether it has been *completed* is decided by the shell, which
+  // already has the profile row in hand — this only decides who may see it.
+  '/welcome',
 ]
 
 /** Auth pages a signed-in user has no reason to see. */
