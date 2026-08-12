@@ -119,6 +119,25 @@ describe('totalDistanceKm', () => {
 
     expect(km).toBeGreaterThan(1100)
   })
+
+  it('agrees with PostGIS on a real itinerary', () => {
+    // Tokyo → Kyoto → Osaka, the coordinates the map picker writes. PostGIS makes
+    // this 403 km:
+    //
+    //   select sum(st_distance(location, prev)) ... => 403
+    //
+    // This app answers the same question with haversine on a sphere, so the two
+    // will never match to the metre — but they must agree to within a fraction of
+    // a percent, or one of them is wrong about the earth.
+    const km = totalDistanceKm([
+      place({ tripId: 'jp', orderIndex: 0, lat: 35.6762, lng: 139.6503 }),
+      place({ tripId: 'jp', orderIndex: 1, lat: 35.0116, lng: 135.7681 }),
+      place({ tripId: 'jp', orderIndex: 2, lat: 34.6937, lng: 135.5023 }),
+    ])
+
+    expect(km).not.toBeNull()
+    expect(Math.abs((km as number) - 403)).toBeLessThan(4)
+  })
 })
 
 describe('yearsTravelling', () => {

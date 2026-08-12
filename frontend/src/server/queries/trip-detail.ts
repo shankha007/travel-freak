@@ -2,7 +2,7 @@ import 'server-only'
 
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 import { createClient } from '@/server/supabase/server'
-import { parsePoint } from '@/shared/geo/point'
+import { pointFrom } from '@/shared/geo/point'
 import type { Database } from '@/shared/types/database'
 
 /**
@@ -116,7 +116,7 @@ export async function getTripDetail(id: string): Promise<TripDetail | null> {
     supabase
       .from('trip_places')
       .select(
-        'id, country_code, region_code, city_name, place_kind, arrival_date, departure_date, notes, order_index, location'
+        'id, country_code, region_code, city_name, place_kind, arrival_date, departure_date, notes, order_index, latitude, longitude'
       )
       .eq('trip_id', id)
       .order('order_index', { ascending: true }),
@@ -163,7 +163,7 @@ export async function getTripDetail(id: string): Promise<TripDetail | null> {
   const urlByPath = new Map((signed.data ?? []).map((s) => [s.path, s.signedUrl]))
 
   const places = (placesResult.data ?? []).map((p) => {
-    const point = parsePoint(p.location)
+    const point = pointFrom(p.latitude, p.longitude)
     return {
       id: p.id,
       countryCode: p.country_code,

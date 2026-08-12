@@ -98,6 +98,29 @@ their own line — nobody outside the repo ever saw them.
 - `docs/STATUS.md` marks screen 12 (Changelog) as done, and no longer accumulates
   release notes: history lives here now.
 
+### Fixed
+
+- **Unlisted trip links and public trip photos never worked.** Both read through
+  the service role, because RLS cannot see a share token — and the schema never
+  granted that role access to any table, so every one of those reads failed with
+  a permission error. Shipped broken in 0.11.0 and invisible until the local
+  database was brought up to date, because the code paths had never run against a
+  schema that had them. Granted in migration `20260813000400`, with default
+  privileges so a new table cannot reintroduce it.
+- **A pinned place read back as unpinned.** PostgREST serialises
+  `geography(Point,4326)` as hex EWKB, not GeoJSON, so the reader returned "no
+  coordinates" for every row that had them — which meant distance travelled, the
+  thing pins exist for, could never be computed. `trip_places` now carries
+  `latitude` and `longitude` generated from `location` (migration
+  `20260813000500`) and the app reads numbers instead of guessing at a binary
+  format. Verified against PostGIS: Tokyo → Kyoto → Osaka is 403 km both ways.
+- **`public_resume_stats()` answered for private profiles.** Its visibility check
+  sat inside an ungrouped aggregate, and `count(*)` over no rows is 0, not null —
+  so a private profile got a row of zeros where its sibling function returns
+  nothing at all. Zeros revealed nothing, which is why it went unnoticed; what it
+  broke was the difference between "private" and "public with no trips"
+  (migration `20260813000300`).
+
 ### Security
 
 - **A post token is not a trip token.** The two resolvers read the same table and
@@ -120,6 +143,10 @@ their own line — nobody outside the repo ever saw them.
   `post_shows_branding_badge()` (migration `20260813000200`);
   `list_deleted_trips()` lets an owner read their own deleted trips, which
   `trips_select_own` otherwise hides from them (migration `20260813000100`).
+- The pgTAP suite is at 76 assertions and green against a database with every
+  migration applied — which is how the three bugs above were found. Four
+  migrations had never been run locally, so the assertions written alongside them
+  had never executed.
 - `@tiptap/extension-image` is pinned to 3.29.2 rather than ranged: its 3.30
   release peer-depends on a `@tiptap/core` newer than the one the starter kit
   installs, and npm refuses the tree.

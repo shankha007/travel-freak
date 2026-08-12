@@ -46,14 +46,14 @@ Last updated: 2026-08-13
 | — | shadcn/ui + Base UI component set | ✅ Done | 21 components installed |
 | — | Light/dark theming | ✅ Done | `next-themes`, system default, no flash |
 | — | Supabase local stack | ✅ Done | Docker; API 54321, DB 54322, Studio 54323 |
-| — | Postgres schema + RLS | ✅ Done | 14 tables, PostGIS, policies on every table. `trip_places.location` is written as EWKT and read back as GeoJSON — see `shared/geo/point.ts` |
+| — | Postgres schema + RLS | ✅ Done | 14 tables, PostGIS, policies on every table. `trip_places.location` is written as EWKT and read back through generated `latitude`/`longitude` columns, because PostgREST returns geography as hex EWKB — see `shared/geo/point.ts` |
 | — | `visited_regions` aggregate + triggers | ✅ Done | Rebuilt from `trip_places` / `wishlist_items` |
-| — | Data API grants | ✅ Done | Migration `20260811000100`; without it PostgREST 42501s every table |
+| — | Data API grants | ✅ Done | Migration `20260811000100` for `anon`/`authenticated`, `20260813000400` for `service_role` — without the latter every elevated read (share tokens, derivatives) 42501s |
 | — | Seed data | ✅ Done | 12 trips, 8 countries, 1 demo account |
 | — | Generated DB types | ✅ Done | `npm run db:types` → `shared/types/database.ts` |
 | — | `brand.ts` rename safety | ✅ Done | No component hardcodes the product name |
 | — | **`entitlements.ts`** | ✅ Done | Reads `plans.limits`; `checkTripQuota()` counts the caller's own live rows rather than trusting the denormalised counter. Gates both `/trips/new` and the create action |
-| — | **pgTAP RLS tests** | ✅ Done | `backend/supabase/tests/database/rls.test.sql`, `npm run db:test`. Two users, cross-user reads and writes, anon visibility, unpublish, soft delete, trip and post share tokens, and the trash listing |
+| — | **pgTAP RLS tests** | ✅ Done | `backend/supabase/tests/database/rls.test.sql`, 76 assertions, `npm run db:test`. Two users, cross-user reads and writes, anon visibility, unpublish, soft delete, trip and post share tokens, and the trash listing |
 | — | HTML sanitisation | ✅ Done | `shared/content/sanitize.ts` — allowlist applied on read, so stored post markup cannot execute on the app's origin |
 | — | **Storage + signed uploads** | ✅ Done | Private `media` bucket, keys `<user>/<trip>/<media>.<ext>` — or `<user>/posts/<post>/<media>.<ext>` for post images — matching the storage policies, which only read the first segment. Reads go out as one-hour signed URLs; `next/image` is allow-listed to the storage host only |
 | — | **Geo assets** | ✅ Done | `npm run build:geo` writes country outlines plus admin-1 split one file per country, simplified 4% with mapshaper. Natural Earth 50m carries ISO 3166-2 for nine large countries, India among them |
@@ -205,7 +205,7 @@ Last updated: 2026-08-13
    coordinates now, so the tab has data to draw and EXIF coordinates have something to be
    matched against. It needs the same `MapView` in pin mode plus a decision about what to show
    for photos whose place has no pin.
-8. **Distance travelled only counts pinned places.** `totalDistanceKm` walks a trip's places in
-   order and skips any without coordinates, so a trip with three places and one pin measures
-   nothing. That is the honest answer, but a partially pinned trip reads as unmeasured with no
-   explanation on the resume.
+8. **A partially pinned trip reads as unmeasured.** `totalDistanceKm` skips places without
+   coordinates, so one pin among three measures nothing. That is the honest answer — the legs it
+   cannot see are real distance — but the resume shows no explanation for why a trip with places
+   has no number.

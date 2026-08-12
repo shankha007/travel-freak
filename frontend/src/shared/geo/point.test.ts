@@ -1,33 +1,29 @@
 import { describe, expect, it } from 'vitest'
-import { formatLngLat, isValidLngLat, parsePoint, toPointEwkt } from './point'
+import { formatLngLat, isValidLngLat, pointFrom, toPointEwkt } from './point'
 
-describe('parsePoint', () => {
-  it('reads the GeoJSON PostgREST returns', () => {
-    expect(parsePoint({ type: 'Point', coordinates: [77.2295, 28.6129] })).toEqual({
-      lng: 77.2295,
-      lat: 28.6129,
-    })
+describe('pointFrom', () => {
+  it('reads the generated columns', () => {
+    expect(pointFrom(28.6129, 77.2295)).toEqual({ lng: 77.2295, lat: 28.6129 })
   })
 
-  it('accepts the same thing as a JSON string', () => {
-    expect(parsePoint('{"type":"Point","coordinates":[77.2295,28.6129]}')).toEqual({
-      lng: 77.2295,
-      lat: 28.6129,
-    })
-  })
-
-  it('treats anything else as no coordinates', () => {
-    // A place with no pin is ordinary; none of these should throw.
-    expect(parsePoint(null)).toBeNull()
-    expect(parsePoint(undefined)).toBeNull()
-    expect(parsePoint('0101000020E6100000')).toBeNull()
-    expect(parsePoint({ type: 'LineString', coordinates: [] })).toBeNull()
-    expect(parsePoint({ type: 'Point', coordinates: ['77', '28'] })).toBeNull()
+  it('treats a missing coordinate as no pin', () => {
+    // Both columns are generated from the same geography, so in practice they are
+    // null together — but half a pin is never a location.
+    expect(pointFrom(null, null)).toBeNull()
+    expect(pointFrom(28.6129, null)).toBeNull()
+    expect(pointFrom(null, 77.2295)).toBeNull()
+    expect(pointFrom(undefined, undefined)).toBeNull()
   })
 
   it('rejects coordinates that are not on the earth', () => {
-    expect(parsePoint({ type: 'Point', coordinates: [200, 28] })).toBeNull()
-    expect(parsePoint({ type: 'Point', coordinates: [77, 91] })).toBeNull()
+    expect(pointFrom(28, 200)).toBeNull()
+    expect(pointFrom(91, 77)).toBeNull()
+  })
+
+  it('does not accept a stringified number, which is what a hex column would give', () => {
+    // PostgREST serialises `location` itself as hex EWKB. Reading that column by
+    // mistake must fail loudly-ish (no pin) rather than half-work.
+    expect(pointFrom('28.6' as unknown as number, '77.2' as unknown as number)).toBeNull()
   })
 })
 
@@ -36,10 +32,16 @@ describe('toPointEwkt', () => {
     expect(toPointEwkt({ lng: 77.2295, lat: 28.6129 })).toBe('SRID=4326;POINT(77.2295 28.6129)')
   })
 
-  it('round-trips through parsePoint via GeoJSON of the same numbers', () => {
-    const point = { lng: -0.1276, lat: 51.5072 }
-    expect(toPointEwkt(point)).toBe('SRID=4326;POINT(-0.1276 51.5072)')
-    expect(parsePoint({ type: 'Point', coordinates: [point.lng, point.lat] })).toEqual(point)
+  it('round-trips through what Postgres generates back', () => {
+    // Verified against the real database: this EWKT stored in a
+    // geography(Point,4326) yields exactly these generated columns.
+    const point = { lng: 77.2295, lat: 28.6129 }
+    expect(toPointEwkt(point)).toBe('SRID=4326;POINT(77.2295 28.6129)')
+    expect(pointFrom(28.6129, 77.2295)).toEqual(point)
+  })
+
+  it('handles the antimeridian and the poles', () => {
+    expect(toPointEwkt({ lng: -180, lat: -90 })).toBe('SRID=4326;POINT(-180 -90)')
   })
 })
 

@@ -12,7 +12,7 @@ import {
   type ResumePlace,
 } from '@/shared/resume'
 import { TOTAL_COUNTRIES } from '@/shared/geo/countries'
-import { parsePoint } from '@/shared/geo/point'
+import { pointFrom } from '@/shared/geo/point'
 import type { Database } from '@/shared/types/database'
 
 /**
@@ -172,7 +172,9 @@ export async function getResumeData(
       .order('country_code', { ascending: true }),
     supabase
       .from('trip_places')
-      .select('country_code, region_code, city_name, place_kind, location, trip_id, order_index')
+      .select(
+        'country_code, region_code, city_name, place_kind, latitude, longitude, trip_id, order_index'
+      )
       .eq('user_id', profile.id),
     supabase
       .from('trips')
@@ -195,7 +197,7 @@ export async function getResumeData(
 
   const regions = (regionRows.data ?? []).map(toVisitedRegion)
   const places: ResumePlace[] = (placeRows.data ?? []).map((p) => {
-    const point = parsePoint(p.location)
+    const point = pointFrom(p.latitude, p.longitude)
     return {
       countryCode: p.country_code,
       regionCode: p.region_code,

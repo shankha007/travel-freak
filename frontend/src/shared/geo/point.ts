@@ -1,13 +1,20 @@
 /**
  * Coordinates, on the way in and on the way out of PostGIS.
  *
- * `trip_places.location` is `geography(Point, 4326)`. PostgREST hands it back as
- * GeoJSON, but takes it as text — so a read and a write are not symmetrical, and
- * both directions live here rather than being re-derived at each call site.
+ * `trip_places.location` is `geography(Point, 4326)`, and the two directions are
+ * not symmetrical:
  *
- * Anything unrecognised on the way in reads as "no coordinates" instead of
- * throwing: a place without a pin is an ordinary place, and a resume should not
- * fail to render because one row holds something unexpected.
+ *  - **Writing** sends EWKT text, which the column's input function parses.
+ *  - **Reading** does not touch `location` at all. PostgREST serialises geography
+ *    as hex EWKB — `0101000020E6100000…`, not GeoJSON — so the app reads the
+ *    `latitude` and `longitude` columns generated from it (migration
+ *    `20260813000500`) and gets plain numbers.
+ *
+ * That asymmetry is the whole reason this file exists: it is the one place that
+ * knows the answer, so no call site has to.
+ *
+ * A row with no pin is an ordinary row, so a missing or nonsensical coordinate
+ * reads as "no coordinates" rather than throwing.
  */
 
 export interface LngLat {
@@ -27,31 +34,20 @@ export function isValidLngLat(value: { lng: number; lat: number }): boolean {
   )
 }
 
-/** Reads a PostGIS point out of whatever PostgREST hands back. */
-export function parsePoint(value: unknown): LngLat | null {
-  // Selected directly, the column arrives as a GeoJSON object. Some clients
-  // stringify it first, so a JSON string is accepted as the same thing.
-  const candidate =
-    typeof value === 'string'
-      ? (() => {
-          try {
-            return JSON.parse(value) as unknown
-          } catch {
-            return null
-          }
-        })()
-      : value
-
-  if (!candidate || typeof candidate !== 'object') return null
-
-  const point = candidate as { type?: string; coordinates?: unknown }
-  if (point.type !== 'Point' || !Array.isArray(point.coordinates)) return null
-
-  const [lng, lat] = point.coordinates
-  if (typeof lng !== 'number' || typeof lat !== 'number') return null
-  if (!isValidLngLat({ lng, lat })) return null
-
-  return { lng, lat }
+/**
+ * Reads a pin from the generated columns.
+ *
+ * Both are null together — they are generated from the same `location` — but this
+ * accepts them separately because that is how a row arrives, and returns null
+ * unless both are present and plausible.
+ */
+export function pointFrom(
+  latitude: number | null | undefined,
+  longitude: number | null | undefined
+): LngLat | null {
+  if (typeof latitude !== 'number' || typeof longitude !== 'number') return null
+  const point = { lng: longitude, lat: latitude }
+  return isValidLngLat(point) ? point : null
 }
 
 /**

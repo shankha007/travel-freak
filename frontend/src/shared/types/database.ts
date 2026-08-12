@@ -452,17 +452,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "share_links_trip_id_fkey"
-            columns: ["trip_id"]
-            isOneToOne: false
-            referencedRelation: "trips"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "share_links_post_id_fkey"
             columns: ["post_id"]
             isOneToOne: false
             referencedRelation: "blog_posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "share_links_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
             referencedColumns: ["id"]
           },
         ]
@@ -599,7 +599,9 @@ export type Database = {
           created_at: string
           departure_date: string | null
           id: string
+          latitude: number | null
           location: unknown
+          longitude: number | null
           notes: string
           order_index: number
           place_kind: Database["public"]["Enums"]["place_kind"]
@@ -615,7 +617,9 @@ export type Database = {
           created_at?: string
           departure_date?: string | null
           id?: string
+          latitude?: number | null
           location?: unknown
+          longitude?: number | null
           notes?: string
           order_index?: number
           place_kind?: Database["public"]["Enums"]["place_kind"]
@@ -631,7 +635,9 @@ export type Database = {
           created_at?: string
           departure_date?: string | null
           id?: string
+          latitude?: number | null
           location?: unknown
+          longitude?: number | null
           notes?: string
           order_index?: number
           place_kind?: Database["public"]["Enums"]["place_kind"]
@@ -1196,10 +1202,30 @@ export type Database = {
       geomfromewkt: { Args: { "": string }; Returns: unknown }
       gettransactionid: { Args: never; Returns: unknown }
       is_trip_collaborator: { Args: { p_trip_id: string }; Returns: boolean }
+      list_deleted_trips: {
+        Args: never
+        Returns: {
+          deleted_at: string
+          end_date: string
+          id: string
+          photo_count: number
+          place_count: number
+          post_count: number
+          slug: string
+          start_date: string
+          summary: string
+          title: string
+          visibility: Database["public"]["Enums"]["visibility"]
+        }[]
+      }
       longtransactionsenabled: { Args: never; Returns: boolean }
       populate_geometry_columns:
         | { Args: { tbl_oid: unknown; use_typmod?: boolean }; Returns: number }
         | { Args: { use_typmod?: boolean }; Returns: string }
+      post_shows_branding_badge: {
+        Args: { p_post_id: string }
+        Returns: boolean
+      }
       postgis_constraint_dims: {
         Args: { geomcolumn: string; geomschema: string; geomtable: string }
         Returns: number
@@ -1237,47 +1263,32 @@ export type Database = {
       }
       postgis_version: { Args: never; Returns: string }
       postgis_wagyu_version: { Args: never; Returns: string }
-      refresh_visited_regions: {
-        Args: { p_user_id: string }
-        Returns: undefined
-      }
-      restore_trip: { Args: { p_trip_id: string }; Returns: boolean }
-      list_deleted_trips: {
-        Args: never
-        Returns: {
-          id: string
-          title: string
-          slug: string
-          summary: string
-          start_date: string | null
-          end_date: string | null
-          visibility: Database["public"]["Enums"]["visibility"]
-          deleted_at: string
-          place_count: number
-          photo_count: number
-          post_count: number
-        }[]
-      }
-      show_limit: { Args: never; Returns: number }
-      show_trgm: { Args: { "": string }; Returns: string[] }
-      resolve_share_link: { Args: { p_token: string }; Returns: string | null }
-      resolve_post_share_link: { Args: { p_token: string }; Returns: string | null }
-      trip_shows_branding_badge: { Args: { p_trip_id: string }; Returns: boolean }
-      post_shows_branding_badge: { Args: { p_post_id: string }; Returns: boolean }
       public_place_counts: {
         Args: { p_user_id: string }
-        Returns: { place_kind: string; place_count: number }[]
+        Returns: {
+          place_count: number
+          place_kind: string
+        }[]
       }
       public_resume_stats: {
         Args: { p_user_id: string }
         Returns: {
-          trips_count: number
+          first_trip: string
+          latest_trip: string
           travel_days: number
+          trips_count: number
           years_travelling: number
-          first_trip: string | null
-          latest_trip: string | null
         }[]
       }
+      refresh_visited_regions: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
+      resolve_post_share_link: { Args: { p_token: string }; Returns: string }
+      resolve_share_link: { Args: { p_token: string }; Returns: string }
+      restore_trip: { Args: { p_trip_id: string }; Returns: boolean }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       shows_branding_badge: { Args: { p_user_id: string }; Returns: boolean }
       soft_delete_media: { Args: { p_media_id: string }; Returns: boolean }
       soft_delete_trip: { Args: { p_trip_id: string }; Returns: boolean }
@@ -1861,6 +1872,10 @@ export type Database = {
       st_wrapx: {
         Args: { geom: unknown; move: number; wrap: number }
         Returns: unknown
+      }
+      trip_shows_branding_badge: {
+        Args: { p_trip_id: string }
+        Returns: boolean
       }
       unlockrows: { Args: { "": string }; Returns: number }
       updategeometrysrid: {
