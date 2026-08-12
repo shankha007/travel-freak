@@ -1231,6 +1231,21 @@ export type Database = {
       restore_trip: { Args: { p_trip_id: string }; Returns: boolean }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      public_place_counts: {
+        Args: { p_user_id: string }
+        Returns: { place_kind: string; place_count: number }[]
+      }
+      public_resume_stats: {
+        Args: { p_user_id: string }
+        Returns: {
+          trips_count: number
+          travel_days: number
+          years_travelling: number
+          first_trip: string | null
+          latest_trip: string | null
+        }[]
+      }
+      shows_branding_badge: { Args: { p_user_id: string }; Returns: boolean }
       soft_delete_media: { Args: { p_media_id: string }; Returns: boolean }
       soft_delete_trip: { Args: { p_trip_id: string }; Returns: boolean }
       st_3dclosestpoint: {

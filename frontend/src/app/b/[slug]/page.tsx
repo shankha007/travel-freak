@@ -158,17 +158,23 @@ export default async function BlogPostPage({ params }: PageProps<'/b/[slug]'>) {
         {isPublic && (
           <footer className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t pt-6 text-sm">
             {post.author?.isPublic ? (
-              <Badge variant="secondary">{post.author.displayName}</Badge>
+              <Link
+                href={`/u/${post.author.username}`}
+                className="underline-offset-4 hover:underline"
+              >
+                <Badge variant="secondary">{post.author.displayName}</Badge>
+              </Link>
             ) : (
               <span />
             )}
-            {/* The no-ads growth loop. Voyager and above pay to have this
-                removed, which needs the author's plan — and `subscriptions` is
-                readable only by its owner, so that lookup has to go through a
-                SECURITY DEFINER helper. Until then it shows for everyone. */}
-            <Link href="/" className="text-muted-foreground underline underline-offset-4">
-              {BRAND.freePlanBadge}
-            </Link>
+            {/* The no-ads growth loop. Paid plans have this removed, which needs
+                the author's plan — and `subscriptions` is readable only by its
+                owner, so the answer comes from shows_branding_badge(). */}
+            {post.showsBadge && (
+              <Link href="/" className="text-muted-foreground underline underline-offset-4">
+                {BRAND.freePlanBadge}
+              </Link>
+            )}
           </footer>
         )}
       </main>

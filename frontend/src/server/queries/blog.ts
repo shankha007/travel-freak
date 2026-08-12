@@ -44,6 +44,8 @@ export interface BlogPostView {
   } | null
   /** True when the caller is the author, so the page can flag an unpublished post. */
   isOwner: boolean
+  /** False once the author is on a paid plan. Free public pages carry the badge. */
+  showsBadge: boolean
 }
 
 export async function getBlogPost(slug: string): Promise<BlogPostView | null> {
@@ -65,7 +67,7 @@ export async function getBlogPost(slug: string): Promise<BlogPostView | null> {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const [profileResult, tripResult] = await Promise.all([
+  const [profileResult, tripResult, badgeResult] = await Promise.all([
     supabase
       .from('profiles')
       .select('username, display_name, avatar_url, is_public')
@@ -79,6 +81,7 @@ export async function getBlogPost(slug: string): Promise<BlogPostView | null> {
           .is('deleted_at', null)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    supabase.rpc('shows_branding_badge', { p_user_id: post.user_id }),
   ])
 
   const profile = profileResult.data
@@ -117,5 +120,9 @@ export async function getBlogPost(slug: string): Promise<BlogPostView | null> {
         }
       : null,
     isOwner: user?.id === post.user_id,
+    // `subscriptions` is owner-only, so the author's plan is read through a
+    // SECURITY DEFINER function that answers this one question rather than
+    // exposing who is paying. It defaults to true when it cannot tell.
+    showsBadge: badgeResult.data !== false,
   }
 }

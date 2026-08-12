@@ -52,6 +52,7 @@ Local ports: API `54321`, Postgres `54322`, Studio `54323`, Mailpit `54324`.
 | `20260812000100_visited_regions_visit_trips.sql`| `visit_trip_ids` on the aggregate, so counts combine correctly |
 | `20260812000200_soft_delete_trip.sql`| `soft_delete_trip()` / `restore_trip()` — RLS makes a direct `deleted_at` write impossible |
 | `20260812000300_soft_delete_media.sql`| `soft_delete_media()` — same trap on `media`, plus releasing the bytes |
+| `20260812000400_public_profile_helpers.sql`| Aggregate answers a public profile needs about someone whose rows a visitor cannot read |
 
 Add a migration with `npx supabase migration new <name>`. Never edit an applied
 migration — write a new one.

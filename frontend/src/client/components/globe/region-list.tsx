@@ -12,7 +12,12 @@ import { cn } from '@/shared/utils'
 interface RegionListProps {
   regions: VisitedRegion[]
   selectedCountry: string | null
-  onSelectCountry: (countryCode: string) => void
+  /**
+   * Omitted on read-only surfaces — a public profile, where there is nothing a
+   * visitor may open. Rows then render as plain text rather than as buttons
+   * that look clickable and do nothing.
+   */
+  onSelectCountry?: (countryCode: string) => void
   className?: string
 }
 
@@ -85,14 +90,12 @@ export function RegionList({
                 // one country contributes several rows, and keying by country
                 // alone silently drops all but the first.
                 <li key={regionKey(region.countryCode, region.regionCode)}>
-                  <button
-                    type="button"
-                    onClick={() => onSelectCountry(region.countryCode)}
-                    aria-current={isSelected ? 'true' : undefined}
-                    className={cn(
-                      'flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-                      isSelected && 'bg-accent'
-                    )}
+                  <RowShell
+                    interactive={Boolean(onSelectCountry)}
+                    onSelect={
+                      onSelectCountry ? () => onSelectCountry(region.countryCode) : undefined
+                    }
+                    isSelected={isSelected}
                   >
                     <span
                       className={cn('size-2.5 shrink-0 rounded-full', meta.fillClass)}
@@ -125,7 +128,7 @@ export function RegionList({
                         </span>
                       </span>
                     )}
-                  </button>
+                  </RowShell>
                 </li>
               )
             })}
@@ -133,5 +136,43 @@ export function RegionList({
         </ScrollArea>
       )}
     </div>
+  )
+}
+
+/**
+ * A row that is a button where there is something to open, and a plain div
+ * where there is not — rather than a disabled button, which still announces
+ * itself as a control.
+ */
+function RowShell({
+  interactive,
+  onSelect,
+  isSelected,
+  children,
+}: {
+  interactive: boolean
+  onSelect?: () => void
+  isSelected: boolean
+  children: React.ReactNode
+}) {
+  const layout = 'flex w-full items-center gap-3 rounded-md px-2 py-2 text-left'
+
+  if (!interactive) {
+    return <div className={layout}>{children}</div>
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-current={isSelected ? 'true' : undefined}
+      className={cn(
+        layout,
+        'transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+        isSelected && 'bg-accent'
+      )}
+    >
+      {children}
+    </button>
   )
 }

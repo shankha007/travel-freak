@@ -26,10 +26,10 @@ Last updated: 2026-08-12
 | Dashboard & globe | 4 | 2 | 0 | 0 |
 | Trips & planner | 2 | 1 | 0 | 4 |
 | Memory & content | 4 | 1 | 0 | 0 |
-| Analytics & resume | 0 | 0 | 2 | 2 |
-| Public sharing | 0 | 0 | 0 | 3 |
+| Analytics & resume | 1 | 0 | 1 | 2 |
+| Public sharing | 2 | 0 | 0 | 2 |
 | Account | 0 | 0 | 1 | 5 |
-| **Total** | **25** | **5** | **3** | **28** |
+| **Total** | **28** | **5** | **2** | **27** |
 
 ---
 
@@ -117,7 +117,7 @@ Last updated: 2026-08-12
 | 26 | **Media upload + quota meter** | ✅ Done | `POST /api/uploads/sign` issues a quota-checked signed URL, the browser PUTs straight to Storage, and `confirmUpload` re-reads the object's real size and sniffs its magic bytes before writing the row. Drag-drop, per-file progress, per-trip and pool meters, EXIF date and GPS captured on the client |
 | 27 | **Blog Studio** `/blogs/new`, `/blogs/[id]/edit` | ✅ Done | Tiptap v3 with a formatting toolbar, autosave (1.5s debounce, ⌘S, unload guard), excerpt and SEO fields, trip link, visibility, publish/unpublish, soft delete. A new post writes no row until the first save, then swaps the URL in place so the cursor survives. Slugs follow the title until publication and freeze after |
 | 28 | **My Blogs** `/blogs` | ✅ Done | All / Published / Drafts with counts, reading time, linked trip, and a link to the public reader |
-| 29 | **Blog reader** `/b/[slug]` | ✅ Done | Public route. Sanitised HTML, byline, reading time, linked trip, JSON-LD `Article`, `noindex` on anything unpublished, free-plan badge. The author sees their own drafts behind a notice; everyone else gets the same 404 as a slug that does not exist |
+| 29 | **Blog reader** `/b/[slug]` | ✅ Done | Public route. Sanitised HTML, byline linking to the author's profile, reading time, linked trip, JSON-LD `Article`, `noindex` on anything unpublished, and the badge only on free plans. The author sees their own drafts behind a notice; everyone else gets the same 404 as a slug that does not exist |
 | 30 | Wishlist `/wishlist` | 🔵 Stub | 3 items seeded; already painting `planned` on the globe |
 | 31 | Travel timeline `/timeline` | 🔵 Stub | |
 
@@ -126,7 +126,7 @@ Last updated: 2026-08-12
 | # | Feature | Status | Notes |
 |---|---|---|---|
 | 32 | Analytics `/analytics` | 🔵 Stub | Phase 1.1 |
-| 33 | Travel resume `/resume` | 🔵 Stub | MVP; the shareable artifact |
+| 33 | **Travel resume** `/resume` | ✅ Done | Countries, regions, trips, travel days, years travelling, distance, and distinct places by kind — cities, mountains, beaches, UNESCO sites. Plus the share panel: public URL, copy button, the switch that publishes the profile, and display name and bio |
 | 34 | Travel Wrapped | ⬜ Not started | Phase 1.2 |
 | 35 | Achievements & XP | ⬜ Not started | Phase 1.2; tables not migrated |
 
@@ -134,8 +134,9 @@ Last updated: 2026-08-12
 
 | # | Feature | Status | Notes |
 |---|---|---|---|
-| 36 | Public profile `/u/[username]` | ⬜ Not started | RLS policy for public profiles already exists |
-| 37 | Public trip `/t/[slug]` | ⬜ Not started | 6 public trips already readable by anon — verified |
+| 36 | **Public profile** `/u/[username]` | ✅ Done | Avatar, bio, home city, interests, the resume counters, a read-only globe with its region list, trip cards and published posts. JSON-LD `Person`, canonical URL, `noindex` while private, and the free-plan badge. A private profile 404s for everyone but its owner, who sees a preview notice |
+| — | **Sitemap** `/sitemap.xml` | ✅ Done | Public profiles and published posts, listed through the same client a visitor gets so it can never advertise a private page |
+| 37 | Public trip `/t/[slug]` | ⬜ Not started | 6 public trips already readable by anon — verified. Blocked on EXIF-stripped derivatives before photos can appear on it |
 | — | Share links (unlisted tokens) | ⬜ Not started | `share_links` table exists |
 
 ## Account
@@ -280,6 +281,34 @@ Its ESM worker imports `./maplibre-gl-shared.mjs` by an unhashed relative path,
 the bundler emits that file hashed, and the request 404s — the worker never
 starts, so the style never loads and the map stays blank with only a MIME-type
 error to show for it. Pinned to 5.24.0, which ships a self-contained bundle.
+
+## Also on 2026-08-12 — the Travel Resume and public profile
+
+Screens 33 and 36, which is the growth loop: the first page in the product that
+exists to be shown to someone who has never heard of it.
+
+Both are one artifact seen from two sides. `/resume` adds the controls that
+decide whether the public side exists — the switch, the URL, a copy button, and
+the display name and bio, since a public profile is nothing without them. The
+full profile screen (39) is still a stub; this covers the settings that block
+sharing and nothing more.
+
+The interesting problem was **what a visitor's copy of the numbers should say.**
+`visited_regions` is already public for a public profile — deliberately, so the
+globe can be shared without exposing the trips behind it. But trips, travel
+days, cities and beaches come from tables where a visitor sees published rows
+only, so counting from rows would make a resume *shrink* when shared: countries
+from the whole history, cities from a fraction of it. Three SECURITY DEFINER
+functions (migration `20260812000400`) answer those questions in aggregate
+instead, refuse unless the owner made the profile public, and never return a row
+that identifies a private trip. `countByKind()` and the SQL agree on what makes
+a place distinct — four trips to Goa are one beach — because the owner sees one
+implementation and a visitor sees the other.
+
+`shows_branding_badge()` closes the gap the blog reader left open: the badge is
+a paid-plan removal, `subscriptions` is owner-only, and nobody should be able to
+enumerate who pays. The function answers the one question a public page has and
+defaults to showing the badge when it cannot.
 
 ## Known gaps worth fixing next
 

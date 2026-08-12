@@ -110,7 +110,7 @@ export const NAV_ITEMS: NavItem[] = [
     href: '/resume',
     label: 'Travel resume',
     icon: 'FileBadge',
-    status: 'stub',
+    status: 'live',
     phase: 'M',
     screen: 33,
     summary:

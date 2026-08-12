@@ -431,6 +431,75 @@ select is(
 );
 
 -- ---------------------------------------------------------------------------
+-- The public profile helpers
+--
+-- These are SECURITY DEFINER, so they are the one place where a visitor learns
+-- something aggregated over rows they cannot read. What they must never do is
+-- answer at all for a profile its owner has not made public.
+-- ---------------------------------------------------------------------------
+
+reset role;
+select set_config('request.jwt.claims', '{"role":"anon"}', true);
+set local role anon;
+
+-- Both fixture profiles are private by default.
+select is_empty(
+  $$ select * from public.public_place_counts('aaaaaaaa-0000-4000-8000-000000000001') $$,
+  'place counts say nothing about a private profile'
+);
+
+-- Cast so pgTAP can resolve the comparison: an untyped NULL leaves is() with
+-- nothing to match the integer against.
+select is(
+  (select trips_count from public.public_resume_stats('aaaaaaaa-0000-4000-8000-000000000001')),
+  null::integer,
+  'resume stats say nothing about a private profile'
+);
+
+select is(
+  (select public.shows_branding_badge('aaaaaaaa-0000-4000-8000-000000000001')),
+  true,
+  'an unknown or private profile defaults to showing the badge, never to hiding it'
+);
+
+-- Publish alice's profile and ask again.
+reset role;
+update public.profiles set is_public = true
+where id = 'aaaaaaaa-0000-4000-8000-000000000001';
+
+select set_config('request.jwt.claims', '{"role":"anon"}', true);
+set local role anon;
+
+select isnt_empty(
+  $$ select * from public.public_place_counts('aaaaaaaa-0000-4000-8000-000000000001') $$,
+  'a public profile does report its place counts'
+);
+
+-- Alice has two trips, one private and one public. The counters describe her
+-- whole history, the way the public globe already does — otherwise a shared
+-- resume would shrink the moment someone else looked at it.
+select is(
+  (select trips_count from public.public_resume_stats('aaaaaaaa-0000-4000-8000-000000000001')),
+  2,
+  'the counters cover every trip, not only the published ones'
+);
+
+-- But nothing here hands over a private trip.
+select is_empty(
+  $$ select id from public.trips where slug = 'rls-alice-private' $$,
+  'while the trips themselves stay hidden'
+);
+
+select is_empty(
+  $$ select * from public.public_place_counts('bbbbbbbb-0000-4000-8000-000000000002') $$,
+  'and bob, who is still private, is unchanged'
+);
+
+reset role;
+update public.profiles set is_public = false
+where id = 'aaaaaaaa-0000-4000-8000-000000000001';
+
+-- ---------------------------------------------------------------------------
 -- Soft delete hides a trip without destroying it
 -- ---------------------------------------------------------------------------
 
