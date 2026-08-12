@@ -181,6 +181,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["media_kind"]
           mime: string
           processing_status: Database["public"]["Enums"]["processing_status"]
+          public_path: string | null
           storage_path: string
           taken_at: string | null
           trip_id: string | null
@@ -205,6 +206,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["media_kind"]
           mime: string
           processing_status?: Database["public"]["Enums"]["processing_status"]
+          public_path?: string | null
           storage_path: string
           taken_at?: string | null
           trip_id?: string | null
@@ -229,6 +231,7 @@ export type Database = {
           kind?: Database["public"]["Enums"]["media_kind"]
           mime?: string
           processing_status?: Database["public"]["Enums"]["processing_status"]
+          public_path?: string | null
           storage_path?: string
           taken_at?: string | null
           trip_id?: string | null
@@ -1231,6 +1234,8 @@ export type Database = {
       restore_trip: { Args: { p_trip_id: string }; Returns: boolean }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      resolve_share_link: { Args: { p_token: string }; Returns: string | null }
+      trip_shows_branding_badge: { Args: { p_trip_id: string }; Returns: boolean }
       public_place_counts: {
         Args: { p_user_id: string }
         Returns: { place_kind: string; place_count: number }[]

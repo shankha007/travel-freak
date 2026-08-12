@@ -431,6 +431,86 @@ select is(
 );
 
 -- ---------------------------------------------------------------------------
+-- Share links
+--
+-- A token is a capability: it is the only thing standing between a stranger and
+-- an unlisted trip, so what it refuses matters more than what it allows.
+-- ---------------------------------------------------------------------------
+
+reset role;
+
+-- An earlier test flipped this trip back to private. Unlisted is the state a
+-- share link exists for, so put it there explicitly rather than depending on
+-- what the section above happened to leave behind.
+update public.trips set visibility = 'unlisted'
+where id = 'a1111111-0000-4000-8000-000000000002';
+
+insert into public.share_links (id, trip_id, user_id, token)
+values
+  ('e1111111-0000-4000-8000-000000000001', 'a1111111-0000-4000-8000-000000000002',
+   'aaaaaaaa-0000-4000-8000-000000000001', 'token-for-alices-public-trip'),
+  ('e1111111-0000-4000-8000-000000000002', 'a1111111-0000-4000-8000-000000000001',
+   'aaaaaaaa-0000-4000-8000-000000000001', 'token-for-alices-private-trip'),
+  ('e1111111-0000-4000-8000-000000000003', 'a1111111-0000-4000-8000-000000000002',
+   'aaaaaaaa-0000-4000-8000-000000000001', 'token-revoked'),
+  ('e1111111-0000-4000-8000-000000000004', 'a1111111-0000-4000-8000-000000000002',
+   'aaaaaaaa-0000-4000-8000-000000000001', 'token-expired');
+
+update public.share_links set revoked_at = now() where token = 'token-revoked';
+update public.share_links set expires_at = now() - interval '1 day' where token = 'token-expired';
+
+select set_config('request.jwt.claims', '{"role":"anon"}', true);
+set local role anon;
+
+select is(
+  (select public.resolve_share_link('token-for-alices-public-trip')),
+  'a1111111-0000-4000-8000-000000000002'::uuid,
+  'a live token resolves to its trip'
+);
+
+select is(
+  (select public.resolve_share_link('token-revoked')),
+  null::uuid,
+  'a revoked token resolves to nothing'
+);
+
+select is(
+  (select public.resolve_share_link('token-expired')),
+  null::uuid,
+  'an expired token resolves to nothing'
+);
+
+select is(
+  (select public.resolve_share_link('no-such-token')),
+  null::uuid,
+  'and an invented token is indistinguishable from a revoked one'
+);
+
+-- The trip behind that private token is `private`, not `unlisted`. A link must
+-- not be able to publish something the owner has kept back.
+select is(
+  (select public.resolve_share_link('token-for-alices-private-trip')),
+  null::uuid,
+  'a link to a private trip resolves to nothing, whatever the token says'
+);
+
+-- Resolving a token does not hand over the trip itself: the caller still has to
+-- read it, and RLS still refuses.
+select is_empty(
+  $$ select id from public.trips where id = 'a1111111-0000-4000-8000-000000000002'
+     and visibility = 'unlisted' $$,
+  'and the token alone does not make the trip readable through RLS'
+);
+
+select throws_ok(
+  $$ insert into public.share_links (trip_id, user_id)
+     values ('b2222222-0000-4000-8000-000000000001', 'bbbbbbbb-0000-4000-8000-000000000002') $$,
+  '42501',
+  null,
+  'anon cannot mint a share link'
+);
+
+-- ---------------------------------------------------------------------------
 -- The public profile helpers
 --
 -- These are SECURITY DEFINER, so they are the one place where a visitor learns

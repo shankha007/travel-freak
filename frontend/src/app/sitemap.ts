@@ -6,19 +6,28 @@ import { SITE_URL } from '@/shared/brand'
  * Sitemap of everything publicly readable.
  *
  * Built through the same client a visitor gets, so it lists exactly what a
- * search engine could actually fetch: public profiles and published public
- * posts. RLS is what removes anything private, which is what keeps the sitemap
- * from ever advertising a page that would 404 for the crawler.
+ * search engine could actually fetch: public profiles, published public trips
+ * and published public posts. RLS is what removes anything private, which is
+ * what keeps the sitemap from ever advertising a page that would 404 for the
+ * crawler.
  *
- * Public trip pages (screen 37) are not built yet, so no `/t/[slug]` entries.
+ * Unlisted trips are deliberately absent. They are reachable only with a token,
+ * and a sitemap is the last place a "secret" URL should appear.
  */
 export const dynamic = 'force-dynamic'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const supabase = await createClient()
 
-  const [profiles, posts] = await Promise.all([
+  const [profiles, trips, posts] = await Promise.all([
     supabase.from('profiles').select('username, updated_at').eq('is_public', true).limit(1000),
+    supabase
+      .from('trips')
+      .select('slug, updated_at')
+      .eq('visibility', 'public')
+      .not('published_at', 'is', null)
+      .is('deleted_at', null)
+      .limit(1000),
     supabase
       .from('blog_posts')
       .select('slug, updated_at')
@@ -41,6 +50,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: new Date(p.updated_at),
       changeFrequency: 'weekly' as const,
       priority: 0.7,
+    })),
+    ...(trips.data ?? []).map((t) => ({
+      url: `${SITE_URL}/t/${t.slug}`,
+      lastModified: new Date(t.updated_at),
+      changeFrequency: 'monthly' as const,
+      priority: 0.6,
     })),
     ...(posts.data ?? []).map((p) => ({
       url: `${SITE_URL}/b/${p.slug}`,

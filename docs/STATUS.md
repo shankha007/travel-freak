@@ -27,9 +27,9 @@ Last updated: 2026-08-12
 | Trips & planner | 2 | 1 | 0 | 4 |
 | Memory & content | 4 | 1 | 0 | 0 |
 | Analytics & resume | 1 | 0 | 1 | 2 |
-| Public sharing | 2 | 0 | 0 | 2 |
+| Public sharing | 4 | 0 | 0 | 0 |
 | Account | 0 | 0 | 1 | 5 |
-| **Total** | **28** | **5** | **2** | **27** |
+| **Total** | **30** | **5** | **2** | **25** |
 
 ---
 
@@ -52,6 +52,7 @@ Last updated: 2026-08-12
 | — | HTML sanitisation | ✅ Done | `shared/content/sanitize.ts` — allowlist applied on read, so stored post markup cannot execute on the app's origin |
 | — | **Storage + signed uploads** | ✅ Done | Private `media` bucket, keys `<user>/<trip>/<media>.<ext>` matching the storage policies. Reads go out as one-hour signed URLs; `next/image` is allow-listed to the storage host only |
 | — | **Geo assets** | ✅ Done | `npm run build:geo` writes country outlines plus admin-1 split one file per country, simplified 4% with mapshaper. Natural Earth 50m carries ISO 3166-2 for nine large countries, India among them |
+| — | **Public image derivatives** | ✅ Done | `media-public` bucket; sharp re-encodes to WebP ≤1600px on first publication, which drops every metadata block. Tested with the same EXIF parser the uploader uses to read GPS |
 | — | Framer Motion | ⬜ Not started | Not installed |
 | — | CI (GitHub Actions) | ⬜ Not started | lint/typecheck/test all pass locally |
 | — | Sentry + PostHog | ⬜ Not started | Plan wants the funnel instrumented on day one |
@@ -136,8 +137,8 @@ Last updated: 2026-08-12
 |---|---|---|---|
 | 36 | **Public profile** `/u/[username]` | ✅ Done | Avatar, bio, home city, interests, the resume counters, a read-only globe with its region list, trip cards and published posts. JSON-LD `Person`, canonical URL, `noindex` while private, and the free-plan badge. A private profile 404s for everyone but its owner, who sees a preview notice |
 | — | **Sitemap** `/sitemap.xml` | ✅ Done | Public profiles and published posts, listed through the same client a visitor gets so it can never advertise a private page |
-| 37 | Public trip `/t/[slug]` | ⬜ Not started | 6 public trips already readable by anon — verified. Blocked on EXIF-stripped derivatives before photos can appear on it |
-| — | Share links (unlisted tokens) | ⬜ Not started | `share_links` table exists |
+| 37 | **Public trip** `/t/[slug]` | ✅ Done | Read-only trip: hero, dates, route, gallery, notes and linked posts, with JSON-LD `Article` and OG images. Photos are published as EXIF-stripped derivatives, never originals |
+| — | **Share links (unlisted tokens)** | ✅ Done | Create and revoke from the trip page; `/t/[slug]?k=<token>` opens an unlisted trip and is never indexed. A link to a *private* trip resolves to nothing, so pulling a trip back cannot be undone by an old link |
 
 ## Account
 
@@ -310,6 +311,40 @@ a paid-plan removal, `subscriptions` is owner-only, and nobody should be able to
 enumerate who pays. The function answers the one question a public page has and
 defaults to showing the badge when it cannot.
 
+## Also on 2026-08-12 — the public trip page
+
+Screen 37, and the thing that was blocking it: photos.
+
+Originals are stored exactly as the camera wrote them, GPS included, which is
+right for the owner and unpublishable for anyone else — a holiday photo taken at
+home pins the photographer's front door. So a public page never serves an
+original. The first time a photo needs to be public, sharp re-encodes it to
+WebP at 1600px into a separate public bucket, which drops every metadata block;
+`media.public_path` remembers the result so nothing pays for it twice. Rotation
+is applied before the EXIF goes, or every portrait phone photo would publish on
+its side. The tests check the output with exifr — the same parser the uploader
+uses to *read* GPS on the way in.
+
+Unlisted trips work through `share_links`, which has existed since the first
+migration with nothing to resolve its tokens. `resolve_share_link()` trades a
+token for one trip id and returns nothing for a token that is unknown, revoked,
+expired, or points at a trip the owner has since made private — so pulling a
+trip back cannot be undone by a link handed out last month. Once the token
+resolves, the read uses the service role scoped to that single id, because RLS
+has no way to know about a token; the two things RLS would otherwise enforce —
+which posts to list, and whether the author's name may be shown — are spelled
+out by hand on that path.
+
+Two mistakes worth recording, both caught by writing the test properly:
+
+- The first EXIF fixture set orientation through `withExif`, which writes the
+  tag without sharp treating it as the image's orientation. The test claimed to
+  prove rotation while proving nothing.
+- The second claimed to inject GPS coordinates. sharp's `withExif` does not
+  write a GPS block that any parser reads back, so the test was overstating what
+  it covered. It now asserts what is actually true and load-bearing: the EXIF
+  block does not survive, and GPS lives inside it.
+
 ## Known gaps worth fixing next
 
 1. **No map picker on create — but no longer blocked.** Places are still country + free-text
@@ -321,18 +356,23 @@ defaults to showing the badge when it cannot.
    delete dialogs make, but nothing calls it, and `soft_delete_media()` has no restore at all —
    its object is removed from Storage immediately, so a restored photo would be a broken link.
    Either build a trash view with real restore, or change the copy.
-3. **No image derivatives, so no photos on public pages yet.** Originals are stored with their
-   EXIF intact, which is right for the owner and wrong for anyone else: publishing one would
-   leak the GPS the plan calls a safety issue. Public trip pages (screen 37) and images inside
-   blog posts both wait on a resize-and-strip step. `profiles.strip_exif_on_publish` already
-   defaults on and has nothing to enforce it.
+3. **Derivatives are generated lazily, on the first request.** That request pays for the
+   re-encode of every photo on the trip, so the first view of a photo-heavy public page is
+   slow. The plan wants this in a background job at publish time; the output is identical, so
+   this is a latency problem rather than a correctness one. `profiles.strip_exif_on_publish`
+   still has nothing reading it — publication always strips, which is the stricter behaviour.
 4. **`/register` has no email verification path in production.** Locally `enable_confirmations`
    is off and sign-up returns a session; with confirmations on the form shows "check your
    inbox", but there is no `/verify` route to land on afterwards.
-5. **Unlisted blogs have no share link.** `visibility = 'unlisted'` is readable only by the
-   author, because the `share_links` token flow is not built yet.
-6. **HEIC has no fallback.** iPhone photos upload and store fine, but browsers that cannot
-   decode HEIC show nothing and record no dimensions — the same derivative pipeline fixes it.
-7. **The maps have no filters.** The plan asks for year, continent and trip type on screens 14
+5. **Unlisted blogs still have no share link.** `share_links` is trip-shaped — one `trip_id`
+   column — so a post that is `unlisted` remains readable only by its author. Either widen the
+   table or give posts their own tokens.
+6. **Blog posts cannot contain images.** The sanitiser allows `<img>` and derivatives now
+   exist, so what is missing is the studio side: an image button that uploads through the
+   existing signed-upload route and inserts the public URL.
+7. **HEIC still has no fallback in the vault.** The public page converts it, but the owner's
+   own gallery points at the original, so a browser that cannot decode HEIC shows nothing
+   there. The same transform would fix it for private views.
+8. **The maps have no filters.** The plan asks for year, continent and trip type on screens 14
    and 16; only the visited/current/planned layer toggles are built. Year needs no new data —
    `visited_regions` carries first and last visit — but continent and trip type do.

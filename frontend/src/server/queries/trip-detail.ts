@@ -77,6 +77,8 @@ export interface TripDetail {
   /** A handful of recent photos for the gallery card, with signed URLs. */
   photos: TripPhoto[]
   coverUrl: string | null
+  /** The active unlisted link's token, when one has been created. */
+  shareToken: string | null
   /** Nights between the dates, or null when the trip has no range yet. */
   durationDays: number | null
   countryCodes: string[]
@@ -106,7 +108,7 @@ export async function getTripDetail(id: string): Promise<TripDetail | null> {
 
   if (!trip) return null
 
-  const [placesResult, memoriesResult, blogsResult, photosResult] = await Promise.all([
+  const [placesResult, memoriesResult, blogsResult, photosResult, shareResult] = await Promise.all([
     supabase
       .from('trip_places')
       .select(
@@ -135,6 +137,15 @@ export async function getTripDetail(id: string): Promise<TripDetail | null> {
       .is('deleted_at', null)
       .order('taken_at', { ascending: false, nullsFirst: false })
       .limit(6),
+    // Owner-only by RLS, which is what the share card needs: a collaborator
+    // viewing this trip gets no token and no controls.
+    supabase
+      .from('share_links')
+      .select('token')
+      .eq('trip_id', id)
+      .is('revoked_at', null)
+      .limit(1)
+      .maybeSingle(),
   ])
 
   // The bucket is private, so thumbnails need short-lived signed links.
@@ -193,6 +204,7 @@ export async function getTripDetail(id: string): Promise<TripDetail | null> {
       visibility: b.visibility,
       publishedAt: b.published_at,
     })),
+    shareToken: shareResult.data?.token ?? null,
     photos: photoRows
       .map((p) => ({
         id: p.id,

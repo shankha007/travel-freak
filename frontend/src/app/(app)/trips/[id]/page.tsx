@@ -18,6 +18,8 @@ import {
   Wallet,
 } from 'lucide-react'
 import { getTripDetail } from '@/server/queries/trip-detail'
+import { SITE_URL } from '@/shared/brand'
+import { ShareTripCard } from '@/client/components/trips/share-trip-card'
 import { countryFlag, countryName } from '@/shared/geo/countries'
 import { formatDateRange } from '@/shared/format'
 import { Badge } from '@/client/components/ui/badge'
@@ -325,6 +327,14 @@ export default async function TripDetailPage({ params }: PageProps<'/trips/[id]'
               )}
             </CardContent>
           </Card>
+
+          <ShareTripCard
+            tripId={trip.id}
+            slug={trip.slug}
+            visibility={trip.visibility}
+            existingToken={trip.shareToken}
+            siteUrl={SITE_URL}
+          />
 
           {/* Linked blogs */}
           <Card>
