@@ -20,6 +20,12 @@ const publicSchema = z.object({
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z
     .string()
     .min(1, { error: 'NEXT_PUBLIC_SUPABASE_ANON_KEY is required' }),
+  // Optional: the maps fall back to drawing polygons on a plain background when
+  // there is no tile key, which is a usable map rather than an error screen.
+  NEXT_PUBLIC_MAPTILER_KEY: z
+    .string()
+    .optional()
+    .transform((v) => (v ? v : undefined)),
 })
 
 let cachedPublicEnv: z.infer<typeof publicSchema> | null = null
@@ -31,6 +37,7 @@ export function publicEnv() {
   const parsed = publicSchema.safeParse({
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    NEXT_PUBLIC_MAPTILER_KEY: process.env.NEXT_PUBLIC_MAPTILER_KEY,
   })
 
   if (!parsed.success) {

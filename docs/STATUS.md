@@ -20,16 +20,16 @@ Last updated: 2026-08-12
 
 | Area | Done | Partial | Stub | Not started |
 |---|---|---|---|---|
-| Infrastructure | 11 | 0 | 0 | 3 |
+| Infrastructure | 12 | 0 | 0 | 3 |
 | Public / marketing | 1 | 1 | 0 | 8 |
 | Auth | 2 | 0 | 0 | 3 |
-| Dashboard & globe | 3 | 1 | 2 | 0 |
+| Dashboard & globe | 4 | 2 | 0 | 0 |
 | Trips & planner | 2 | 1 | 0 | 4 |
 | Memory & content | 4 | 1 | 0 | 0 |
 | Analytics & resume | 0 | 0 | 2 | 2 |
 | Public sharing | 0 | 0 | 0 | 3 |
 | Account | 0 | 0 | 1 | 5 |
-| **Total** | **23** | **4** | **5** | **28** |
+| **Total** | **25** | **5** | **3** | **28** |
 
 ---
 
@@ -51,6 +51,7 @@ Last updated: 2026-08-12
 | — | **pgTAP RLS tests** | ✅ Done | `backend/supabase/tests/database/rls.test.sql`, 40 assertions, `npm run db:test`. Two users, cross-user reads and writes, anon visibility, unpublish, soft delete |
 | — | HTML sanitisation | ✅ Done | `shared/content/sanitize.ts` — allowlist applied on read, so stored post markup cannot execute on the app's origin |
 | — | **Storage + signed uploads** | ✅ Done | Private `media` bucket, keys `<user>/<trip>/<media>.<ext>` matching the storage policies. Reads go out as one-hour signed URLs; `next/image` is allow-listed to the storage host only |
+| — | **Geo assets** | ✅ Done | `npm run build:geo` writes country outlines plus admin-1 split one file per country, simplified 4% with mapshaper. Natural Earth 50m carries ISO 3166-2 for nine large countries, India among them |
 | — | Framer Motion | ⬜ Not started | Not installed |
 | — | CI (GitHub Actions) | ⬜ Not started | lint/typecheck/test all pass locally |
 | — | Sentry + PostHog | ⬜ Not started | Plan wants the funnel instrumented on day one |
@@ -91,8 +92,8 @@ Last updated: 2026-08-12
 | 15 | **Country/region modal** | ✅ Done | Trips, memories, dates, cities; deep-linkable `?region=IND` |
 | — | Globe region-detail paywall | ✅ Done | `showRegionDetail` from `planCode`, decided server-side |
 | — | Dashboard globe preview | 🟡 Partial | Query exists (`getGlobePreviewRegions`); card links to `/globe` instead of embedding |
-| 16 | World map `/maps/world` | 🔵 Stub | Needs a MapTiler key |
-| 17 | India map `/maps/india` | 🔵 Stub | |
+| 16 | **World map** `/maps/world` | 🟡 Partial | MapLibre 2D, country fills joined by `feature-state`, hover tooltip, click-through to the region modal, layer toggles for visited/current/planned, and the same keyboard-navigable region list as the globe. Subdivisions are gated on `globe_region_detail` and lazy-loaded per visited country. **Filters for year, continent and trip type are not built** |
+| 17 | **India map** `/maps/india` | ✅ Done | All 36 states and union territories, free on every plan, fitted to the country on load |
 
 ## Trips & planner
 
@@ -253,12 +254,40 @@ Two bugs found while verifying:
   with `soft_delete_media()` (migration `20260812000300`), which also releases
   the bytes and clears the trip cover. The pgTAP suite now asserts both.
 
+## Also on 2026-08-12 — the world and India maps
+
+Screens 16 and 17. Both are the same component: MapLibre with two GeoJSON fill
+layers, joined to `visited_regions` through `feature-state` so changing what is
+highlighted never re-uploads geometry. Selection lives in the URL, so a country
+on the map is as shareable as one on the globe, and every map is paired with the
+keyboard-navigable region list — the map is a presentation surface, not the only
+path to the data.
+
+- **Subdivisions are the paywall on the world map** and free on the India map.
+  The world map fetches admin-1 only for countries the user has actually
+  visited, one small file each.
+- **A missing MapTiler key is not an error.** Without one the polygons render on
+  a plain background, which is what happens locally today: the key in
+  `.env.local` is empty, so the maps draw without a basemap. Set one to get
+  coastlines and labels underneath.
+- **Coverage is nine countries** — Natural Earth's 50m admin-1 set carries ISO
+  3166-2 for Australia, Brazil, Canada, China, India, Indonesia, Russia, South
+  Africa and the USA. Extending it is the plan's v1.1 item; the loader already
+  handles a country with no file.
+
+One dependency had to move: **maplibre-gl 6 does not work under this build.**
+Its ESM worker imports `./maplibre-gl-shared.mjs` by an unhashed relative path,
+the bundler emits that file hashed, and the request 404s — the worker never
+starts, so the style never loads and the map stays blank with only a MIME-type
+error to show for it. Pinned to 5.24.0, which ships a self-contained bundle.
+
 ## Known gaps worth fixing next
 
-1. **No map picker on create.** Places are country + free-text city, so `trip_places.location`
-   (the PostGIS point) is left null. Distance-travelled and nearest-city snapping cannot be
-   computed until the world map screen lands and supplies coordinates. Unchanged, and still
-   blocked on screen 16.
+1. **No map picker on create — but no longer blocked.** Places are still country + free-text
+   city, so `trip_places.location` stays null and distance-travelled cannot be computed. The
+   world map now exists, so the picker is buildable: it needs a click-to-place mode on the same
+   `MapView` plus a geocoder for search. This also unblocks the vault's map tab and lets EXIF
+   coordinates be matched to places.
 2. **Deleted trips and photos are unreachable.** `restore_trip()` keeps the 30-day promise the
    delete dialogs make, but nothing calls it, and `soft_delete_media()` has no restore at all —
    its object is removed from Storage immediately, so a restored photo would be a broken link.
@@ -275,3 +304,6 @@ Two bugs found while verifying:
    author, because the `share_links` token flow is not built yet.
 6. **HEIC has no fallback.** iPhone photos upload and store fine, but browsers that cannot
    decode HEIC show nothing and record no dimensions — the same derivative pipeline fixes it.
+7. **The maps have no filters.** The plan asks for year, continent and trip type on screens 14
+   and 16; only the visited/current/planned layer toggles are built. Year needs no new data —
+   `visited_regions` carries first and last visit — but continent and trip type do.
