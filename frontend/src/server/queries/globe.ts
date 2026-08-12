@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { cache } from 'react'
 import { createClient } from '@/server/supabase/server'
 import { requireUser } from '@/server/auth'
 import { getMediaUrls } from '@/server/queries/vault'
@@ -46,8 +47,16 @@ function toVisitedRegion(row: VisitedRegionRow, urls?: Map<string, string>): Vis
   }
 }
 
-/** Every region row for the signed-in user, for the globe and region list. */
-export async function getVisitedRegions(): Promise<VisitedRegion[]> {
+/**
+ * Every region row for the signed-in user, for the globe and region list.
+ *
+ * Cached per render pass: the dashboard wants the same rows twice, once for its
+ * counters and once for the globe preview, and each call otherwise re-reads the
+ * aggregate and re-signs every hero photo.
+ */
+export const getVisitedRegions = cache(async function getVisitedRegions(): Promise<
+  VisitedRegion[]
+> {
   const supabase = await createClient()
   const user = await requireUser()
 
@@ -68,7 +77,7 @@ export async function getVisitedRegions(): Promise<VisitedRegion[]> {
   )
 
   return rows.map((row) => toVisitedRegion(row, urls))
-}
+})
 
 /**
  * Everything the region modal shows for one country.

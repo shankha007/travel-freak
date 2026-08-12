@@ -170,12 +170,17 @@ export async function getResumeData(
       .select('*')
       .eq('user_id', profile.id)
       .order('country_code', { ascending: true }),
-    supabase
-      .from('trip_places')
-      .select(
-        'country_code, region_code, city_name, place_kind, latitude, longitude, trip_id, order_index'
-      )
-      .eq('user_id', profile.id),
+    // Only the owner has anything to compute from these: a visitor's place
+    // counts come from `public_place_counts()` and their distance is withheld
+    // outright, so on a public profile this query's every row would be dropped.
+    viewerIsOwner
+      ? supabase
+          .from('trip_places')
+          .select(
+            'country_code, region_code, city_name, place_kind, latitude, longitude, trip_id, order_index'
+          )
+          .eq('user_id', profile.id)
+      : Promise.resolve({ data: null }),
     supabase
       .from('trips')
       .select(
@@ -217,16 +222,19 @@ export async function getResumeData(
     ? allTrips
     : allTrips.filter((t) => t.visibility === 'public' && t.published_at !== null)
 
-  const coverUrls = await getMediaUrls(
-    visibleTrips.map((t) => t.cover_media_id).filter((id): id is string => Boolean(id))
-  )
+  // Signing the covers and counting a visitor's trips are unrelated; neither
+  // needs the other's answer.
+  const [coverUrls, counters] = await Promise.all([
+    getMediaUrls(
+      visibleTrips.map((t) => t.cover_media_id).filter((id): id is string => Boolean(id))
+    ),
+    viewerIsOwner ? ownCounters(allTrips, places) : publicCounters(profile.id),
+  ])
 
   const countryLevel = rollUpToCountries(regions)
   const visitedCountries = countryLevel.filter(
     (r) => r.state === 'visited' || r.state === 'current'
   ).length
-
-  const counters = viewerIsOwner ? ownCounters(allTrips, places) : await publicCounters(profile.id)
 
   return {
     profile,

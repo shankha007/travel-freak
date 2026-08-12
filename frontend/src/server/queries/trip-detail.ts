@@ -2,6 +2,7 @@ import 'server-only'
 
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 import { createClient } from '@/server/supabase/server'
+import { getMediaUrl } from '@/server/queries/vault'
 import { pointFrom } from '@/shared/geo/point'
 import type { Database } from '@/shared/types/database'
 
@@ -162,6 +163,17 @@ export async function getTripDetail(id: string): Promise<TripDetail | null> {
     : { data: [] }
   const urlByPath = new Map((signed.data ?? []).map((s) => [s.path, s.signedUrl]))
 
+  // The gallery is the six most recent photos, and the cover need not be one of
+  // them — an early photo picked as the cover and then followed by six more
+  // would leave the hero blank. Sign it on its own when the batch above missed
+  // it, which is one extra call and only on the trips that need it.
+  const coverInGallery = photoRows.find((p) => p.id === trip.cover_media_id)
+  const coverUrl = trip.cover_media_id
+    ? coverInGallery
+      ? (urlByPath.get(coverInGallery.storage_path) ?? null)
+      : await getMediaUrl(trip.cover_media_id)
+    : null
+
   const places = (placesResult.data ?? []).map((p) => {
     const point = pointFrom(p.latitude, p.longitude)
     return {
@@ -222,11 +234,7 @@ export async function getTripDetail(id: string): Promise<TripDetail | null> {
         caption: p.caption,
       }))
       .filter((p): p is TripPhoto => p.url !== null),
-    coverUrl: trip.cover_media_id
-      ? (photoRows
-          .filter((p) => p.id === trip.cover_media_id)
-          .map((p) => urlByPath.get(p.storage_path) ?? null)[0] ?? null)
-      : null,
+    coverUrl,
     durationDays:
       trip.start_date && trip.end_date
         ? Math.max(0, differenceInCalendarDays(parseISO(trip.end_date), parseISO(trip.start_date)))

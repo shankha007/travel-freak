@@ -135,12 +135,11 @@ async function loadPost(
   // The session is read through the ordinary client either way: on the token path
   // the elevated client has no session, and "is this the author" is still worth
   // answering — a writer opening their own link should not see a stranger's view.
+  // It goes out with the rest: the auth server's answer changes none of them.
   const sessionClient = await createClient()
-  const {
-    data: { user },
-  } = await sessionClient.auth.getUser()
 
-  const [profileResult, tripResult, badgeResult] = await Promise.all([
+  const [sessionResult, profileResult, tripResult, badgeResult] = await Promise.all([
+    sessionClient.auth.getUser(),
     supabase
       .from('profiles')
       .select('username, display_name, avatar_url, is_public')
@@ -160,7 +159,7 @@ async function loadPost(
     supabase.rpc('post_shows_branding_badge', { p_post_id: post.id }),
   ])
 
-  const isOwner = user?.id === post.user_id
+  const isOwner = sessionResult.data.user?.id === post.user_id
 
   // On the elevated path the service role returned the profile whatever its
   // visibility, so the rule RLS would have applied is applied here: a private

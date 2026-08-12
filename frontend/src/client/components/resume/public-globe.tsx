@@ -1,12 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import type { VisitedRegion } from '@/shared/types/globe'
 import { RegionLegend } from '@/client/components/globe/region-legend'
 import { RegionList } from '@/client/components/globe/region-list'
 import { Skeleton } from '@/client/components/ui/skeleton'
-
-type GlobeViewComponent = typeof import('@/client/components/globe/globe-view').GlobeView
+import { useLazyComponent } from '@/client/hooks/use-lazy-component'
 
 /**
  * The globe on a public profile: look, do not touch.
@@ -20,20 +18,9 @@ type GlobeViewComponent = typeof import('@/client/components/globe/globe-view').
  * and screen readers, so the list is how this data is actually navigable.
  */
 export function PublicGlobe({ regions }: { regions: VisitedRegion[] }) {
-  const [component, setComponent] = useState<{ Component: GlobeViewComponent } | null>(null)
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    import('@/client/components/globe/globe-view')
-      .then((m) => !cancelled && setComponent({ Component: m.GlobeView }))
-      .catch(() => !cancelled && setFailed(true))
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  const GlobeView = component?.Component ?? null
+  const { Component: GlobeView, failed } = useLazyComponent(
+    async () => (await import('@/client/components/globe/globe-view')).GlobeView
+  )
 
   return (
     <div className="flex flex-col gap-4 lg:flex-row">

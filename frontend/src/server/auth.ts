@@ -34,17 +34,16 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
 
   if (!user) return null
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('username, display_name, avatar_url, onboarded_at')
-    .eq('id', user.id)
-    .single()
-
-  const { data: subscription } = await supabase
-    .from('subscriptions')
-    .select('plan_code')
-    .eq('user_id', user.id)
-    .single()
+  // Two independent reads, so they go out together: the profile row does not
+  // tell us anything the subscription lookup needs.
+  const [{ data: profile }, { data: subscription }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('username, display_name, avatar_url, onboarded_at')
+      .eq('id', user.id)
+      .maybeSingle(),
+    supabase.from('subscriptions').select('plan_code').eq('user_id', user.id).maybeSingle(),
+  ])
 
   return {
     id: user.id,

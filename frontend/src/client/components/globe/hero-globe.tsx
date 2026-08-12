@@ -1,10 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import type { VisitedRegion } from '@/shared/types/globe'
 import { Skeleton } from '@/client/components/ui/skeleton'
-
-type GlobeViewComponent = typeof import('./globe-view').GlobeView
+import { useLazyComponent } from '@/client/hooks/use-lazy-component'
 
 interface HeroGlobeProps {
   regions: VisitedRegion[]
@@ -22,24 +20,9 @@ interface HeroGlobeProps {
  * bundle, which is what holds the landing page inside its Lighthouse budget.
  */
 export function HeroGlobe({ regions, className }: HeroGlobeProps) {
-  const [component, setComponent] = useState<{ Component: GlobeViewComponent } | null>(null)
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    import('./globe-view')
-      .then((m) => {
-        // Wrapped in an object: a bare setState(fn) would be treated as an
-        // updater function rather than the value.
-        if (!cancelled) setComponent({ Component: m.GlobeView })
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  const { Component: GlobeView, failed } = useLazyComponent(
+    async () => (await import('./globe-view')).GlobeView
+  )
 
   if (failed) {
     return (
@@ -53,12 +36,11 @@ export function HeroGlobe({ regions, className }: HeroGlobeProps) {
     )
   }
 
-  if (!component) {
+  if (!GlobeView) {
     return <Skeleton className={className} />
   }
 
-  const { Component } = component
   // No-op selection: the hero is a demo, and a modal on the marketing page
   // would interrupt the path to sign-up.
-  return <Component regions={regions} onSelectCountry={() => {}} className={className} />
+  return <GlobeView regions={regions} onSelectCountry={() => {}} className={className} />
 }

@@ -4,6 +4,7 @@ import { differenceInCalendarDays, parseISO } from 'date-fns'
 import { createAdminClient, createClient } from '@/server/supabase/server'
 import { derivativePath, ensurePublicDerivative, publicMediaUrl } from '@/server/media/derivatives'
 import { publicEnv } from '@/shared/env'
+import { mapWithConcurrency } from '@/shared/concurrency'
 import type { Database } from '@/shared/types/database'
 
 /**
@@ -86,6 +87,9 @@ export interface PublicTrip {
 
 const SELECT_TRIP = `id, user_id, title, slug, summary, start_date, end_date, status,
   visibility, trip_type, traveler_count, published_at, cover_media_id`
+
+/** How many photos may be re-encoded at once. See the loop that uses it. */
+const DERIVATIVE_CONCURRENCY = 4
 
 /** A published public trip, by slug. Null when there is nothing public to show. */
 export async function getPublicTrip(slug: string): Promise<PublicTrip | null> {
@@ -213,33 +217,37 @@ async function loadTrip(
   }))
 
   const env = publicEnv()
-  const photoRows = mediaResult.data ?? []
+  const photoRows = (mediaResult.data ?? []).filter((row) => row.trip_id !== null)
 
   // Derivatives are generated on first publication and remembered afterwards,
-  // so this is a one-time cost per photo rather than a per-request one.
-  const photos: PublicTripPhoto[] = []
-  for (const row of photoRows) {
-    if (!row.trip_id) continue
-
-    const { path } = await ensurePublicDerivative({
+  // so this is a one-time cost per photo rather than a per-request one. That
+  // first request used to pay for the whole gallery one photo at a time;
+  // photos are independent, so a few go at once. The cap is deliberate — each
+  // one downloads an original and runs a sharp pipeline, and letting two dozen
+  // do that simultaneously trades a slow page for an exhausted server.
+  const resolved = await mapWithConcurrency(photoRows, DERIVATIVE_CONCURRENCY, (row) =>
+    ensurePublicDerivative({
       id: row.id,
       userId: row.user_id,
       storagePath: row.storage_path,
       publicPath: row.public_path,
-      target: derivativePath(row.user_id, row.trip_id, row.id),
+      target: derivativePath(row.user_id, row.trip_id as string, row.id),
     })
+  )
 
+  const photos: PublicTripPhoto[] = photoRows
     // A photo that cannot be safely converted is left out rather than served
     // from the original.
-    if (!path) continue
-
-    photos.push({
+    .map((row, i) => ({ row, path: resolved[i].path }))
+    .filter((entry): entry is { row: (typeof photoRows)[number]; path: string } =>
+      Boolean(entry.path)
+    )
+    .map(({ row, path }) => ({
       id: row.id,
       url: publicMediaUrl(env.NEXT_PUBLIC_SUPABASE_URL, path),
       caption: row.caption,
       altText: row.alt_text,
-    })
-  }
+    }))
 
   // Published public posts only. On the elevated path RLS is not doing this,
   // so it is spelled out.

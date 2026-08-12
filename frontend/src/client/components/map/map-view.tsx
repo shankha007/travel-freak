@@ -12,7 +12,12 @@ import Map, {
 import type { LngLatBoundsLike } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { COUNTRIES_GEOJSON_URL, countryName, type CountryCollection } from '@/shared/geo/countries'
-import { admin1Url, type Admin1Collection } from '@/shared/geo/admin1'
+import {
+  ADMIN1_INDEX_URL,
+  admin1Url,
+  type Admin1Collection,
+  type Admin1IndexEntry,
+} from '@/shared/geo/admin1'
 import { mapStyleUrl } from '@/shared/geo/map-style'
 import { fillColorExpression, fillOpacityExpression } from '@/shared/geo/map-paint'
 import { REGION_STATE_META, resolveRegionStateColor } from '@/shared/geo/region-state'
@@ -127,28 +132,43 @@ export function MapView({
 
   // Subdivisions are fetched per country and merged, so a user with three
   // visited countries downloads three small files rather than the world.
+  //
+  // Which countries have one is asked first, from the index the build writes.
+  // Coverage is partial — nine countries today — so requesting a file per
+  // visited country means a 404 for most of them on every load. The index is a
+  // few hundred bytes, cached after the first map, and keeps this data-driven:
+  // extending coverage still needs no code change here.
   const admin1Key = admin1Countries.join(',')
   useEffect(() => {
     if (!admin1Key) return
 
     let cancelled = false
-    Promise.all(
-      admin1Key.split(',').map((iso) =>
-        fetch(admin1Url(iso))
-          .then((res) => (res.ok ? (res.json() as Promise<Admin1Collection>) : null))
-          // A country with no admin-1 file is normal — coverage is partial.
-          .catch(() => null)
-      )
-    ).then((collections) => {
-      if (cancelled) return
-      setLoadedAdmin1({
-        key: admin1Key,
-        data: {
-          type: 'FeatureCollection',
-          features: collections.flatMap((c) => c?.features ?? []),
-        },
+    fetch(ADMIN1_INDEX_URL)
+      .then((res) => (res.ok ? (res.json() as Promise<Admin1IndexEntry[]>) : []))
+      .catch(() => [] as Admin1IndexEntry[])
+      .then((index) => {
+        const covered = new Set(index.map((entry) => entry.iso_a3))
+        return Promise.all(
+          admin1Key
+            .split(',')
+            .filter((iso) => covered.has(iso))
+            .map((iso) =>
+              fetch(admin1Url(iso))
+                .then((res) => (res.ok ? (res.json() as Promise<Admin1Collection>) : null))
+                .catch(() => null)
+            )
+        )
       })
-    })
+      .then((collections) => {
+        if (cancelled) return
+        setLoadedAdmin1({
+          key: admin1Key,
+          data: {
+            type: 'FeatureCollection',
+            features: collections.flatMap((c) => c?.features ?? []),
+          },
+        })
+      })
 
     return () => {
       cancelled = true

@@ -10,6 +10,11 @@ there rather than here. Keep the gaps at the end of this file current.
 
 Last updated: 2026-08-13
 
+Every ✅ below was re-checked in a browser against the local stack on 2026-08-13,
+including sign-in, the globe and both maps on a free and a paid plan, the trip
+and blog screens, delete → trash → restore, and a share link through create,
+open, revoke and pull-back.
+
 ## Legend
 
 | Mark | Meaning |
@@ -56,7 +61,7 @@ Last updated: 2026-08-13
 | — | **pgTAP RLS tests** | ✅ Done | `backend/supabase/tests/database/rls.test.sql`, 86 assertions, `npm run db:test`. Two users, cross-user reads and writes, anon visibility, unpublish, soft delete, trip and post share tokens, and the trash listing |
 | — | HTML sanitisation | ✅ Done | `shared/content/sanitize.ts` — allowlist applied on read, so stored post markup cannot execute on the app's origin |
 | — | **Storage + signed uploads** | ✅ Done | Private `media` bucket, keys `<user>/<trip>/<media>.<ext>` — or `<user>/posts/<post>/<media>.<ext>` for post images — matching the storage policies, which only read the first segment. Reads go out as one-hour signed URLs; `next/image` is allow-listed to the storage host only |
-| — | **Geo assets** | ✅ Done | `npm run build:geo` writes country outlines plus admin-1 split one file per country, simplified 4% with mapshaper. Natural Earth 50m carries ISO 3166-2 for nine large countries, India among them |
+| — | **Geo assets** | ✅ Done | `npm run build:geo` writes country outlines plus admin-1 split one file per country, simplified 4% with mapshaper. Natural Earth 50m carries ISO 3166-2 for nine large countries, India among them. The map reads `admin1/index.json` before fetching, so an uncovered country costs no request |
 | — | **Public image derivatives** | ✅ Done | `media-public` bucket; sharp re-encodes to WebP ≤1600px, dropping every metadata block — on first publication for trip photos, at upload for post images, whose URL has to live in stored HTML. Tested with the same EXIF parser the uploader uses to read GPS |
 | — | Framer Motion | ⬜ Not started | Not installed |
 | — | CI (GitHub Actions) | ⬜ Not started | lint/typecheck/test all pass locally |
@@ -177,9 +182,10 @@ Last updated: 2026-08-13
 ## Known gaps worth fixing next
 
 1. **Derivatives are generated lazily, on the first request.** That request pays for the
-   re-encode of every photo on the trip, so the first view of a photo-heavy public page is
-   slow. The plan wants this in a background job at publish time; the output is identical, so
-   this is a latency problem rather than a correctness one. Post images are the exception —
+   re-encode of every photo on the trip — four at a time now rather than one after another,
+   which shortens it but does not move it off the request. The plan wants this in a background
+   job at publish time; the output is identical, so this is a latency problem rather than a
+   correctness one. Post images are the exception —
    they are converted at upload, because their URL has to live in stored HTML.
    `profiles.strip_exif_on_publish` still has nothing reading it — publication always strips,
    which is the stricter behaviour.

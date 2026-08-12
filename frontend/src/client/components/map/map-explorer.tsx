@@ -13,33 +13,7 @@ import { RegionModal } from '@/client/components/globe/region-modal'
 import { Button } from '@/client/components/ui/button'
 import { Skeleton } from '@/client/components/ui/skeleton'
 import { cn } from '@/shared/utils'
-
-type MapViewComponent = typeof import('./map-view').MapView
-
-/**
- * Loads MapLibre on the client only.
- *
- * maplibre-gl touches `window` at module scope and is ~800 KB, so it must never
- * be evaluated during SSR and must not sit in the initial bundle. Same approach
- * as the globe: an explicit import that surfaces failures rather than a
- * Suspense boundary that would leave the page stuck on a placeholder.
- */
-function useMapView() {
-  const [component, setComponent] = useState<{ Component: MapViewComponent } | null>(null)
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    import('./map-view')
-      .then((m) => !cancelled && setComponent({ Component: m.MapView }))
-      .catch(() => !cancelled && setFailed(true))
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  return { MapView: component?.Component ?? null, failed }
-}
+import { useLazyComponent } from '@/client/hooks/use-lazy-component'
 
 interface MapExplorerProps {
   regions: VisitedRegion[]
@@ -65,7 +39,9 @@ export function MapExplorer({
   const router = useRouter()
   const searchParams = useSearchParams()
   const selected = searchParams.get('region')
-  const { MapView, failed } = useMapView()
+  const { Component: MapView, failed } = useLazyComponent(
+    async () => (await import('./map-view')).MapView
+  )
 
   const [visibleStates, setVisibleStates] = useState<RegionState[]>([...TOGGLEABLE, 'unvisited'])
   const [detail, setDetail] = useState<{ forCountry: string; data: RegionDetail | null } | null>(

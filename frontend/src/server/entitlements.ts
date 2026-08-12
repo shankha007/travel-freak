@@ -42,23 +42,32 @@ export interface Entitlements {
 export const getEntitlements = cache(async (): Promise<Entitlements> => {
   const supabase = await createClient()
 
+  // One round trip, not two: `subscriptions.plan_code` is a foreign key into
+  // `plans`, so PostgREST can embed the plan with the subscription that names it.
   const { data: subscription } = await supabase
     .from('subscriptions')
-    .select('plan_code')
+    .select('plan_code, plans ( name, limits )')
     .maybeSingle()
 
-  // Falling back to the free plan rather than throwing: a missing subscription
-  // row should degrade to the most restrictive tier, never to unrestricted.
-  const planCode = subscription?.plan_code ?? 'explorer'
+  if (subscription) {
+    return {
+      planCode: subscription.plan_code,
+      planName: subscription.plans?.name ?? 'Explorer',
+      limits: (subscription.plans?.limits ?? {}) as PlanLimits,
+    }
+  }
 
+  // Falling back to the free plan rather than throwing: a missing subscription
+  // row should degrade to the most restrictive tier, never to unrestricted. This
+  // costs the extra query the common path no longer pays.
   const { data: plan } = await supabase
     .from('plans')
-    .select('code, name, limits')
-    .eq('code', planCode)
+    .select('name, limits')
+    .eq('code', 'explorer')
     .maybeSingle()
 
   return {
-    planCode,
+    planCode: 'explorer',
     planName: plan?.name ?? 'Explorer',
     limits: (plan?.limits ?? {}) as PlanLimits,
   }

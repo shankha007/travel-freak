@@ -7,44 +7,11 @@ import { Globe2 } from 'lucide-react'
 import type { RegionDetail, VisitedRegion } from '@/shared/types/globe'
 import { rollUpToCountries } from '@/shared/types/globe'
 import { TOTAL_COUNTRIES } from '@/shared/geo/countries'
+import { useLazyComponent } from '@/client/hooks/use-lazy-component'
 import { RegionLegend } from './region-legend'
 import { RegionList } from './region-list'
 import { RegionModal } from './region-modal'
 import { Skeleton } from '@/client/components/ui/skeleton'
-
-type GlobeViewComponent = typeof import('./globe-view').GlobeView
-
-/**
- * Loads the WebGL globe on the client only.
- *
- * three.js and react-globe.gl are ~500 KB and touch `window` at module scope,
- * so the module must never be evaluated during SSR. An explicit effect-driven
- * import keeps that guarantee while still code-splitting the chunk, and unlike
- * a lazy/Suspense boundary it surfaces load failures instead of leaving the
- * page silently stuck on a placeholder.
- */
-function useGlobeView() {
-  const [component, setComponent] = useState<{ Component: GlobeViewComponent } | null>(null)
-  const [failed, setFailed] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    import('./globe-view')
-      .then((m) => {
-        // Wrapped in an object: a bare setState(fn) would be treated as an
-        // updater function rather than the value.
-        if (!cancelled) setComponent({ Component: m.GlobeView })
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  return { GlobeView: component?.Component ?? null, failed }
-}
 
 interface GlobeExplorerProps {
   regions: VisitedRegion[]
@@ -69,7 +36,9 @@ export function GlobeExplorer({
   const router = useRouter()
   const searchParams = useSearchParams()
   const selected = searchParams.get('region')
-  const { GlobeView, failed } = useGlobeView()
+  const { Component: GlobeView, failed } = useLazyComponent(
+    async () => (await import('./globe-view')).GlobeView
+  )
 
   const [detail, setDetail] = useState<{
     forCountry: string

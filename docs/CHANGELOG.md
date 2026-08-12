@@ -108,8 +108,24 @@ their own line — nobody outside the repo ever saw them.
   badged a paying customer — whenever the author's profile was private.
 - `docs/STATUS.md` marks screen 12 (Changelog) as done, and no longer accumulates
   release notes: history lives here now.
+- **The first view of a public trip page is faster.** Photos are still converted
+  to public copies the first time someone opens the page, but a few at a time
+  instead of one after another, so a gallery no longer costs the sum of every
+  re-encode. The cap is deliberate: each conversion is real work, and doing all
+  of them at once would trade a slow page for a stalled server.
 
 ### Fixed
+
+- **A trip's cover photo could vanish from its own page.** The hero was matched
+  against the six photos the gallery card shows, so a cover chosen early and
+  followed by six newer photos left the page with no image — while the vault
+  still showed it set. The cover is now fetched on its own when the gallery does
+  not already contain it.
+- **The world map asked for subdivision data that does not exist.** It requested
+  a states-and-provinces file for every country you have visited, but only nine
+  countries have one, so most loads fired a handful of failed requests before
+  drawing. It now reads the coverage index the build already writes and asks only
+  for what is there.
 
 - **Unlisted trip links and public trip photos never worked.** Both read through
   the service role, because RLS cannot see a share token — and the schema never
@@ -166,6 +182,16 @@ their own line — nobody outside the repo ever saw them.
 - `@tiptap/extension-image` is pinned to 3.29.2 rather than ranged: its 3.30
   release peer-depends on a `@tiptap/core` newer than the one the starter kit
   installs, and npm refuses the tree.
+- **Fewer round trips per page.** The request-scoped Supabase client is built
+  once per request rather than once per query module; the session's profile and
+  plan are read together; `getEntitlements()` embeds the plan in the subscription
+  query it already makes; and `getVisitedRegions()` is deduped per render. A
+  public profile also no longer reads the visitor's `trip_places`, none of which
+  it is allowed to count.
+- `mapWithConcurrency()` in `shared/concurrency.ts` — bounded parallel mapping
+  that preserves input order, with unit tests. Used for image derivatives.
+- `useLazyComponent()` replaces four near-identical copies of the effect-driven
+  dynamic import behind the globe and the maps.
 
 ## 0.11.0 — 2026-08-12 — Public trip pages and share links
 
