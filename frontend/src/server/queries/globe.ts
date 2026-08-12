@@ -2,6 +2,7 @@ import 'server-only'
 
 import { createClient } from '@/server/supabase/server'
 import { requireUser } from '@/server/auth'
+import { getMediaUrls } from '@/server/queries/vault'
 import { countryName } from '@/shared/geo/countries'
 import type {
   RegionDetail,
@@ -26,7 +27,7 @@ import type { Database } from '@/shared/types/database'
 
 type VisitedRegionRow = Database['public']['Tables']['visited_regions']['Row']
 
-function toVisitedRegion(row: VisitedRegionRow): VisitedRegion {
+function toVisitedRegion(row: VisitedRegionRow, urls?: Map<string, string>): VisitedRegion {
   return {
     countryCode: row.country_code,
     regionCode: row.region_code ?? '',
@@ -38,9 +39,10 @@ function toVisitedRegion(row: VisitedRegionRow): VisitedRegion {
     tripIds: row.trip_ids ?? [],
     cityNames: row.city_names ?? [],
     featuredMediaId: row.featured_media_id,
-    // Media lives in a private bucket, so a URL means issuing a signed link.
-    // Nothing is uploaded yet; the modal falls back to "No photo yet".
-    featuredMediaUrl: null,
+    // The media bucket is private, so a URL means minting a signed link.
+    // `refresh_visited_regions()` picks the hero: the region's featured photo,
+    // falling back to the most recent trip's cover.
+    featuredMediaUrl: row.featured_media_id ? (urls?.get(row.featured_media_id) ?? null) : null,
   }
 }
 
@@ -59,7 +61,13 @@ export async function getVisitedRegions(): Promise<VisitedRegion[]> {
     throw new Error(`Could not load visited regions: ${error.message}`)
   }
 
-  return (data ?? []).map(toVisitedRegion)
+  const rows = data ?? []
+  // One batched signing call for every hero photo, rather than one per region.
+  const urls = await getMediaUrls(
+    rows.map((r) => r.featured_media_id).filter((id): id is string => Boolean(id))
+  )
+
+  return rows.map((row) => toVisitedRegion(row, urls))
 }
 
 /**
@@ -80,6 +88,11 @@ export async function getRegionDetail(countryCode: string): Promise<RegionDetail
     .eq('country_code', countryCode)
 
   if (!regions?.length) return null
+
+  // The hero photo for the modal, picked by the aggregate across this country's
+  // subdivision rows.
+  const heroId = regions.map((r) => r.featured_media_id).find((id): id is string => Boolean(id))
+  const featuredMediaUrl = heroId ? ((await getMediaUrls([heroId])).get(heroId) ?? null) : null
 
   // Collapse the country's subdivision rows into one summary.
   const tripIds = [...new Set(regions.flatMap((r) => r.trip_ids ?? []))]
@@ -114,7 +127,7 @@ export async function getRegionDetail(countryCode: string): Promise<RegionDetail
     const [tripRows, memoryRows, blogRows] = await Promise.all([
       supabase
         .from('trips')
-        .select('id, title, slug, summary, start_date, end_date, photo_count')
+        .select('id, title, slug, summary, start_date, end_date, photo_count, cover_media_id')
         .eq('user_id', user.id)
         .in('id', tripIds)
         .is('deleted_at', null)
@@ -139,6 +152,11 @@ export async function getRegionDetail(countryCode: string): Promise<RegionDetail
         .map((b) => [b.trip_id, b.slug])
     )
 
+    // One signing call covering every trip cover in the modal.
+    const coverUrls = await getMediaUrls(
+      (tripRows.data ?? []).map((t) => t.cover_media_id).filter((id): id is string => Boolean(id))
+    )
+
     trips = (tripRows.data ?? []).map((t) => ({
       id: t.id,
       title: t.title,
@@ -146,7 +164,7 @@ export async function getRegionDetail(countryCode: string): Promise<RegionDetail
       startDate: t.start_date,
       endDate: t.end_date,
       summary: t.summary,
-      coverMediaUrl: null,
+      coverMediaUrl: t.cover_media_id ? (coverUrls.get(t.cover_media_id) ?? null) : null,
       blogSlug: blogByTrip.get(t.id) ?? null,
       photoCount: t.photo_count,
     }))
@@ -169,7 +187,7 @@ export async function getRegionDetail(countryCode: string): Promise<RegionDetail
     firstVisit,
     lastVisit,
     cityNames,
-    featuredMediaUrl: null,
+    featuredMediaUrl,
     trips,
     memories,
   }

@@ -50,6 +50,8 @@ Local ports: API `54321`, Postgres `54322`, Studio `54323`, Mailpit `54324`.
 | `20260807000300_plans_and_storage.sql`| Plan catalogue and the `media` / `avatars` buckets             |
 | `20260811000100_data_api_grants.sql`| Table grants for the `anon` / `authenticated` Data API roles     |
 | `20260812000100_visited_regions_visit_trips.sql`| `visit_trip_ids` on the aggregate, so counts combine correctly |
+| `20260812000200_soft_delete_trip.sql`| `soft_delete_trip()` / `restore_trip()` — RLS makes a direct `deleted_at` write impossible |
+| `20260812000300_soft_delete_media.sql`| `soft_delete_media()` — same trap on `media`, plus releasing the bytes |
 
 Add a migration with `npx supabase migration new <name>`. Never edit an applied
 migration — write a new one.
@@ -64,7 +66,8 @@ Runs every `supabase/tests/database/*.test.sql` with pgTAP against the running
 stack. `rls.test.sql` invents two users and asserts that neither can read or
 write the other's trips, places, memories, media, blogs, wishlist, subscription
 or usage rows — plus what a signed-out visitor may see, that unpublishing hides
-a trip immediately, and that a soft delete hides a trip without destroying it.
+a trip immediately, and that soft-deleting a trip or a photo goes through the
+SECURITY DEFINER functions rather than a direct write, which RLS refuses.
 
 Each file runs inside one transaction that is rolled back, so the suite leaves
 no rows behind and the pgTAP extension itself is never committed.

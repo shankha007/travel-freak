@@ -71,12 +71,14 @@ values
   ('bbbbbbbb-0000-4000-8000-000000000002', 'b2222222-0000-4000-8000-000000000001',
    'note', 'Bob private memory');
 
-insert into public.media (user_id, trip_id, kind, storage_path, mime, bytes)
+-- Ids are fixed so the media tests can name bob's photo without being able to
+-- read it — which is the whole point of the assertion that follows.
+insert into public.media (id, user_id, trip_id, kind, storage_path, mime, bytes)
 values
-  ('aaaaaaaa-0000-4000-8000-000000000001', 'a1111111-0000-4000-8000-000000000001',
-   'image', 'rls/alice/1.jpg', 'image/jpeg', 100),
-  ('bbbbbbbb-0000-4000-8000-000000000002', 'b2222222-0000-4000-8000-000000000001',
-   'image', 'rls/bob/1.jpg', 'image/jpeg', 100);
+  ('d1111111-0000-4000-8000-000000000001', 'aaaaaaaa-0000-4000-8000-000000000001',
+   'a1111111-0000-4000-8000-000000000001', 'image', 'rls/alice/1.jpg', 'image/jpeg', 100),
+  ('d2222222-0000-4000-8000-000000000002', 'bbbbbbbb-0000-4000-8000-000000000002',
+   'b2222222-0000-4000-8000-000000000001', 'image', 'rls/bob/1.jpg', 'image/jpeg', 100);
 
 insert into public.blog_posts (user_id, trip_id, title, slug, visibility, published_at)
 values
@@ -365,6 +367,67 @@ select is_empty(
   $$ select id from public.trip_places
      where trip_id = 'a1111111-0000-4000-8000-000000000002' $$,
   'and so do its places'
+);
+
+-- ---------------------------------------------------------------------------
+-- Media: cross-user isolation on the storage-backed table
+-- ---------------------------------------------------------------------------
+
+reset role;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"aaaaaaaa-0000-4000-8000-000000000001","role":"authenticated"}',
+  true
+);
+set local role authenticated;
+
+-- The upload path mints the media id server-side and derives the storage key
+-- from the session's user id, but the row insert is still an ordinary write, so
+-- the policy has to be the thing that stops a forged one.
+select throws_ok(
+  $$ insert into public.media (user_id, trip_id, kind, storage_path, mime, bytes)
+     values ('bbbbbbbb-0000-4000-8000-000000000002',
+             'b2222222-0000-4000-8000-000000000001',
+             'image', 'rls/forged/1.jpg', 'image/jpeg', 10) $$,
+  '42501',
+  null,
+  'alice cannot insert media owned by bob'
+);
+
+select throws_ok(
+  $$ update public.media set deleted_at = now()
+     where storage_path = 'rls/alice/1.jpg' $$,
+  '42501',
+  null,
+  'a photo cannot be soft-deleted by a direct update, for the same reason trips cannot'
+);
+
+select is(
+  (select public.soft_delete_media('d1111111-0000-4000-8000-000000000001')),
+  true,
+  'the owner can soft-delete a photo through soft_delete_media()'
+);
+
+select is_empty(
+  $$ select id from public.media where storage_path = 'rls/alice/1.jpg' $$,
+  'and it stops being readable'
+);
+
+-- Named by id rather than found by query: the function bypasses RLS, so the
+-- thing under test is its own ownership check, not alice's inability to see it.
+select is(
+  (select public.soft_delete_media('d2222222-0000-4000-8000-000000000002')),
+  false,
+  'but bob''s photo is not deletable through it'
+);
+
+-- Deleting a photo has to give the storage back, or "deleted" would keep
+-- costing the user their pool.
+reset role;
+select is(
+  (select bytes from public.media where storage_path = 'rls/alice/1.jpg'),
+  0::bigint,
+  'a deleted photo releases its bytes'
 );
 
 -- ---------------------------------------------------------------------------

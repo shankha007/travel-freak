@@ -20,16 +20,16 @@ Last updated: 2026-08-12
 
 | Area | Done | Partial | Stub | Not started |
 |---|---|---|---|---|
-| Infrastructure | 10 | 0 | 0 | 3 |
+| Infrastructure | 11 | 0 | 0 | 3 |
 | Public / marketing | 1 | 1 | 0 | 8 |
 | Auth | 2 | 0 | 0 | 3 |
 | Dashboard & globe | 3 | 1 | 2 | 0 |
 | Trips & planner | 2 | 1 | 0 | 4 |
-| Memory & content | 3 | 0 | 1 | 1 |
+| Memory & content | 4 | 1 | 0 | 0 |
 | Analytics & resume | 0 | 0 | 2 | 2 |
 | Public sharing | 0 | 0 | 0 | 3 |
 | Account | 0 | 0 | 1 | 5 |
-| **Total** | **21** | **3** | **6** | **29** |
+| **Total** | **23** | **4** | **5** | **28** |
 
 ---
 
@@ -50,6 +50,7 @@ Last updated: 2026-08-12
 | — | **`entitlements.ts`** | ✅ Done | Reads `plans.limits`; `checkTripQuota()` counts the caller's own live rows rather than trusting the denormalised counter. Gates both `/trips/new` and the create action |
 | — | **pgTAP RLS tests** | ✅ Done | `backend/supabase/tests/database/rls.test.sql`, 40 assertions, `npm run db:test`. Two users, cross-user reads and writes, anon visibility, unpublish, soft delete |
 | — | HTML sanitisation | ✅ Done | `shared/content/sanitize.ts` — allowlist applied on read, so stored post markup cannot execute on the app's origin |
+| — | **Storage + signed uploads** | ✅ Done | Private `media` bucket, keys `<user>/<trip>/<media>.<ext>` matching the storage policies. Reads go out as one-hour signed URLs; `next/image` is allow-listed to the storage host only |
 | — | Framer Motion | ⬜ Not started | Not installed |
 | — | CI (GitHub Actions) | ⬜ Not started | lint/typecheck/test all pass locally |
 | — | Sentry + PostHog | ⬜ Not started | Plan wants the funnel instrumented on day one |
@@ -111,8 +112,8 @@ Last updated: 2026-08-12
 
 | # | Feature | Status | Notes |
 |---|---|---|---|
-| 25 | Memory Vault | 🔵 Stub | Region modal links to `/trips/[id]/vault` |
-| 26 | Media upload + quota meter | ⬜ Not started | Signed-upload route handler is the critical path |
+| 25 | **Memory Vault** `/trips/[id]/vault` | 🟡 Partial | Timeline and Gallery are live: photos and notes interleaved by date, photo detail with caption, alt text, cover photo and delete, plus a note composer. **Map view is an explained placeholder** — it needs place coordinates, which arrive with the world map screen |
+| 26 | **Media upload + quota meter** | ✅ Done | `POST /api/uploads/sign` issues a quota-checked signed URL, the browser PUTs straight to Storage, and `confirmUpload` re-reads the object's real size and sniffs its magic bytes before writing the row. Drag-drop, per-file progress, per-trip and pool meters, EXIF date and GPS captured on the client |
 | 27 | **Blog Studio** `/blogs/new`, `/blogs/[id]/edit` | ✅ Done | Tiptap v3 with a formatting toolbar, autosave (1.5s debounce, ⌘S, unload guard), excerpt and SEO fields, trip link, visibility, publish/unpublish, soft delete. A new post writes no row until the first save, then swaps the URL in place so the cursor survives. Slugs follow the title until publication and freeze after |
 | 28 | **My Blogs** `/blogs` | ✅ Done | All / Published / Drafts with counts, reading time, linked trip, and a link to the public reader |
 | 29 | **Blog reader** `/b/[slug]` | ✅ Done | Public route. Sanitised HTML, byline, reading time, linked trip, JSON-LD `Article`, `noindex` on anything unpublished, free-plan badge. The author sees their own drafts behind a notice; everyone else gets the same 404 as a slug that does not exist |
@@ -221,19 +222,56 @@ Two more bugs found while verifying it:
   sets `data-placeholder`; showing it is the stylesheet's job, and the rule was
   missing from `globals.css`.
 
+## Also on 2026-08-12 — media upload and the Memory Vault
+
+Screens 25 and 26. The plan's critical path: photos go from the browser
+straight to Storage, and the server's only jobs are saying yes and recording
+what landed.
+
+- **`POST /api/uploads/sign`** is the quota gate. It re-checks trip ownership,
+  the declared type and size, the per-trip photo cap and the storage pool, then
+  issues a signed URL. A 402 (not a 403) comes back on a plan limit, and the
+  uploader turns that into an upgrade card rather than an error.
+- **`confirmUpload` does not trust the client.** It re-reads the object's real
+  size from Storage, re-runs the quota against that, and identifies the file
+  from its leading bytes. A file that is not really an image is deleted rather
+  than recorded, so nothing orphaned is left counting against the pool.
+- **Uploads run one at a time**, because the quota is counted per request and
+  five parallel uploads against a limit of five would all be told yes.
+- Photos are served only as one-hour signed URLs. EXIF GPS is stored for the
+  owner and never sent to the client — the vault only learns whether a photo
+  *has* coordinates.
+
+Two bugs found while verifying:
+
+- **An HTML page uploaded as `.png` was accepted**, because the type recorded by
+  Storage is just the header the browser sent. That is what the magic-byte
+  sniffing now catches; there are unit tests for the signatures, including the
+  404-page case that exposed it.
+- **Photos could not be deleted**: `media` has the same policy shape as `trips`,
+  so setting `deleted_at` failed with 42501 for the photo's own owner. Fixed
+  with `soft_delete_media()` (migration `20260812000300`), which also releases
+  the bytes and clears the trip cover. The pgTAP suite now asserts both.
+
 ## Known gaps worth fixing next
 
 1. **No map picker on create.** Places are country + free-text city, so `trip_places.location`
    (the PostGIS point) is left null. Distance-travelled and nearest-city snapping cannot be
    computed until the world map screen lands and supplies coordinates. Unchanged, and still
    blocked on screen 16.
-2. **Deleted trips are unreachable.** `restore_trip()` keeps the 30-day promise the delete
-   dialog makes, but nothing calls it — there is no trash view. Either build one or the copy
-   is writing a cheque the UI cannot cash.
-3. **The studio has no images.** Blocked on media upload — the sanitiser already allows `<img>`,
-   so the block is the signed-upload route, not the editor. Cover images are the same story.
+2. **Deleted trips and photos are unreachable.** `restore_trip()` keeps the 30-day promise the
+   delete dialogs make, but nothing calls it, and `soft_delete_media()` has no restore at all —
+   its object is removed from Storage immediately, so a restored photo would be a broken link.
+   Either build a trash view with real restore, or change the copy.
+3. **No image derivatives, so no photos on public pages yet.** Originals are stored with their
+   EXIF intact, which is right for the owner and wrong for anyone else: publishing one would
+   leak the GPS the plan calls a safety issue. Public trip pages (screen 37) and images inside
+   blog posts both wait on a resize-and-strip step. `profiles.strip_exif_on_publish` already
+   defaults on and has nothing to enforce it.
 4. **`/register` has no email verification path in production.** Locally `enable_confirmations`
    is off and sign-up returns a session; with confirmations on the form shows "check your
    inbox", but there is no `/verify` route to land on afterwards.
 5. **Unlisted blogs have no share link.** `visibility = 'unlisted'` is readable only by the
    author, because the `share_links` token flow is not built yet.
+6. **HEIC has no fallback.** iPhone photos upload and store fine, but browsers that cannot
+   decode HEIC show nothing and record no dimensions — the same derivative pipeline fixes it.

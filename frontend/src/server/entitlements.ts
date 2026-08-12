@@ -112,6 +112,93 @@ export async function checkTripQuota(): Promise<QuotaCheck> {
   }
 }
 
+export interface MediaQuota {
+  /** Photos already stored on this trip. */
+  photosUsed: number
+  photosLimit: number | null
+  /** Bytes stored across the whole account — the real cost backstop. */
+  storageUsed: number
+  storageLimit: number | null
+  /** Largest single upload the remaining pool can take. */
+  bytesRemaining: number | null
+}
+
+/**
+ * The trip's photo count and the account's storage pool, in one read.
+ *
+ * Counted live from `media` rather than from `trips.photo_count` and
+ * `usage_counters.storage_bytes`: both are trigger-maintained and correct in
+ * practice, but a quota gate should not depend on a denormalisation being in
+ * sync. The counters stay useful for display.
+ */
+export async function getMediaQuota(tripId: string): Promise<MediaQuota> {
+  const supabase = await createClient()
+  const user = await requireUser()
+  const { limits } = await getEntitlements()
+
+  const [tripPhotos, stored] = await Promise.all([
+    supabase
+      .from('media')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('trip_id', tripId)
+      .eq('kind', 'image')
+      .is('deleted_at', null),
+    supabase.from('media').select('bytes').eq('user_id', user.id).is('deleted_at', null),
+  ])
+
+  const photosUsed = tripPhotos.count ?? 0
+  const storageUsed = (stored.data ?? []).reduce((sum, m) => sum + (m.bytes ?? 0), 0)
+  const storageLimit = limits.storage_bytes ?? null
+
+  return {
+    photosUsed,
+    photosLimit: limits.photos_per_trip ?? null,
+    storageUsed,
+    storageLimit,
+    bytesRemaining: storageLimit === null ? null : Math.max(0, storageLimit - storageUsed),
+  }
+}
+
+export interface MediaQuotaCheck extends QuotaCheck {
+  quota: MediaQuota
+}
+
+/**
+ * Whether one more photo of `bytes` may be stored on this trip.
+ *
+ * Runs **before** a signed upload URL is issued, per the plan's rule that
+ * client-side checks are UX and this is the enforcement. Both limits are
+ * reported so the caller can say which one was hit — "5 of 5 photos" and "1 GB
+ * full" call for different copy and a different upgrade prompt.
+ */
+export async function checkPhotoQuota(tripId: string, bytes: number): Promise<MediaQuotaCheck> {
+  const { planName } = await getEntitlements()
+  const quota = await getMediaQuota(tripId)
+
+  if (quota.photosLimit !== null && quota.photosUsed >= quota.photosLimit) {
+    return {
+      allowed: false,
+      used: quota.photosUsed,
+      limit: quota.photosLimit,
+      quota,
+      reason: `${planName} includes ${quota.photosLimit} photos per trip and this trip has ${quota.photosUsed}. Upgrade to add more — nothing you have uploaded is affected.`,
+    }
+  }
+
+  if (quota.bytesRemaining !== null && bytes > quota.bytesRemaining) {
+    return {
+      allowed: false,
+      used: quota.storageUsed,
+      limit: quota.storageLimit,
+      quota,
+      reason: `That photo does not fit in what is left of your ${planName} storage. Free some space or upgrade — nothing is deleted either way.`,
+    }
+  }
+
+  return { allowed: true, used: quota.photosUsed, limit: quota.photosLimit, quota }
+}
+
 /** Convenience for read paths that only need the boolean. */
 export async function canUseRegionDetail(): Promise<boolean> {
   const { limits } = await getEntitlements()

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import {
@@ -261,31 +262,65 @@ export default async function TripDetailPage({ params }: PageProps<'/trips/[id]'
         <div className="space-y-4">
           {/* Gallery */}
           <Card>
-            <CardHeader>
+            <CardHeader className="flex-row items-center justify-between">
               <CardTitle className="text-base">Gallery</CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                nativeButton={false}
+                render={<Link href={`/trips/${trip.id}/vault`} />}
+              >
+                Open vault
+              </Button>
             </CardHeader>
-            <CardContent className="space-y-2">
-              {trip.photoCount + trip.videoCount + trip.audioCount > 0 ? (
-                <ul className="space-y-1 text-sm">
-                  <li className="flex items-center justify-between">
-                    <span className="flex items-center gap-1.5 text-muted-foreground">
-                      <Camera className="size-3.5" aria-hidden />
-                      Photos
-                    </span>
-                    <span className="tabular-nums">{trip.photoCount}</span>
-                  </li>
-                  <li className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Storage used</span>
-                    <span className="tabular-nums">{formatBytes(trip.mediaBytes)}</span>
-                  </li>
-                </ul>
+            <CardContent className="space-y-3">
+              {trip.photos.length > 0 ? (
+                <>
+                  <ul className="grid grid-cols-3 gap-1.5">
+                    {trip.photos.map((photo) => (
+                      <li key={photo.id}>
+                        <Link
+                          href={`/trips/${trip.id}/vault`}
+                          className="relative block aspect-square overflow-hidden rounded-md bg-muted"
+                        >
+                          <Image
+                            src={photo.url}
+                            alt={photo.altText || photo.caption || 'Trip photo'}
+                            fill
+                            sizes="120px"
+                            className="object-cover"
+                          />
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <ul className="space-y-1 text-sm">
+                    <li className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-muted-foreground">
+                        <Camera className="size-3.5" aria-hidden />
+                        Photos
+                      </span>
+                      <span className="tabular-nums">{trip.photoCount}</span>
+                    </li>
+                    <li className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Storage used</span>
+                      <span className="tabular-nums">{formatBytes(trip.mediaBytes)}</span>
+                    </li>
+                  </ul>
+                </>
               ) : (
                 <div className="flex flex-col items-center gap-2 py-4 text-center">
                   <Images className="size-6 text-muted-foreground" aria-hidden />
                   <p className="text-sm text-muted-foreground">No photos yet.</p>
-                  <p className="text-xs text-muted-foreground">
-                    Upload lands with the Memory Vault.
-                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    nativeButton={false}
+                    render={<Link href={`/trips/${trip.id}/vault`} />}
+                  >
+                    Add photos
+                  </Button>
                 </div>
               )}
             </CardContent>

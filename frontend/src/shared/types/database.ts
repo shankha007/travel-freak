@@ -1231,6 +1231,7 @@ export type Database = {
       restore_trip: { Args: { p_trip_id: string }; Returns: boolean }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      soft_delete_media: { Args: { p_media_id: string }; Returns: boolean }
       soft_delete_trip: { Args: { p_trip_id: string }; Returns: boolean }
       st_3dclosestpoint: {
         Args: { geom1: unknown; geom2: unknown }

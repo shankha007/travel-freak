@@ -46,6 +46,13 @@ export interface TripBlog {
   publishedAt: string | null
 }
 
+export interface TripPhoto {
+  id: string
+  url: string
+  altText: string
+  caption: string
+}
+
 export interface TripDetail {
   id: string
   title: string
@@ -67,6 +74,9 @@ export interface TripDetail {
   places: TripPlaceDetail[]
   memories: TripMemory[]
   blogs: TripBlog[]
+  /** A handful of recent photos for the gallery card, with signed URLs. */
+  photos: TripPhoto[]
+  coverUrl: string | null
   /** Nights between the dates, or null when the trip has no range yet. */
   durationDays: number | null
   countryCodes: string[]
@@ -87,7 +97,7 @@ export async function getTripDetail(id: string): Promise<TripDetail | null> {
     .from('trips')
     .select(
       `id, title, slug, summary, start_date, end_date, status, visibility,
-       trip_type, traveler_count, budget_planned, currency,
+       trip_type, traveler_count, budget_planned, currency, cover_media_id,
        photo_count, video_count, audio_count, media_bytes, created_at`
     )
     .eq('id', id)
@@ -96,7 +106,7 @@ export async function getTripDetail(id: string): Promise<TripDetail | null> {
 
   if (!trip) return null
 
-  const [placesResult, memoriesResult, blogsResult] = await Promise.all([
+  const [placesResult, memoriesResult, blogsResult, photosResult] = await Promise.all([
     supabase
       .from('trip_places')
       .select(
@@ -116,7 +126,26 @@ export async function getTripDetail(id: string): Promise<TripDetail | null> {
       .eq('trip_id', id)
       .is('deleted_at', null)
       .order('published_at', { ascending: false, nullsFirst: false }),
+    // Enough for the gallery card; the vault is where all of them live.
+    supabase
+      .from('media')
+      .select('id, storage_path, alt_text, caption')
+      .eq('trip_id', id)
+      .eq('kind', 'image')
+      .is('deleted_at', null)
+      .order('taken_at', { ascending: false, nullsFirst: false })
+      .limit(6),
   ])
+
+  // The bucket is private, so thumbnails need short-lived signed links.
+  const photoRows = photosResult.data ?? []
+  const signed = photoRows.length
+    ? await supabase.storage.from('media').createSignedUrls(
+        photoRows.map((p) => p.storage_path),
+        60 * 60
+      )
+    : { data: [] }
+  const urlByPath = new Map((signed.data ?? []).map((s) => [s.path, s.signedUrl]))
 
   const places = (placesResult.data ?? []).map((p) => ({
     id: p.id,
@@ -164,6 +193,19 @@ export async function getTripDetail(id: string): Promise<TripDetail | null> {
       visibility: b.visibility,
       publishedAt: b.published_at,
     })),
+    photos: photoRows
+      .map((p) => ({
+        id: p.id,
+        url: urlByPath.get(p.storage_path) ?? null,
+        altText: p.alt_text,
+        caption: p.caption,
+      }))
+      .filter((p): p is TripPhoto => p.url !== null),
+    coverUrl: trip.cover_media_id
+      ? (photoRows
+          .filter((p) => p.id === trip.cover_media_id)
+          .map((p) => urlByPath.get(p.storage_path) ?? null)[0] ?? null)
+      : null,
     durationDays:
       trip.start_date && trip.end_date
         ? Math.max(0, differenceInCalendarDays(parseISO(trip.end_date), parseISO(trip.start_date)))
