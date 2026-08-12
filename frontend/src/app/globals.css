@@ -53,6 +53,15 @@
   --color-globe-current: var(--globe-current);
   --color-globe-planned: var(--globe-planned);
   --color-globe-unvisited: var(--globe-unvisited);
+  /* Changelog entry kinds. See src/shared/content/changelog.ts for the labels
+     that must always accompany these colours. */
+  --color-change-added: var(--change-added);
+  --color-change-changed: var(--change-changed);
+  --color-change-fixed: var(--change-fixed);
+  --color-change-removed: var(--change-removed);
+  --color-change-security: var(--change-security);
+  --color-change-infra: var(--change-infra);
+
   --color-globe-visited-foreground: var(--globe-visited-foreground);
   --color-globe-current-foreground: var(--globe-current-foreground);
   --color-globe-planned-foreground: var(--globe-planned-foreground);
@@ -94,6 +103,15 @@
   --globe-current-foreground: oklch(0.99 0 0);
   --globe-planned-foreground: oklch(0.26 0.05 78);
   --globe-unvisited-foreground: oklch(0.42 0.01 220);
+
+  /* Changelog kinds — used as both a dot and tinted label text, so lightness is
+     picked for contrast against a 12%-opacity wash of itself, not against white. */
+  --change-added: oklch(0.5 0.13 155);
+  --change-changed: oklch(0.5 0.12 250);
+  --change-fixed: oklch(0.5 0.14 295);
+  --change-removed: oklch(0.52 0.16 25);
+  --change-security: oklch(0.52 0.13 200);
+  --change-infra: oklch(0.48 0.03 240);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -138,6 +156,14 @@
   --globe-current-foreground: oklch(0.16 0.03 245);
   --globe-planned-foreground: oklch(0.2 0.04 78);
   --globe-unvisited-foreground: oklch(0.78 0.01 220);
+
+  /* Lifted for the dark surface, same hues. */
+  --change-added: oklch(0.78 0.14 155);
+  --change-changed: oklch(0.76 0.12 250);
+  --change-fixed: oklch(0.78 0.13 295);
+  --change-removed: oklch(0.75 0.15 25);
+  --change-security: oklch(0.78 0.11 200);
+  --change-infra: oklch(0.75 0.03 240);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);

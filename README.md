@@ -17,6 +17,18 @@ Each folder is independently installable and has its own `package.json`.
 | `frontend/` | The app users load in a browser         | `npm install` in `frontend/`  |
 | `backend/`  | Postgres schema, RLS policies, storage  | `npm install` in `backend/`   |
 
+## Docs
+
+| File                                       | What it is                                            |
+| ------------------------------------------ | ----------------------------------------------------- |
+| [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) | Product and architecture plan                        |
+| [docs/STATUS.md](docs/STATUS.md)           | Where each screen stands right now, plus known gaps    |
+| [docs/CHANGELOG.md](docs/CHANGELOG.md)     | What shipped, newest first — published at `/changelog` |
+
+The changelog is rendered into the app at build time, so an entry added there is
+an entry published to users. Its own header explains the format; every change
+that reaches `master` adds one.
+
 ## Getting started
 
 Install and run the app:
@@ -72,3 +84,8 @@ So the split reads: **`frontend/` is the application, `backend/` is the database
 Set the project root to `frontend/` in your host (on Vercel: Settings → General → Root
 Directory). Migrations in `backend/supabase/migrations` are applied with the Supabase CLI,
 not by the app build.
+
+The `/changelog` page reads `docs/CHANGELOG.md` at build time, which is above that root —
+so the build also needs "Include source files outside of the Root Directory in the Build
+Step" enabled. Without it the build fails with a message naming this setting, rather than
+deploying a changelog page with nothing on it.

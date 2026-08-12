@@ -3,6 +3,11 @@
 Feature-by-feature state of the build. Screen numbers refer to §5 of
 [PROJECT_PLAN.md](PROJECT_PLAN.md).
 
+This file answers "where does the product stand"; it is not a history. What
+shipped, when, and why lives in [CHANGELOG.md](CHANGELOG.md) — the notes that
+used to accumulate at the bottom of this file are there now, and new ones go
+there rather than here. Keep the gaps at the end of this file current.
+
 Last updated: 2026-08-12
 
 ## Legend
@@ -21,7 +26,7 @@ Last updated: 2026-08-12
 | Area | Done | Partial | Stub | Not started |
 |---|---|---|---|---|
 | Infrastructure | 12 | 0 | 0 | 3 |
-| Public / marketing | 1 | 1 | 0 | 8 |
+| Public / marketing | 2 | 1 | 0 | 7 |
 | Auth | 2 | 0 | 0 | 3 |
 | Dashboard & globe | 4 | 2 | 0 | 0 |
 | Trips & planner | 2 | 1 | 0 | 4 |
@@ -29,7 +34,7 @@ Last updated: 2026-08-12
 | Analytics & resume | 1 | 0 | 1 | 2 |
 | Public sharing | 4 | 0 | 0 | 0 |
 | Account | 0 | 0 | 1 | 5 |
-| **Total** | **30** | **5** | **2** | **25** |
+| **Total** | **31** | **5** | **2** | **24** |
 
 ---
 
@@ -68,7 +73,7 @@ Last updated: 2026-08-12
 | 5 | About | ⬜ Not started | Phase 1.1 |
 | 6 | Contact | ⬜ Not started | Phase 1.1 |
 | 11 | Legal (privacy/terms/refunds) | ⬜ Not started | MVP requirement |
-| 12 | Changelog | ⬜ Not started | Phase 1.1 |
+| 12 | **Changelog** `/changelog` | ✅ Done | Public, no login, statically rendered from `docs/CHANGELOG.md` at build time. Timeline of releases with per-kind sections; the parser refuses a malformed entry rather than dropping it |
 | — | OG image endpoint | ⬜ Not started | Phase 1.1 |
 | — | SEO (JSON-LD, sitemap, RSS) | ⬜ Not started | |
 
@@ -166,184 +171,6 @@ Last updated: 2026-08-12
 | Toasts | ⬜ Not started | `sonner` installed and mounted |
 
 ---
-
-## Fixed on 2026-08-12
-
-The five gaps previously listed here, four of which are now closed, plus three
-bugs the work uncovered.
-
-1. **Trip edit and delete** — shipped, see screens 19–20 above.
-2. **The two 404s** — `/register` and `/b/[slug]` both exist.
-3. **Map picker** — still open, see below. It genuinely depends on the world-map screen.
-4. **pgTAP RLS tests** — 40 assertions, `npm run db:test`.
-5. **`rollUpToCountries` trip counting** — the aggregate now carries
-   `visit_trip_ids` (migration `20260812000100`) and the roll-up unions them, so a
-   country visited on four trips reads as 4 and one trip across three states still
-   reads as 1. Against the seed: India went 1 → 4, Nepal and Thailand 1 → 2, Japan
-   correctly stayed 1.
-
-Found while building the above:
-
-- **Soft delete was impossible for anyone.** On UPDATE, Postgres requires the new
-  row to satisfy the table's SELECT policies, and `trips_select_own` ends in
-  `deleted_at is null` — so setting `deleted_at` failed with 42501 for the owner
-  too. Fixed with the `soft_delete_trip()` / `restore_trip()` SECURITY DEFINER
-  pair rather than by loosening the policy (migration `20260812000200`). The test
-  suite now asserts both the refusal and the working path.
-- **Owner screens leaked other users' public data.** The dashboard, trips list,
-  globe and — worst — `checkTripQuota()` filtered by nothing, relying on RLS to
-  scope rows. RLS is a ceiling, not a scope: `trips` also exposes every published
-  public trip. A brand-new account opened on a dashboard reading "7 countries,
-  6 trips" and started life partway through its plan limit. Every owner-scoped
-  query now filters `user_id` explicitly.
-- **The account menu crashed on open**, taking sign-out with it: `DropdownMenuLabel`
-  maps to Base UI's `Menu.GroupLabel`, which throws outside a `Menu.Group`.
-
-## Also on 2026-08-12 — Blog Studio
-
-Screens 27 and 28, which closes the MVP's content loop: a trip can now be
-written up, published, and read at a public URL without touching the database.
-
-Two things worth knowing about how it behaves:
-
-- **A new post writes no row until the first autosave**, so an abandoned
-  `/blogs/new` leaves nothing behind. That save returns an id and the URL is
-  swapped with `history.replaceState`; a router navigation would remount the
-  editor and take the writer's cursor with it.
-- **Publishing never changes visibility.** A private post cannot be published —
-  the button is disabled and the server refuses — because quietly flipping
-  someone's privacy setting to make a button work is how people publish things
-  they did not mean to.
-
-Two more bugs found while verifying it:
-
-- **Toolbar buttons applied formatting at the top of the document** rather than
-  at the cursor: pressing a button moved focus, the selection collapsed, and
-  `chain().focus()` restored the last known caret. Fixed by preventing the
-  default on mousedown.
-- **The editor placeholder never rendered.** Tiptap's Placeholder extension only
-  sets `data-placeholder`; showing it is the stylesheet's job, and the rule was
-  missing from `globals.css`.
-
-## Also on 2026-08-12 — media upload and the Memory Vault
-
-Screens 25 and 26. The plan's critical path: photos go from the browser
-straight to Storage, and the server's only jobs are saying yes and recording
-what landed.
-
-- **`POST /api/uploads/sign`** is the quota gate. It re-checks trip ownership,
-  the declared type and size, the per-trip photo cap and the storage pool, then
-  issues a signed URL. A 402 (not a 403) comes back on a plan limit, and the
-  uploader turns that into an upgrade card rather than an error.
-- **`confirmUpload` does not trust the client.** It re-reads the object's real
-  size from Storage, re-runs the quota against that, and identifies the file
-  from its leading bytes. A file that is not really an image is deleted rather
-  than recorded, so nothing orphaned is left counting against the pool.
-- **Uploads run one at a time**, because the quota is counted per request and
-  five parallel uploads against a limit of five would all be told yes.
-- Photos are served only as one-hour signed URLs. EXIF GPS is stored for the
-  owner and never sent to the client — the vault only learns whether a photo
-  *has* coordinates.
-
-Two bugs found while verifying:
-
-- **An HTML page uploaded as `.png` was accepted**, because the type recorded by
-  Storage is just the header the browser sent. That is what the magic-byte
-  sniffing now catches; there are unit tests for the signatures, including the
-  404-page case that exposed it.
-- **Photos could not be deleted**: `media` has the same policy shape as `trips`,
-  so setting `deleted_at` failed with 42501 for the photo's own owner. Fixed
-  with `soft_delete_media()` (migration `20260812000300`), which also releases
-  the bytes and clears the trip cover. The pgTAP suite now asserts both.
-
-## Also on 2026-08-12 — the world and India maps
-
-Screens 16 and 17. Both are the same component: MapLibre with two GeoJSON fill
-layers, joined to `visited_regions` through `feature-state` so changing what is
-highlighted never re-uploads geometry. Selection lives in the URL, so a country
-on the map is as shareable as one on the globe, and every map is paired with the
-keyboard-navigable region list — the map is a presentation surface, not the only
-path to the data.
-
-- **Subdivisions are the paywall on the world map** and free on the India map.
-  The world map fetches admin-1 only for countries the user has actually
-  visited, one small file each.
-- **A missing MapTiler key is not an error.** Without one the polygons render on
-  a plain background, which is what happens locally today: the key in
-  `.env.local` is empty, so the maps draw without a basemap. Set one to get
-  coastlines and labels underneath.
-- **Coverage is nine countries** — Natural Earth's 50m admin-1 set carries ISO
-  3166-2 for Australia, Brazil, Canada, China, India, Indonesia, Russia, South
-  Africa and the USA. Extending it is the plan's v1.1 item; the loader already
-  handles a country with no file.
-
-One dependency had to move: **maplibre-gl 6 does not work under this build.**
-Its ESM worker imports `./maplibre-gl-shared.mjs` by an unhashed relative path,
-the bundler emits that file hashed, and the request 404s — the worker never
-starts, so the style never loads and the map stays blank with only a MIME-type
-error to show for it. Pinned to 5.24.0, which ships a self-contained bundle.
-
-## Also on 2026-08-12 — the Travel Resume and public profile
-
-Screens 33 and 36, which is the growth loop: the first page in the product that
-exists to be shown to someone who has never heard of it.
-
-Both are one artifact seen from two sides. `/resume` adds the controls that
-decide whether the public side exists — the switch, the URL, a copy button, and
-the display name and bio, since a public profile is nothing without them. The
-full profile screen (39) is still a stub; this covers the settings that block
-sharing and nothing more.
-
-The interesting problem was **what a visitor's copy of the numbers should say.**
-`visited_regions` is already public for a public profile — deliberately, so the
-globe can be shared without exposing the trips behind it. But trips, travel
-days, cities and beaches come from tables where a visitor sees published rows
-only, so counting from rows would make a resume *shrink* when shared: countries
-from the whole history, cities from a fraction of it. Three SECURITY DEFINER
-functions (migration `20260812000400`) answer those questions in aggregate
-instead, refuse unless the owner made the profile public, and never return a row
-that identifies a private trip. `countByKind()` and the SQL agree on what makes
-a place distinct — four trips to Goa are one beach — because the owner sees one
-implementation and a visitor sees the other.
-
-`shows_branding_badge()` closes the gap the blog reader left open: the badge is
-a paid-plan removal, `subscriptions` is owner-only, and nobody should be able to
-enumerate who pays. The function answers the one question a public page has and
-defaults to showing the badge when it cannot.
-
-## Also on 2026-08-12 — the public trip page
-
-Screen 37, and the thing that was blocking it: photos.
-
-Originals are stored exactly as the camera wrote them, GPS included, which is
-right for the owner and unpublishable for anyone else — a holiday photo taken at
-home pins the photographer's front door. So a public page never serves an
-original. The first time a photo needs to be public, sharp re-encodes it to
-WebP at 1600px into a separate public bucket, which drops every metadata block;
-`media.public_path` remembers the result so nothing pays for it twice. Rotation
-is applied before the EXIF goes, or every portrait phone photo would publish on
-its side. The tests check the output with exifr — the same parser the uploader
-uses to *read* GPS on the way in.
-
-Unlisted trips work through `share_links`, which has existed since the first
-migration with nothing to resolve its tokens. `resolve_share_link()` trades a
-token for one trip id and returns nothing for a token that is unknown, revoked,
-expired, or points at a trip the owner has since made private — so pulling a
-trip back cannot be undone by a link handed out last month. Once the token
-resolves, the read uses the service role scoped to that single id, because RLS
-has no way to know about a token; the two things RLS would otherwise enforce —
-which posts to list, and whether the author's name may be shown — are spelled
-out by hand on that path.
-
-Two mistakes worth recording, both caught by writing the test properly:
-
-- The first EXIF fixture set orientation through `withExif`, which writes the
-  tag without sharp treating it as the image's orientation. The test claimed to
-  prove rotation while proving nothing.
-- The second claimed to inject GPS coordinates. sharp's `withExif` does not
-  write a GPS block that any parser reads back, so the test was overstating what
-  it covered. It now asserts what is actually true and load-bearing: the EXIF
-  block does not survive, and GPS lives inside it.
 
 ## Known gaps worth fixing next
 

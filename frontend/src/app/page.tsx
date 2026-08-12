@@ -104,6 +104,9 @@ export default function Home() {
       <header className="flex h-14 shrink-0 items-center justify-between px-4 md:px-6">
         <span className="font-semibold tracking-tight">{BRAND.name}</span>
         <div className="flex items-center gap-1">
+          <Button variant="ghost" nativeButton={false} render={<Link href="/changelog" />}>
+            Changelog
+          </Button>
           <ThemeToggle />
           <Button variant="ghost" nativeButton={false} render={<Link href="/login" />}>
             Sign in
@@ -246,6 +249,9 @@ export default function Home() {
             {BRAND.name} — {BRAND.tagline}
           </p>
           <nav className="flex gap-4">
+            <Link href="/changelog" className="hover:text-foreground">
+              Changelog
+            </Link>
             <Link href="/login" className="hover:text-foreground">
               Sign in
             </Link>
