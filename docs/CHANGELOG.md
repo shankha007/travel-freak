@@ -66,6 +66,26 @@ their own line — nobody outside the repo ever saw them.
   log a real trip for that country the trip's dates, cities and photos take over.
   Previously the only ways to paint a country green were to invent a whole trip
   for it or to lie about wanting to go.
+- **The Memory Vault has a map** — the third tab of `/trips/[id]/vault` was a
+  placeholder waiting for coordinates; now it draws the trip. Pinned places
+  appear as numbered stops joined in the order you visited them, and photos
+  appear where they were taken. A photo with GPS from the camera is drawn at its
+  own coordinates. A photo without GPS is drawn at the stop whose dates contain
+  it — dashed, and labelled as placed by date, because that is a good guess and
+  not a measurement. Photos that match neither are listed under the map with the
+  reason, rather than quietly left out. Several photos at one point share a
+  marker; selecting it lists them, which is also how the map's contents are
+  reachable from a keyboard.
+- **Public blog index** `/b` — every published public post in one place, newest
+  first, with the byline, the trip it was written about and how long it takes to
+  read. No login: it is the front door for anything anyone chooses to publish
+  here, and it carries `Blog` structured data and a sitemap entry so search
+  engines can find the posts underneath it. It lives at `/b` rather than
+  `/blogs`, which belongs to your own drafts.
+- **About** `/about` — what this is for, and the four promises it is built to:
+  private by default, no ads on any plan, your data leaves with you, and free
+  where it counts. Each one is a rule enforced in the product rather than a
+  sentiment.
 - **Public changelog page** `/changelog` — a timeline of every release, rendered
   from `docs/CHANGELOG.md` at build time. No login, no database read: the page is
   static, so it costs nothing to serve and cannot drift from this file.
@@ -113,6 +133,9 @@ their own line — nobody outside the repo ever saw them.
   cannot be brought back. Deleting a photo releases its bytes from storage
   immediately, which is what stops it counting against the plan — so there is no
   copy left to restore, and pretending otherwise was the actual bug.
+- **A photo's own coordinates are now shown to its owner**, in the photo detail
+  dialog, instead of a line saying only that it has some. They are still yours
+  alone — nothing published carries them.
 - **Restoring a trip is refused when it would breach the plan's trip limit**,
   rather than quietly putting the account over. The trip stays in the trash and
   the screen offers the upgrade.
@@ -210,6 +233,14 @@ their own line — nobody outside the repo ever saw them.
 
 ### Infrastructure
 
+- **The seed's places carry pins.** Every stop in the demo data now has
+  coordinates, so the route lines, the distance totals and the vault's map are
+  visible in a fresh checkout without hand-made fixtures. Two deliberately have
+  none — Kolkata, a trip pinned nowhere, and Thimphu, a trip pinned in part —
+  because both are states the product allows and the screens have to be reachable.
+- `MapView` takes `markers`, `route` and `fitTo`, so a caller can draw points and
+  a path and frame the map to them instead of to the world. The vault's map is
+  the first user; the trip route map is the next.
 - `visited_countries` is a third source for the `visited_regions` aggregate,
   after `trip_places` and `wishlist_items` (migration `20260813000600`).
   Precedence runs richest-first and is the whole design: a mark never displaces

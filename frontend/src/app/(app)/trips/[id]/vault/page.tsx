@@ -67,7 +67,12 @@ export default async function VaultPage({ params }: PageProps<'/trips/[id]/vault
             photosLimit={quota.photosLimit}
           />
 
-          <VaultViews photos={vault.photos} memories={vault.memories} tripId={vault.tripId} />
+          <VaultViews
+            photos={vault.photos}
+            memories={vault.memories}
+            places={vault.places}
+            tripId={vault.tripId}
+          />
         </div>
 
         {/* Quota meter. Both numbers are shown because both are real: the

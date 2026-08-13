@@ -21,8 +21,12 @@ interface MarketingLink {
   label: string
 }
 
+// `/b` rather than `/blogs`: the authenticated "My Blogs" screen owns that path,
+// and this is the index of the `/b/[slug]` posts it links to.
 const LINKS: MarketingLink[] = [
+  { href: '/b', label: 'Blogs' },
   { href: '/pricing', label: 'Pricing' },
+  { href: '/about', label: 'About' },
   { href: '/changelog', label: 'Changelog' },
 ]
 

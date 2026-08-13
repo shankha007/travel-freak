@@ -3,6 +3,8 @@ import 'server-only'
 import { createClient } from '@/server/supabase/server'
 import { requireUser } from '@/server/auth'
 import { getMediaQuota, type MediaQuota } from '@/server/entitlements'
+import { countryName } from '@/shared/geo/countries'
+import { pointFrom, type LngLat } from '@/shared/geo/point'
 import type { Database } from '@/shared/types/database'
 
 /**
@@ -30,7 +32,27 @@ export interface VaultPhoto {
   takenAt: string | null
   createdAt: string
   isFeatured: boolean
-  hasLocation: boolean
+  /**
+   * Where the camera says the photo was taken, when it recorded that.
+   *
+   * The vault is the owner's own screen, so this is the one place the
+   * coordinates cross to the client — the public pages publish EXIF-stripped
+   * derivatives and never see it.
+   */
+  point: LngLat | null
+}
+
+/** A stop on the trip, as the vault's map needs it. */
+export interface VaultPlace {
+  id: string
+  /** City if there is one, otherwise the country's name. */
+  label: string
+  countryCode: string
+  /** The pin, when the place was given one. */
+  point: LngLat | null
+  arrivalDate: string | null
+  departureDate: string | null
+  orderIndex: number
 }
 
 export interface VaultMemory {
@@ -46,6 +68,7 @@ export interface VaultData {
   tripTitle: string
   photos: VaultPhoto[]
   memories: VaultMemory[]
+  places: VaultPlace[]
   quota: MediaQuota
 }
 
@@ -70,7 +93,7 @@ export async function getVaultData(tripId: string): Promise<VaultData | null> {
 
   if (!trip) return null
 
-  const [photoRows, memoryRows, quota] = await Promise.all([
+  const [photoRows, memoryRows, placeRows, quota] = await Promise.all([
     supabase
       .from('media')
       .select(
@@ -89,6 +112,13 @@ export async function getVaultData(tripId: string): Promise<VaultData | null> {
       .eq('trip_id', tripId)
       .order('happened_at', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: true }),
+    supabase
+      .from('trip_places')
+      .select(
+        'id, city_name, country_code, arrival_date, departure_date, order_index, latitude, longitude'
+      )
+      .eq('trip_id', tripId)
+      .order('order_index', { ascending: true }),
     getMediaQuota(tripId),
   ])
 
@@ -120,9 +150,7 @@ export async function getVaultData(tripId: string): Promise<VaultData | null> {
       takenAt: r.taken_at,
       createdAt: r.created_at,
       isFeatured: r.is_featured,
-      // The coordinates themselves stay on the server: the vault only needs to
-      // know whether a photo could be placed on a map later.
-      hasLocation: r.exif_lat !== null && r.exif_lng !== null,
+      point: pointFrom(r.exif_lat, r.exif_lng),
     })),
     memories: (memoryRows.data ?? []).map((m) => ({
       id: m.id,
@@ -130,6 +158,15 @@ export async function getVaultData(tripId: string): Promise<VaultData | null> {
       body: m.body,
       happenedAt: m.happened_at,
       createdAt: m.created_at,
+    })),
+    places: (placeRows.data ?? []).map((p) => ({
+      id: p.id,
+      label: p.city_name || countryName(p.country_code),
+      countryCode: p.country_code,
+      point: pointFrom(p.latitude, p.longitude),
+      arrivalDate: p.arrival_date,
+      departureDate: p.departure_date,
+      orderIndex: p.order_index,
     })),
     quota,
   }

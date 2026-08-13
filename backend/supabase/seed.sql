@@ -166,58 +166,84 @@ values
 -- The single source of truth for the globe. Each insert fires
 -- trigger_refresh_visited_regions, so public.visited_regions is rebuilt from
 -- these rows — it is never written directly.
+--
+-- `location` is the optional pin, written as EWKT because that is what the
+-- geography column parses (see frontend `shared/geo/point.ts`). It is what the
+-- route line, the distance total and the vault's map are drawn from. Three
+-- rows deliberately have none, because the app allows a place recorded by name
+-- alone and those screens have to be reachable in development:
+--
+--   * Kolkata — a trip with no pins at all.
+--   * Thimphu — a trip pinned only in part, which is what makes a distance
+--     total incomplete rather than absent.
 -- ---------------------------------------------------------------------------
 
 insert into public.trip_places (
   trip_id, user_id, country_code, region_code, city_name,
-  place_kind, arrival_date, departure_date, order_index, notes
+  place_kind, arrival_date, departure_date, order_index, notes, location
 )
 values
   -- India
   ('a0000001-0000-4000-8000-000000000001', '11111111-1111-1111-1111-111111111111',
    'IND', 'IN-LA', 'Leh', 'mountain', '2026-05-12', '2026-05-22', 0,
-   'Acclimatised two days before heading to Khardung La.'),
+   'Acclimatised two days before heading to Khardung La.',
+   'SRID=4326;POINT(77.5771 34.1526)'),
   ('a0000001-0000-4000-8000-000000000002', '11111111-1111-1111-1111-111111111111',
-   'IND', 'IN-UT', 'Rishikesh', 'other', '2025-07-19', '2025-07-26', 0, ''),
+   'IND', 'IN-UT', 'Rishikesh', 'other', '2025-07-19', '2025-07-26', 0, '',
+   'SRID=4326;POINT(78.2676 30.0869)'),
   ('a0000001-0000-4000-8000-000000000003', '11111111-1111-1111-1111-111111111111',
-   'IND', 'IN-GA', 'Goa', 'beach', '2024-12-21', '2024-12-30', 0, ''),
+   'IND', 'IN-GA', 'Goa', 'beach', '2024-12-21', '2024-12-30', 0, '',
+   'SRID=4326;POINT(73.8278 15.4909)'),
+  -- No pin: a place recorded by name alone, which the wizard allows.
   ('a0000001-0000-4000-8000-000000000004', '11111111-1111-1111-1111-111111111111',
-   'IND', 'IN-WB', 'Kolkata', 'city', '2023-10-18', '2023-10-24', 0, ''),
+   'IND', 'IN-WB', 'Kolkata', 'city', '2023-10-18', '2023-10-24', 0, '', null),
 
   -- Japan
   ('a0000001-0000-4000-8000-000000000005', '11111111-1111-1111-1111-111111111111',
-   'JPN', 'JP-13', 'Tokyo', 'city', '2025-04-01', '2025-04-06', 0, ''),
+   'JPN', 'JP-13', 'Tokyo', 'city', '2025-04-01', '2025-04-06', 0, '',
+   'SRID=4326;POINT(139.6917 35.6895)'),
   ('a0000001-0000-4000-8000-000000000005', '11111111-1111-1111-1111-111111111111',
-   'JPN', 'JP-26', 'Kyoto', 'city', '2025-04-06', '2025-04-11', 1, ''),
+   'JPN', 'JP-26', 'Kyoto', 'city', '2025-04-06', '2025-04-11', 1, '',
+   'SRID=4326;POINT(135.7681 35.0116)'),
   ('a0000001-0000-4000-8000-000000000005', '11111111-1111-1111-1111-111111111111',
    'JPN', 'JP-27', 'Osaka', 'city', '2025-04-11', '2025-04-14', 2,
-   'The late bloom that saved the trip.'),
+   'The late bloom that saved the trip.',
+   'SRID=4326;POINT(135.5023 34.6937)'),
 
   -- Nepal
   ('a0000001-0000-4000-8000-000000000006', '11111111-1111-1111-1111-111111111111',
-   'NPL', 'NP-P4', 'Pokhara', 'mountain', '2024-03-09', '2024-03-24', 0, ''),
+   'NPL', 'NP-P4', 'Pokhara', 'mountain', '2024-03-09', '2024-03-24', 0, '',
+   'SRID=4326;POINT(83.9856 28.2096)'),
   ('a0000001-0000-4000-8000-000000000007', '11111111-1111-1111-1111-111111111111',
-   'NPL', 'NP-P3', 'Kathmandu', 'city', '2022-11-04', '2022-11-08', 0, ''),
+   'NPL', 'NP-P3', 'Kathmandu', 'city', '2022-11-04', '2022-11-08', 0, '',
+   'SRID=4326;POINT(85.3240 27.7172)'),
 
   -- Thailand
   ('a0000001-0000-4000-8000-000000000008', '11111111-1111-1111-1111-111111111111',
-   'THA', 'TH-10', 'Bangkok', 'city', '2023-02-11', '2023-02-18', 0, ''),
+   'THA', 'TH-10', 'Bangkok', 'city', '2023-02-11', '2023-02-18', 0, '',
+   'SRID=4326;POINT(100.5018 13.7563)'),
   ('a0000001-0000-4000-8000-000000000009', '11111111-1111-1111-1111-111111111111',
-   'THA', 'TH-50', 'Chiang Mai', 'city', '2024-08-03', '2024-08-12', 0, ''),
+   'THA', 'TH-50', 'Chiang Mai', 'city', '2024-08-03', '2024-08-12', 0, '',
+   'SRID=4326;POINT(98.9853 18.7883)'),
 
   -- UAE
   ('a0000001-0000-4000-8000-000000000010', '11111111-1111-1111-1111-111111111111',
-   'ARE', 'AE-DU', 'Dubai', 'city', '2025-01-16', '2025-01-18', 0, ''),
+   'ARE', 'AE-DU', 'Dubai', 'city', '2025-01-16', '2025-01-18', 0, '',
+   'SRID=4326;POINT(55.2708 25.2048)'),
 
   -- Singapore (ongoing -> 'current')
   ('a0000001-0000-4000-8000-000000000011', '11111111-1111-1111-1111-111111111111',
-   'SGP', '', 'Singapore', 'city', '2026-08-08', '2026-08-15', 0, ''),
+   'SGP', '', 'Singapore', 'city', '2026-08-08', '2026-08-15', 0, '',
+   'SRID=4326;POINT(103.8198 1.3521)'),
 
   -- Bhutan (planning -> 'planned')
   ('a0000001-0000-4000-8000-000000000012', '11111111-1111-1111-1111-111111111111',
-   'BTN', 'BT-11', 'Paro', 'mountain', '2026-11-02', '2026-11-07', 0, ''),
+   'BTN', 'BT-11', 'Paro', 'mountain', '2026-11-02', '2026-11-07', 0, '',
+   'SRID=4326;POINT(89.4133 27.4287)'),
+  -- No pin, while Paro has one: half a route, which is the case the resume's
+  -- distance total has to be honest about.
   ('a0000001-0000-4000-8000-000000000012', '11111111-1111-1111-1111-111111111111',
-   'BTN', 'BT-15', 'Thimphu', 'city', '2026-11-07', '2026-11-12', 1, '');
+   'BTN', 'BT-15', 'Thimphu', 'city', '2026-11-07', '2026-11-12', 1, '', null);
 
 -- ---------------------------------------------------------------------------
 -- Memories — what the globe's region modal shows under a country

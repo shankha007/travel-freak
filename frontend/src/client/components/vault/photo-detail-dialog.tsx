@@ -7,6 +7,7 @@ import { AlertCircle, Loader2, MapPin, Star, Trash2 } from 'lucide-react'
 import { deleteMedia, setCoverPhoto, updateMediaDetails } from '@/server/actions/media'
 import type { VaultPhoto } from '@/server/queries/vault'
 import { formatBytes } from '@/shared/format'
+import { formatLngLat } from '@/shared/geo/point'
 import { Button } from '@/client/components/ui/button'
 import {
   Dialog,
@@ -108,10 +109,11 @@ export function PhotoDetailDialog({ photo, onClose }: { photo: VaultPhoto; onClo
             </DialogDescription>
           </DialogHeader>
 
-          {photo.hasLocation && (
+          {photo.point && (
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <MapPin className="size-3.5" aria-hidden />
-              This photo carries GPS coordinates. They stay private to you.
+              <span className="tabular-nums">{formatLngLat(photo.point)}</span>
+              <span>· from the camera, and private to you</span>
             </p>
           )}
 

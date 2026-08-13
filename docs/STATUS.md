@@ -31,15 +31,15 @@ open, revoke and pull-back.
 | Area | Done | Partial | Stub | Not started |
 |---|---|---|---|---|
 | Infrastructure | 16 | 0 | 0 | 3 |
-| Public / marketing | 3 | 0 | 0 | 7 |
+| Public / marketing | 5 | 0 | 0 | 5 |
 | Auth | 5 | 0 | 0 | 2 |
 | Dashboard & globe | 5 | 2 | 0 | 0 |
 | Trips & planner | 5 | 1 | 0 | 4 |
-| Memory & content | 4 | 1 | 2 | 0 |
+| Memory & content | 5 | 0 | 2 | 0 |
 | Analytics & resume | 1 | 0 | 1 | 2 |
 | Public sharing | 5 | 0 | 0 | 0 |
 | Account | 0 | 0 | 1 | 6 |
-| **Total** | **44** | **4** | **4** | **24** |
+| **Total** | **47** | **3** | **4** | **22** |
 
 ---
 
@@ -54,7 +54,7 @@ open, revoke and pull-back.
 | — | Postgres schema + RLS | ✅ Done | 14 tables, PostGIS, policies on every table. `trip_places.location` is written as EWKT and read back through generated `latitude`/`longitude` columns, because PostgREST returns geography as hex EWKB — see `shared/geo/point.ts` |
 | — | `visited_regions` aggregate + triggers | ✅ Done | Rebuilt from `trip_places` / `visited_countries` / `wishlist_items`, in that precedence — a bare "been there" mark never displaces what a logged trip knows |
 | — | Data API grants | ✅ Done | Migration `20260811000100` for `anon`/`authenticated`, `20260813000400` for `service_role` — without the latter every elevated read (share tokens, derivatives) 42501s |
-| — | Seed data | ✅ Done | 12 trips, 8 countries, 1 demo account |
+| — | Seed data | ✅ Done | 12 trips, 8 countries, 1 demo account. Places carry pins, so routes, distances and the vault's map are visible in a fresh checkout; Kolkata and Thimphu deliberately have none, covering the unpinned and part-pinned cases. No `media` rows — a row without a storage object breaks more than it demonstrates |
 | — | Generated DB types | ✅ Done | `npm run db:types` → `shared/types/database.ts` |
 | — | `brand.ts` rename safety | ✅ Done | No component hardcodes the product name |
 | — | **`entitlements.ts`** | ✅ Done | Reads `plans.limits`; `checkTripQuota()` counts the caller's own live rows rather than trusting the denormalised counter. Gates both `/trips/new` and the create action |
@@ -73,9 +73,9 @@ open, revoke and pull-back.
 |---|---|---|---|
 | 1 | **Landing** `/` | ✅ Done | Hero with live demo globe, 6 feature cards, 3 pricing tiers, CTA |
 | 3 | **Pricing** `/pricing` | ✅ Done | Own route, read from `plans` — cards, monthly/annual toggle with the real saving, and a comparison table whose every cell is a function of `limits`, so it cannot drift from what `entitlements.ts` enforces. Landing keeps one line and a link; every in-app upgrade prompt points here |
+| 4 | **Public blogs** `/b` | ✅ Done | Every published public post, newest first — byline, linked trip and reading time, with the newest in a wide card. **Not at `/blogs`**: the authenticated My Blogs screen owns that path, and `/b` is the index of the `/b/[slug]` posts it lists. Read through the visitor's client, so RLS decides the contents; a post whose trip is not published links to no trip. `Blog` JSON-LD and a sitemap entry |
+| 5 | **About** `/about` | ✅ Done | Why the product exists and the four promises it is built to — private by default, no ads on any plan, exportable data, free at country level. Statically rendered, `AboutPage` JSON-LD. Deliberately about the product, not an invented team |
 | 2 | Features `/features` | ⬜ Not started | |
-| 4 | Public blogs `/blogs` | ⬜ Not started | Marketing index, distinct from the authenticated `/blogs` |
-| 5 | About | ⬜ Not started | Phase 1.1 |
 | 6 | Contact | ⬜ Not started | Phase 1.1 |
 | 11 | Legal (privacy/terms/refunds) | ⬜ Not started | MVP requirement |
 | 12 | **Changelog** `/changelog` | ✅ Done | Public, no login, statically rendered from `docs/CHANGELOG.md` at build time. Timeline of releases with per-kind sections; the parser refuses a malformed entry rather than dropping it |
@@ -125,7 +125,7 @@ open, revoke and pull-back.
 
 | # | Feature | Status | Notes |
 |---|---|---|---|
-| 25 | **Memory Vault** `/trips/[id]/vault` | 🟡 Partial | Timeline and Gallery are live: photos and notes interleaved by date, photo detail with caption, alt text, cover photo and a confirmed delete, plus a note composer. **Map view is an explained placeholder** — no longer blocked, now that places can carry coordinates |
+| 25 | **Memory Vault** `/trips/[id]/vault` | ✅ Done | Timeline, Gallery and Map. Timeline interleaves photos and notes by date; photo detail carries caption, alt text, coordinates, cover photo and a confirmed delete. The map draws pinned places as numbered stops joined in visit order, and photos at their EXIF coordinates or — dashed, and labelled — at the stop whose dates contain them. Photos matching neither are listed with the reason. `shared/geo/photo-placement.ts` owns that policy and is unit-tested |
 | 26 | **Media upload + quota meter** | ✅ Done | `POST /api/uploads/sign` issues a quota-checked signed URL, the browser PUTs straight to Storage, and `confirmUpload` re-reads the object's real size and sniffs its magic bytes before writing the row. Drag-drop, per-file progress, per-trip and pool meters, EXIF date and GPS captured on the client |
 | 27 | **Blog Studio** `/blogs/new`, `/blogs/[id]/edit` | ✅ Done | Tiptap v3 with a formatting toolbar, **inline images**, autosave (1.5s debounce, ⌘S, unload guard), excerpt and SEO fields, trip link, visibility, publish/unpublish, soft delete and a **share panel** for unlisted links. A new post writes no row until the first save, then swaps the URL in place so the cursor survives. Images upload through the signed-upload route and are inserted as EXIF-stripped copies |
 | 28 | **My Blogs** `/blogs` | ✅ Done | All / Published / Drafts with counts, reading time, linked trip, and a link to the public reader |
@@ -207,11 +207,14 @@ open, revoke and pull-back.
    after 30 days, so expired trips and posts are unreachable but still stored. The plan wants a
    scheduled job that hard-deletes past the window, including the storage objects a trip's
    photos still occupy.
-7. **The vault's map tab is still a placeholder, but is no longer blocked.** Places can carry
-   coordinates now, so the tab has data to draw and EXIF coordinates have something to be
-   matched against. It needs the same `MapView` in pin mode plus a decision about what to show
-   for photos whose place has no pin.
-8. **A partially pinned trip reads as unmeasured.** `totalDistanceKm` skips places without
+7. **The trip page still has no route map.** `MapView` now takes markers, a route line and a
+   set of points to frame itself to — that is what the vault's map tab is built on — so the
+   same three props would draw the route timeline on `/trips/[id]` and on the public `/t/[slug]`.
+   Nothing blocks it but the work.
+8. **The marketing nav has no mobile equivalent.** `MarketingHeader` hides its links below
+   `sm`, which was survivable at two and is not at four — a phone visitor reaches Blogs, About
+   and Pricing only through the footer. It needs a menu, or the links need to wrap.
+9. **A partially pinned trip reads as unmeasured.** `totalDistanceKm` skips places without
    coordinates, so one pin among three measures nothing. That is the honest answer — the legs it
    cannot see are real distance — but the resume shows no explanation for why a trip with places
    has no number.

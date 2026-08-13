@@ -3,11 +3,12 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { Camera, Images, MapPin, MapPinned, Quote, Sparkles, Star, Trash2 } from 'lucide-react'
+import { Camera, Images, MapPin, Quote, Sparkles, Star, Trash2 } from 'lucide-react'
 import { deleteMemory } from '@/server/actions/media'
-import type { VaultMemory, VaultPhoto } from '@/server/queries/vault'
+import type { VaultMemory, VaultPhoto, VaultPlace } from '@/server/queries/vault'
 import { PhotoDetailDialog } from '@/client/components/vault/photo-detail-dialog'
 import { MemoryComposer } from '@/client/components/vault/memory-composer'
+import { VaultMap } from '@/client/components/vault/vault-map'
 import { Button } from '@/client/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/client/components/ui/tabs'
 import { cn } from '@/shared/utils'
@@ -69,16 +70,17 @@ function buildTimeline(photos: VaultPhoto[], memories: VaultMemory[]) {
 export function VaultViews({
   photos,
   memories,
+  places,
   tripId,
 }: {
   photos: VaultPhoto[]
   memories: VaultMemory[]
+  places: VaultPlace[]
   tripId: string
 }) {
   const router = useRouter()
   const [selected, setSelected] = useState<VaultPhoto | null>(null)
   const timeline = buildTimeline(photos, memories)
-  const located = photos.filter((p) => p.hasLocation).length
 
   async function removeMemory(id: string) {
     await deleteMemory(id)
@@ -229,18 +231,10 @@ export function VaultViews({
         </TabsContent>
 
         {/* ------------------------------------------------------------ map */}
+        {/* A hidden panel is unmounted, which is what keeps MapLibre and the
+            country outlines off a visit that never leaves the timeline. */}
         <TabsContent value="map">
-          <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-10 text-center">
-            <MapPinned className="size-6 text-muted-foreground" aria-hidden />
-            <div className="space-y-1">
-              <p className="text-sm font-medium">The map view is waiting on coordinates</p>
-              <p className="max-w-md text-sm text-muted-foreground">
-                {located > 0
-                  ? `${located} of these photos carry GPS from your camera. Places on this trip have no coordinates yet, so there is nothing to plot them against — that lands with the world map screen.`
-                  : 'Places on this trip are country and city only. Coordinates arrive with the world map screen and its picker.'}
-              </p>
-            </div>
-          </div>
+          <VaultMap photos={photos} places={places} tripId={tripId} onSelectPhoto={setSelected} />
         </TabsContent>
       </Tabs>
 

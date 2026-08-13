@@ -1,6 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Image from 'next/image'
+import { Camera } from 'lucide-react'
 import Map, {
   Layer,
   Marker,
@@ -60,6 +62,30 @@ export interface PickedPoint extends LngLat {
   countryCode: string | null
 }
 
+/**
+ * A point drawn on top of the polygons — a stop on a trip, or a photo.
+ *
+ * Markers are a layer of *content*, unlike the fills underneath, so unlike the
+ * fills they are real DOM: each one is a button, reachable by keyboard and
+ * named by `title`. That is why they are `<Marker>` elements rather than a
+ * symbol layer, which would be pixels the same way the fills are.
+ */
+export interface MapMarker {
+  id: string
+  point: LngLat
+  kind: 'stop' | 'photo'
+  /** The marker's accessible name, and the first line of its tooltip. */
+  title: string
+  /** A second line — a date, or how the point was arrived at. */
+  detail?: string
+  /** Short text drawn inside a stop marker; the stop's number, in practice. */
+  label?: string
+  /** Thumbnail for a photo marker. */
+  thumbnailUrl?: string | null
+  /** Drawn as an outline rather than a solid, for a point that was inferred. */
+  inferred?: boolean
+}
+
 interface MapViewProps {
   regions: VisitedRegion[]
   /** Draw subdivision polygons for these countries, in ISO alpha-3. */
@@ -76,6 +102,19 @@ interface MapViewProps {
    */
   onPickPoint?: (point: PickedPoint) => void
   pin?: LngLat | null
+  /** Points drawn over the fills. Empty or absent on the browsing maps. */
+  markers?: MapMarker[]
+  onSelectMarker?: (id: string) => void
+  /**
+   * A path through the trip's stops, in order. Drawn dashed and under the
+   * markers: it is the order they were visited in, not the roads taken.
+   */
+  route?: LngLat[]
+  /**
+   * Frame these points on load instead of the world. Used by the trip maps,
+   * where the interesting extent is the trip rather than the planet.
+   */
+  fitTo?: LngLat[]
   /**
    * Pixels to keep clear on the right when framing the world, for a panel
    * floating over the map. Without it the initial fit centres the world under
@@ -96,6 +135,8 @@ interface HoverInfo {
 interface MapSurfaces {
   land: string
   coast: string
+  /** The route line's colour, which follows the theme's accent like the pin does. */
+  route: string
 }
 
 /**
@@ -118,6 +159,10 @@ export function MapView({
   focusCountry,
   onPickPoint,
   pin,
+  markers,
+  onSelectMarker,
+  route,
+  fitTo,
   insetRight = 0,
   className,
 }: MapViewProps) {
@@ -137,6 +182,24 @@ export function MapView({
   const regionIndex = useMemo(() => indexRegions(regions), [regions])
   const mapStyle = useMemo(() => mapStyleUrl(publicEnv().NEXT_PUBLIC_MAPTILER_KEY), [])
 
+  // The route as one LineString, rebuilt only when the coordinates themselves
+  // change. MapLibre re-uploads a GeoJSON source whenever the object identity
+  // does, and callers assemble this list fresh on every render — so the key is
+  // the memo's dependency, and the coordinates are read back out of it.
+  const routeKey = (route ?? []).map((p) => `${p.lng},${p.lat}`).join('|')
+  const routeData = useMemo(() => {
+    const coordinates = routeKey
+      ? routeKey.split('|').map((pair) => pair.split(',').map(Number) as [number, number])
+      : []
+    if (coordinates.length < 2) return null
+    return {
+      type: 'FeatureCollection',
+      features: [
+        { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates } },
+      ],
+    } satisfies GeoJSON.FeatureCollection
+  }, [routeKey])
+
   // Region colours are CSS custom properties so they follow the theme; MapLibre
   // paint expressions need concrete values, so resolve them and re-resolve when
   // the theme class on <html> changes.
@@ -151,6 +214,7 @@ export function MapView({
       setSurfaces({
         land: resolveThemeColor('--map-land'),
         coast: resolveThemeColor('--map-coast'),
+        route: resolveThemeColor('--primary'),
       })
     }
     read()
@@ -273,11 +337,25 @@ export function MapView({
    * width, which otherwise leaves the map fitted to a region now behind glass.
    */
   const framedFor = useRef<string | null>(null)
-  const frameKey = `${focusCountry ?? 'world'}:${insetRight}`
+  const fitKey = (fitTo ?? []).map((p) => `${p.lng.toFixed(3)},${p.lat.toFixed(3)}`).join('|')
+  const frameKey = `${focusCountry ?? 'world'}:${fitKey}:${insetRight}`
 
   const frameView = useCallback(() => {
     const map = mapRef.current
     if (!map || !countries || framedFor.current === frameKey) return
+
+    if (fitTo?.length) {
+      // A trip in one city is a single point, whose bounding box has no size.
+      // `maxZoom` is what keeps that from slamming the camera to street level on
+      // a map that has no streets drawn on it.
+      map.fitBounds(boundsOfPoints(fitTo), {
+        padding: { ...PADDING, right: PADDING.right + insetRight },
+        maxZoom: 6,
+        duration: 0,
+      })
+      framedFor.current = frameKey
+      return
+    }
 
     if (focusCountry) {
       const feature = countries.features.find((f) => f.properties.iso_a3 === focusCountry)
@@ -297,7 +375,7 @@ export function MapView({
     }
 
     framedFor.current = frameKey
-  }, [countries, focusCountry, frameKey, insetRight])
+  }, [countries, fitTo, focusCountry, frameKey, insetRight])
 
   useEffect(() => {
     frameView()
@@ -516,6 +594,74 @@ export function MapView({
           </Source>
         )}
 
+        {/* Under the markers, over the fills: the order the stops were visited
+            in, dashed because it is a sequence and not a road. */}
+        {routeData && (
+          <Source id="route" type="geojson" data={routeData}>
+            <Layer
+              id="route-line"
+              type="line"
+              layout={{ 'line-cap': 'round', 'line-join': 'round' }}
+              paint={{
+                'line-color': surfaces.route,
+                'line-width': 2,
+                'line-opacity': 0.8,
+                'line-dasharray': [2, 2],
+              }}
+            />
+          </Source>
+        )}
+
+        {markers?.map((marker) => (
+          <Marker
+            key={marker.id}
+            longitude={marker.point.lng}
+            latitude={marker.point.lat}
+            anchor={marker.kind === 'stop' ? 'bottom' : 'center'}
+          >
+            <button
+              type="button"
+              onClick={(event) => {
+                // The map is listening for clicks too, and in pick mode it would
+                // read this one as a request to move the pin.
+                event.stopPropagation()
+                onSelectMarker?.(marker.id)
+              }}
+              disabled={!onSelectMarker}
+              title={marker.detail ? `${marker.title} — ${marker.detail}` : marker.title}
+              className={cn(
+                'block cursor-pointer rounded-full shadow-md transition-transform',
+                'focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none',
+                onSelectMarker && 'hover:scale-110',
+                marker.kind === 'stop'
+                  ? 'size-6 border-2 border-white bg-primary text-[0.625rem] font-semibold text-primary-foreground tabular-nums'
+                  : 'size-9 overflow-hidden border-2 border-white bg-muted',
+                // An inferred point is drawn hollow, so a guess never looks like
+                // a measurement at a glance.
+                marker.inferred && 'border-dashed border-primary bg-background'
+              )}
+            >
+              {marker.kind === 'photo' && marker.thumbnailUrl ? (
+                <Image
+                  src={marker.thumbnailUrl}
+                  alt=""
+                  width={36}
+                  height={36}
+                  className="size-full object-cover"
+                />
+              ) : marker.kind === 'photo' ? (
+                <Camera className="m-auto size-4 text-muted-foreground" aria-hidden />
+              ) : (
+                marker.label
+              )}
+              <span className="sr-only">
+                {marker.title}
+                {marker.detail ? `, ${marker.detail}` : ''}
+              </span>
+            </button>
+          </Marker>
+        ))}
+
         {/* The pin is drawn rather than added as a source: it is one point that
             moves on every click, and a GeoJSON source would be re-uploaded each
             time. `anchor="bottom"` puts the tip on the coordinate. */}
@@ -540,6 +686,16 @@ export function MapView({
       )}
     </div>
   )
+}
+
+/** Bounding box of a set of points, for fitBounds. Degenerate when they coincide. */
+function boundsOfPoints(points: LngLat[]): LngLatBoundsLike {
+  const lngs = points.map((p) => p.lng)
+  const lats = points.map((p) => p.lat)
+  return [
+    [Math.min(...lngs), Math.min(...lats)],
+    [Math.max(...lngs), Math.max(...lats)],
+  ]
 }
 
 /** Bounding box of a polygon or multipolygon, for fitBounds. */
