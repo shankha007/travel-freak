@@ -76,6 +76,14 @@ their own line — nobody outside the repo ever saw them.
   reason, rather than quietly left out. Several photos at one point share a
   marker; selecting it lists them, which is also how the map's contents are
   reachable from a keyboard.
+- **Wishlist** `/wishlist` — the tab that said "soon" is a screen. Add anywhere
+  you mean to get to, with a note to your future self, a rough budget, the season
+  worth going in, and how badly you want it; the list groups by that last one, so
+  "Next up" sits apart from the fifteen places you would go one day. A wish costs
+  nothing against your plan and paints the country planned on the globe and both
+  maps the moment you add it — and disappears from them the moment you remove it.
+  A country you have already been to is marked as such, because the globe will be
+  painting it green whatever the wishlist says.
 - **Password reset** `/forgot-password`, `/reset-password` — a forgotten password
   is no longer the end of an account. Ask for a link from the sign-in screen, set
   a new password, and you are straight back in. The link lasts an hour and works

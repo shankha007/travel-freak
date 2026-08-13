@@ -91,7 +91,7 @@ export const NAV_ITEMS: NavItem[] = [
     href: '/wishlist',
     label: 'Wishlist',
     icon: 'Heart',
-    status: 'stub',
+    status: 'live',
     phase: 'M',
     screen: 30,
     summary:

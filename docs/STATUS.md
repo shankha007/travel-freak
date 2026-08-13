@@ -35,11 +35,11 @@ open, revoke and pull-back.
 | Auth | 6 | 0 | 0 | 1 |
 | Dashboard & globe | 5 | 2 | 0 | 0 |
 | Trips & planner | 5 | 1 | 0 | 4 |
-| Memory & content | 5 | 0 | 2 | 0 |
+| Memory & content | 6 | 0 | 1 | 0 |
 | Analytics & resume | 1 | 0 | 1 | 2 |
 | Public sharing | 5 | 0 | 0 | 0 |
 | Account | 0 | 0 | 1 | 6 |
-| **Total** | **48** | **3** | **4** | **21** |
+| **Total** | **49** | **3** | **3** | **21** |
 
 ---
 
@@ -130,7 +130,7 @@ open, revoke and pull-back.
 | 27 | **Blog Studio** `/blogs/new`, `/blogs/[id]/edit` | ✅ Done | Tiptap v3 with a formatting toolbar, **inline images**, autosave (1.5s debounce, ⌘S, unload guard), excerpt and SEO fields, trip link, visibility, publish/unpublish, soft delete and a **share panel** for unlisted links. A new post writes no row until the first save, then swaps the URL in place so the cursor survives. Images upload through the signed-upload route and are inserted as EXIF-stripped copies |
 | 28 | **My Blogs** `/blogs` | ✅ Done | All / Published / Drafts with counts, reading time, linked trip, and a link to the public reader |
 | 29 | **Blog reader** `/b/[slug]` | ✅ Done | Public route. Sanitised HTML, byline linking to the author's profile, reading time, linked trip, JSON-LD `Article`, `noindex` on anything unpublished or opened with a token, and the badge only on free plans. `?k=<token>` opens an unlisted post through `resolve_post_share_link()`; the author sees their own drafts behind a notice, and everyone else gets the same 404 as a slug that does not exist |
-| 30 | Wishlist `/wishlist` | 🔵 Stub | 3 items seeded; already painting `planned` on the globe |
+| 30 | **Wishlist** `/wishlist` | ✅ Done | Add, edit and remove, grouped by priority with its label always spelled out. Country is the only required field — the globe needs nothing else. Writes revalidate the globe, both maps and the dashboard, because `wishlist_items` is a source for `visited_regions` and a stale page would keep painting a deleted wish. The one-row-per-country index surfaces as a sentence, not an error, and a rejected save is echoed back into the form rather than cleared by React's reset. A country already visited is flagged on its card |
 | 31 | Travel timeline `/timeline` | 🔵 Stub | |
 
 ## Analytics, resume, recap
@@ -168,7 +168,7 @@ open, revoke and pull-back.
 
 | Feature | Status | Notes |
 |---|---|---|
-| Sidebar + mobile bottom nav | ✅ Done | Driven by `shared/navigation.ts`; stubs marked "soon" |
+| Sidebar + mobile bottom nav | ✅ Done | Driven by `shared/navigation.ts`; stubs marked "soon". Of the four in the phone's bottom bar, none is a stub now that the wishlist is built |
 | Theme picker | ✅ Done | Six palettes plus System, from `shared/themes.ts`. Dark palettes join the `dark` variant in `globals.css`, which `themes.test.ts` enforces; each retunes the region-state and map colours, not just the chrome |
 | Skeleton loaders | 🟡 Partial | Globe and login only |
 | Empty states | 🟡 Partial | Globe, trips, dashboard activity |
