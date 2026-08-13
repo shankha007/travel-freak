@@ -35,11 +35,11 @@ open, revoke and pull-back.
 | Auth | 6 | 0 | 0 | 1 |
 | Dashboard & globe | 5 | 2 | 0 | 0 |
 | Trips & planner | 5 | 1 | 0 | 4 |
-| Memory & content | 6 | 0 | 1 | 0 |
+| Memory & content | 7 | 0 | 0 | 0 |
 | Analytics & resume | 1 | 0 | 1 | 2 |
 | Public sharing | 5 | 0 | 0 | 0 |
 | Account | 0 | 0 | 1 | 6 |
-| **Total** | **49** | **3** | **3** | **21** |
+| **Total** | **50** | **3** | **2** | **21** |
 
 ---
 
@@ -131,7 +131,7 @@ open, revoke and pull-back.
 | 28 | **My Blogs** `/blogs` | ✅ Done | All / Published / Drafts with counts, reading time, linked trip, and a link to the public reader |
 | 29 | **Blog reader** `/b/[slug]` | ✅ Done | Public route. Sanitised HTML, byline linking to the author's profile, reading time, linked trip, JSON-LD `Article`, `noindex` on anything unpublished or opened with a token, and the badge only on free plans. `?k=<token>` opens an unlisted post through `resolve_post_share_link()`; the author sees their own drafts behind a notice, and everyone else gets the same 404 as a slug that does not exist |
 | 30 | **Wishlist** `/wishlist` | ✅ Done | Add, edit and remove, grouped by priority with its label always spelled out. Country is the only required field — the globe needs nothing else. Writes revalidate the globe, both maps and the dashboard, because `wishlist_items` is a source for `visited_regions` and a stale page would keep painting a deleted wish. The one-row-per-country index surfaces as a sentence, not an error, and a rejected save is echoed back into the form rather than cleared by React's reset. A country already visited is flagged on its card |
-| 31 | Travel timeline `/timeline` | 🔵 Stub | |
+| 31 | **Travel timeline** `/timeline` | ✅ Done | Year sections newest first with a jump row, trips and published posts interleaved. Per-year stats come from `shared/timeline.ts`, which is pure and unit-tested because they are claims about someone's life: days are counted in the year actually spent (a New Year crossing splits), travel booked is counted apart from travel taken, and "first time in" reads `visited_regions` filtered to `visited`/`current` — a planned trip has reached nowhere. Undated trips get a trailing section rather than being dropped. Free on every plan |
 
 ## Analytics, resume, recap
 

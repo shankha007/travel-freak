@@ -76,6 +76,15 @@ their own line — nobody outside the repo ever saw them.
   reason, rather than quietly left out. Several photos at one point share a
   marker; selecting it lists them, which is also how the map's contents are
   reachable from a keyboard.
+- **Travel Timeline** `/timeline` — everything you have done, by year, newest
+  first. `/trips` answers "what have I got"; this answers "what happened". Each
+  year opens with what it added up to — trips, days away, countries, and the
+  ones you reached for the first time — and then lists the trips and the posts
+  you published, interleaved. Days are counted in the year they were actually
+  spent, so a trip from 28 December to 4 January gives four days to each year
+  rather than eight to one. Booked travel is counted separately from travel
+  taken: a year holding both says "23 days away · 11 more booked", because one
+  of those is a life lived and the other is a plan.
 - **Wishlist** `/wishlist` — the tab that said "soon" is a screen. Add anywhere
   you mean to get to, with a note to your future self, a rough budget, the season
   worth going in, and how badly you want it; the list groups by that last one, so

@@ -101,7 +101,7 @@ export const NAV_ITEMS: NavItem[] = [
     href: '/timeline',
     label: 'Timeline',
     icon: 'CalendarRange',
-    status: 'stub',
+    status: 'live',
     phase: 'M',
     screen: 31,
     summary: 'Everything you have done, chronologically, grouped by year.',
