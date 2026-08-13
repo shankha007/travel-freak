@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react'
 import { useFormStatus } from 'react-dom'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { AlertCircle, Loader2 } from 'lucide-react'
 import { signIn, type AuthFormState } from '@/server/actions/auth'
@@ -46,7 +47,17 @@ export function LoginForm() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
+        <div className="flex items-center justify-between gap-2">
+          <Label htmlFor="password">Password</Label>
+          {/* Beside the field it is about, which is where someone looks the
+              moment the password they typed did not work. */}
+          <Link
+            href="/forgot-password"
+            className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          >
+            Forgot password?
+          </Link>
+        </div>
         <Input
           id="password"
           name="password"

@@ -3,7 +3,13 @@
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/server/supabase/server'
-import { signInSchema, signUpSchema } from '@/shared/validation/auth'
+import { SITE_URL } from '@/shared/brand'
+import {
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  signInSchema,
+  signUpSchema,
+} from '@/shared/validation/auth'
 
 /**
  * Auth Server Actions.
@@ -88,8 +94,14 @@ export async function signUp(_prev: SignUpState, formData: FormData): Promise<Si
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    // Read by handle_new_user() for the profile's display name.
-    options: { data: displayName ? { full_name: displayName } : {} },
+    options: {
+      // Read by handle_new_user() for the profile's display name.
+      data: displayName ? { full_name: displayName } : {},
+      // Where the confirmation link lands when the project requires one. Without
+      // this it goes to `site_url`, which is the landing page — a signed-in
+      // stranger to their own new account, with nothing saying it worked.
+      emailRedirectTo: `${SITE_URL}/auth/confirm?next=/verify`,
+    },
   })
 
   if (error) {
@@ -120,4 +132,127 @@ export async function signOut() {
   await supabase.auth.signOut()
   revalidatePath('/', 'layout')
   redirect('/login')
+}
+
+export interface RecoveryState extends AuthFormState {
+  /** Set once the request has been accepted, whatever it found. */
+  sent?: boolean
+}
+
+/**
+ * Sends a password reset link — screen 9.
+ *
+ * Reports success whether or not the address has an account. The alternative
+ * turns this form into a membership oracle: anyone could type an email and
+ * learn from the response whether that person keeps their travel history here,
+ * which is exactly the thing a private profile is meant not to say.
+ *
+ * The rate limiting that makes that promise affordable is the auth server's,
+ * not ours — `auth.rate_limit.email_sent` in `config.toml`.
+ */
+export async function requestPasswordReset(
+  _prev: RecoveryState,
+  formData: FormData
+): Promise<RecoveryState> {
+  const parsed = forgotPasswordSchema.safeParse({ email: formData.get('email') })
+
+  // The one thing worth failing on: a malformed address is the user's typo,
+  // not a stranger probing, and silently "sending" to it helps nobody.
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Enter a valid email address.' }
+  }
+
+  const supabase = await createClient()
+
+  // The link lands on the confirm route, which trades the token for a session
+  // and then forwards to the form that sets the new password.
+  await supabase.auth.resetPasswordForEmail(parsed.data.email, {
+    redirectTo: `${SITE_URL}/auth/confirm?next=/reset-password`,
+  })
+
+  return { error: null, sent: true }
+}
+
+export interface ResetPasswordState extends AuthFormState {
+  fieldErrors?: Record<string, string>
+}
+
+/**
+ * Sets a new password for whoever holds the current session.
+ *
+ * The authorisation is the session itself: it exists only because the recovery
+ * link was opened, and the auth server issued it. So there is no token to check
+ * here — a caller without one has no session, and `updateUser` refuses.
+ */
+export async function resetPassword(
+  _prev: ResetPasswordState,
+  formData: FormData
+): Promise<ResetPasswordState> {
+  const parsed = resetPasswordSchema.safeParse({
+    password: formData.get('password'),
+    confirmPassword: formData.get('confirmPassword'),
+  })
+
+  if (!parsed.success) {
+    const fieldErrors: Record<string, string> = {}
+    for (const issue of parsed.error.issues) {
+      const key = issue.path.join('.')
+      fieldErrors[key] ??= issue.message
+    }
+    return { error: 'Please fix the highlighted fields.', fieldErrors }
+  }
+
+  const supabase = await createClient()
+
+  // getUser(), not getSession(): the session has to be one the auth server
+  // still vouches for, and a recovery link that has already been spent leaves a
+  // cookie that looks fine locally.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return {
+      error: 'That reset link has expired. Ask for a new one and try again.',
+    }
+  }
+
+  const { error } = await supabase.auth.updateUser({ password: parsed.data.password })
+
+  if (error) {
+    // Most often the auth server's own password rules, which the shared schema
+    // already mirrors — so this is the case where the two have drifted, and
+    // repeating the server's wording is more use than inventing our own.
+    return { error: error.message || 'Could not set that password. Please try again.' }
+  }
+
+  revalidatePath('/', 'layout')
+  redirect('/dashboard')
+}
+
+/**
+ * Sends the confirmation email again.
+ *
+ * Same non-enumerable contract as the reset request: an address with no pending
+ * confirmation gets the same answer as one that just received an email.
+ */
+export async function resendConfirmation(
+  _prev: RecoveryState,
+  formData: FormData
+): Promise<RecoveryState> {
+  const parsed = forgotPasswordSchema.safeParse({ email: formData.get('email') })
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Enter a valid email address.' }
+  }
+
+  const supabase = await createClient()
+
+  await supabase.auth.resend({
+    type: 'signup',
+    email: parsed.data.email,
+    options: { emailRedirectTo: `${SITE_URL}/auth/confirm?next=/verify` },
+  })
+
+  return { error: null, sent: true }
 }

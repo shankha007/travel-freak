@@ -36,3 +36,35 @@ export const signUpSchema = z.object({
 })
 
 export type SignUpValues = z.output<typeof signUpSchema>
+
+/** Asking for a reset link. The address is all that is needed, and all that is asked. */
+export const forgotPasswordSchema = z.object({
+  email: z.email({ error: 'Enter a valid email address' }),
+})
+
+/**
+ * Choosing a new password.
+ *
+ * Held to the sign-up minimum rather than the sign-in one: this is a password
+ * being created, so there is no existing account whose shorter password would
+ * be locked out by the rule.
+ *
+ * The confirmation field is not security — someone who has the recovery link
+ * can set whatever they like either way. It is there because a typo in a
+ * password you cannot see locks you out of your own account, and the reset
+ * link that would fix it has just been spent.
+ */
+export const resetPasswordSchema = z
+  .object({
+    password: z
+      .string()
+      .min(MIN_PASSWORD_LENGTH, {
+        error: `Use at least ${MIN_PASSWORD_LENGTH} characters — this is the key to your memories`,
+      })
+      .max(72, { error: 'Passwords are limited to 72 characters' }),
+    confirmPassword: z.string(),
+  })
+  .refine((values) => values.password === values.confirmPassword, {
+    error: 'The two passwords do not match',
+    path: ['confirmPassword'],
+  })

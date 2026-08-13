@@ -76,6 +76,16 @@ their own line — nobody outside the repo ever saw them.
   reason, rather than quietly left out. Several photos at one point share a
   marker; selecting it lists them, which is also how the map's contents are
   reachable from a keyboard.
+- **Password reset** `/forgot-password`, `/reset-password` — a forgotten password
+  is no longer the end of an account. Ask for a link from the sign-in screen, set
+  a new password, and you are straight back in. The link lasts an hour and works
+  once. The form says the same thing whether or not that address has an account,
+  because an answer that differed would turn it into a way of asking who has one.
+- **Email confirmation lands somewhere** `/verify` — confirming a new address
+  used to drop you on the marketing page with nothing saying it had worked. It
+  now lands on a page that says so, and an expired link gets a page that explains
+  it and offers another — the right kind, so a stale reset link is not answered
+  with a confirmation email.
 - **Public blog index** `/b` — every published public post in one place, newest
   first, with the byline, the trip it was written about and how long it takes to
   read. No login: it is the front door for anything anyone chooses to publish
@@ -233,6 +243,17 @@ their own line — nobody outside the repo ever saw them.
 
 ### Infrastructure
 
+- **The auth emails point at the app.** `backend/supabase/templates/` holds the
+  recovery and confirmation templates, and both link to `/auth/confirm` carrying
+  a token hash rather than a PKCE code. A code has to be exchanged in the browser
+  that asked for it, so the stock templates broke the ordinary case of requesting
+  a reset on a laptop and opening the mail on a phone. The route still accepts a
+  code, so a project left on the defaults keeps working. Production needs the two
+  templates set in the Supabase dashboard.
+- **`additional_redirect_urls` covers the dev origin.** `site_url` allows only
+  itself, so `redirectTo` pointing at `/auth/confirm` was rejected and quietly
+  replaced with the landing page — found by sending a real reset email and
+  reading where the link went.
 - **The seed's places carry pins.** Every stop in the demo data now has
   coordinates, so the route lines, the distance totals and the vault's map are
   visible in a fresh checkout without hand-made fixtures. Two deliberately have

@@ -38,7 +38,8 @@ export function RegisterForm() {
         <div className="space-y-1">
           <p className="font-medium">Check your inbox</p>
           <p className="text-sm text-muted-foreground">
-            We sent you a confirmation link. Click it and your globe is ready.
+            We sent you a confirmation link. Click it and your globe is ready — it is good for an
+            hour.
           </p>
         </div>
         <Button
@@ -49,6 +50,15 @@ export function RegisterForm() {
         >
           Back to sign in
         </Button>
+        <p className="text-sm text-muted-foreground">
+          Nothing arrived?{' '}
+          <Link
+            href="/verify?error=missing"
+            className="font-medium text-foreground underline underline-offset-4"
+          >
+            Send it again
+          </Link>
+        </p>
       </div>
     )
   }

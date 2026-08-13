@@ -32,14 +32,14 @@ open, revoke and pull-back.
 |---|---|---|---|---|
 | Infrastructure | 16 | 0 | 0 | 3 |
 | Public / marketing | 5 | 0 | 0 | 5 |
-| Auth | 5 | 0 | 0 | 2 |
+| Auth | 6 | 0 | 0 | 1 |
 | Dashboard & globe | 5 | 2 | 0 | 0 |
 | Trips & planner | 5 | 1 | 0 | 4 |
 | Memory & content | 5 | 0 | 2 | 0 |
 | Analytics & resume | 1 | 0 | 1 | 2 |
 | Public sharing | 5 | 0 | 0 | 0 |
 | Account | 0 | 0 | 1 | 6 |
-| **Total** | **47** | **3** | **4** | **22** |
+| **Total** | **48** | **3** | **4** | **21** |
 
 ---
 
@@ -90,7 +90,7 @@ open, revoke and pull-back.
 | — | Session refresh + route protection | ✅ Done | `src/proxy.ts`; `getUser()` not `getSession()` |
 | — | Sign out | ✅ Done | Server Action, clears httpOnly cookies |
 | 7 | **Register** `/register` | ✅ Done | Email + password + optional name, shared Zod schema, 8-character minimum matching `config.toml`. Handles both projects that require email confirmation and local, where sign-up returns a session immediately. Profile, `explorer` subscription and usage row come from the `on_auth_user_created` trigger |
-| 9 | Forgot / reset / verify | ⬜ Not started | |
+| 9 | **Forgot / reset / verify** | ✅ Done | `/forgot-password` answers the same way whichever address is typed, so it cannot be used to ask who has an account. `/auth/confirm` trades an emailed token for a session and forwards — it takes a `token_hash`, which is verified server-side and so works on a different device, and still accepts a PKCE `code` for a project on the stock templates. `/reset-password` requires that session; `/verify` covers confirmed, expired and opened-directly, and offers the remedy matching the link that failed. Email templates live in `backend/supabase/templates/` |
 | 10 | **Onboarding wizard** `/welcome` | ✅ Done | Username, home country, then tap the countries you have been to on a map that fills in as you go, with a searchable list beside it. Each step saves before advancing, so it resumes; only the last sets `onboarded_at`, which is what the app shell gates on |
 | — | Google OAuth | ⬜ Not started | |
 
@@ -189,9 +189,12 @@ open, revoke and pull-back.
    they are converted at upload, because their URL has to live in stored HTML.
    `profiles.strip_exif_on_publish` still has nothing reading it — publication always strips,
    which is the stricter behaviour.
-2. **`/register` has no email verification path in production.** Locally `enable_confirmations`
-   is off and sign-up returns a session; with confirmations on the form shows "check your
-   inbox", but there is no `/verify` route to land on afterwards.
+2. **Sign-up confirmation is built but not exercised.** `/verify` and the confirmation
+   template exist, and the reset flow proves the route they share. But local
+   `enable_confirmations` is off, so the signup path itself has never run end to end —
+   turning it on locally is the check. Production additionally needs both email templates
+   set in the Supabase dashboard and its own origin in the redirect allow-list; nothing in
+   the repo can enforce either, so a deploy that skips them sends links that go nowhere.
 3. **HEIC still has no fallback in the vault.** The public page converts it, but the owner's
    own gallery points at the original, so a browser that cannot decode HEIC shows nothing
    there. The same transform would fix it for private views.

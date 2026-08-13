@@ -1,0 +1,20 @@
+<!--
+  Sign-up confirmation email. Same reasoning as recovery.html: a token hash sent
+  to the app's own /auth/confirm, so the link works in whichever browser opens
+  the inbox.
+-->
+<h2>Confirm your email</h2>
+
+<p>Welcome to TravelFreak. Confirm this address and your globe is ready:</p>
+
+<p>
+  <a
+    href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=signup&next=/verify"
+    >Confirm my email</a
+  >
+</p>
+
+<p>
+  The link is good for one hour. If you did not create an account, ignore this
+  email and nothing further will happen.
+</p>

@@ -160,7 +160,19 @@ site_url = "http://127.0.0.1:3000"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000"]
+#
+# `site_url` alone allows only itself, so a `redirectTo` of
+# <origin>/auth/confirm?next=… is rejected and silently replaced by the landing
+# page — a reset link that signs you in and says nothing. Both dev origins are
+# listed with `/**` because the app is served from localhost while `site_url` is
+# spelled 127.0.0.1, and the auth server treats those as different hosts.
+#
+# Production needs its own origin here, in the dashboard's URL configuration.
+additional_redirect_urls = [
+  "http://localhost:3000/**",
+  "http://127.0.0.1:3000/**",
+  "https://127.0.0.1:3000",
+]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
@@ -250,6 +262,25 @@ otp_expiry = 3600
 # [auth.email.template.invite]
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
+
+# The two links that matter are ours, not the stock ones. Both point at the
+# app's /auth/confirm carrying {{ .TokenHash }}, which is verified server-side —
+# the default templates send a PKCE code instead, and exchanging one needs the
+# verifier cookie, so the link only works in the browser that asked for it.
+# Opening the email on a different device is the normal case.
+#
+# Production needs the same two templates set in the Supabase dashboard; this
+# file only configures the local stack.
+#
+# `content_path` is resolved from the directory the CLI runs in — `backend/` —
+# not from this file, so it carries the `supabase/` segment.
+[auth.email.template.recovery]
+subject = "Set a new TravelFreak password"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.confirmation]
+subject = "Confirm your TravelFreak email"
+content_path = "./supabase/templates/confirmation.html"
 
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
