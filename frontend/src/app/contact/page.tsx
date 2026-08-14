@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { BookOpen, Bug, LifeBuoy, ShieldAlert } from 'lucide-react'
 import { BRAND, SITE_URL, pageTitle } from '@/shared/brand'
+import { SITE_OG_IMAGE } from '@/shared/og'
 import { getSessionUser } from '@/server/auth'
 import { ContactForm } from '@/client/components/marketing/contact-form'
 import { MarketingFooter, MarketingHeader } from '@/client/components/marketing/chrome'
@@ -30,6 +31,7 @@ export const metadata: Metadata = {
     type: 'website',
     title: pageTitle('Contact'),
     description: `Write to the people who build ${BRAND.name}.`,
+    images: [SITE_OG_IMAGE],
   },
 }
 

@@ -76,7 +76,12 @@ export async function generateMetadata({
       type: 'article',
       title: trip.title,
       description,
-      images: trip.coverUrl ? [trip.coverUrl] : undefined,
+      // The cover photo when there is one — a real picture of the place beats
+      // any card we could draw. When there is not, the key is omitted entirely
+      // rather than set to `undefined`: an explicit `images: undefined`
+      // suppresses the colocated `opengraph-image.tsx`, which is how this page
+      // ended up with no card at all for every trip without a cover.
+      ...(trip.coverUrl ? { images: [trip.coverUrl] } : {}),
     },
   }
 }

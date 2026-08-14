@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowRight, Info } from 'lucide-react'
 import { BRAND, SITE_URL, pageTitle } from '@/shared/brand'
+import { SITE_OG_IMAGE } from '@/shared/og'
 import type { LegalBlock, LegalDoc } from '@/shared/content/legal'
 import { relatedLegalDocs } from '@/shared/content/legal'
 import { Reveal } from '@/client/components/motion/reveal'
@@ -32,6 +33,9 @@ export function legalMetadata(doc: LegalDoc): Metadata {
       type: 'article',
       title: pageTitle(doc.title),
       description: doc.summary,
+      // Spelled out because a page's own `openGraph` replaces the parent's
+      // rather than merging into it, images included — see `SITE_OG_IMAGE`.
+      images: [SITE_OG_IMAGE],
     },
   }
 }

@@ -31,7 +31,7 @@ open, revoke and pull-back.
 | Area | Done | Partial | Stub | Not started |
 |---|---|---|---|---|
 | Infrastructure | 18 | 0 | 0 | 2 |
-| Public / marketing | 7 | 0 | 0 | 3 |
+| Public / marketing | 8 | 0 | 0 | 2 |
 | Auth | 6 | 0 | 0 | 1 |
 | Dashboard & globe | 5 | 2 | 0 | 0 |
 | Trips & planner | 5 | 1 | 0 | 4 |
@@ -39,7 +39,7 @@ open, revoke and pull-back.
 | Analytics & resume | 2 | 0 | 0 | 2 |
 | Public sharing | 5 | 0 | 0 | 0 |
 | Account | 3 | 1 | 0 | 3 |
-| **Total** | **58** | **4** | **0** | **15** |
+| **Total** | **59** | **4** | **0** | **14** |
 
 ---
 
@@ -80,7 +80,7 @@ open, revoke and pull-back.
 | 6 | **Contact** `/contact` | ✅ Done | Seven topics, Zod-validated, no account needed. A rejected message comes back with every field still filled, including the topic. A honeypot is answered with the same acknowledgement a person gets, so a bot learns nothing. The path you wrote from is sent; nothing else about the visit is |
 | 11 | **Legal** `/privacy`, `/terms`, `/refunds` | ✅ Done | One renderer over `shared/content/legal.ts`, so three documents cannot drift into three typographic treatments. Each states its effective date and carries a contents list — capped and scrollable on a phone, sticky on desktop. `legal.test.ts` enforces unique anchors, non-empty blocks, a date that has already arrived and a contact address in every document. Written by the people who built the product, not by counsel |
 | 12 | **Changelog** `/changelog` | ✅ Done | Public, no login, statically rendered from `docs/CHANGELOG.md` at build time. Timeline of releases with per-kind sections; the parser refuses a malformed entry rather than dropping it |
-| — | OG image endpoint | ⬜ Not started | Phase 1.1 |
+| — | **Share cards** | ✅ Done | `opengraph-image.tsx` at four segments rather than the plan's `/api/og/*` — the file convention generates the URL, the size metadata and the cache headers, which hand-rolled routes would have meant hand-rolling too. A profile and a trip card draw a real world map with the relevant countries filled, from `shared/geo/project.ts` (pure, unit-tested, two SVG paths for 177 countries). Every card reads through the visitor's client, so a private trip, an unpublished post and a private profile all fall back to the site card — the same one an unknown URL gets, which is what stops the endpoint confirming that a username exists |
 | — | SEO (JSON-LD, sitemap, RSS) | ⬜ Not started | |
 
 ## Auth
@@ -226,16 +226,22 @@ open, revoke and pull-back.
    nothing in the repo makes that happen. A database webhook or a scheduled digest to
    `BRAND.support.email` would close it, and `handled_at` is already there to mark what has been
    answered.
-10. **A deleted account's photographs go, but the trash is still never purged.** Deletion
+10. **`/resume` and `/analytics` disagree about how many days you have been away.** The
+   share card for the demo profile says 103 days and the analytics screen says 104, because
+   `resume.ts` measures a trip as end minus start while `analytics.ts` and `timeline.ts` count
+   both ends the way people count holidays. Two of the three agree; the resume — and the
+   `public_resume_stats()` function behind a visitor's view of it — is the one to change, which
+   means a migration as well as a file.
+11. **A deleted account's photographs go, but the trash is still never purged.** Deletion
    removes a leaving user's storage objects by prefix, which closes that hole. Gap 6 is the one
    still open: a trip soft-deleted 40 days ago is unreachable to everyone and still on disk,
    because nothing runs on a schedule to hard-delete past the window.
-11. **Analytics can only show budgets that were *planned*.** `trips.budget_planned` is the
+12. **Analytics can only show budgets that were *planned*.** `trips.budget_planned` is the
    only money in the schema; the `expenses` table screen 22 needs is not migrated, so there is
    nothing to compare a plan against. The screen says so rather than labelling a plan as spend,
    and the arithmetic groups by currency rather than converting — adding ₹40,000 to $400 needs an
    exchange rate this codebase does not have and should not invent.
-12. **A partially pinned trip reads as unmeasured.** `totalDistanceKm` skips places without
+13. **A partially pinned trip reads as unmeasured.** `totalDistanceKm` skips places without
    coordinates, so one pin among three measures nothing. That is the honest answer — the legs it
    cannot see are real distance — but the resume shows no explanation for why a trip with places
    has no number.

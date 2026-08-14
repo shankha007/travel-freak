@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowRight, ShieldCheck } from 'lucide-react'
 import { BRAND, SITE_URL, pageTitle } from '@/shared/brand'
+import { SITE_OG_IMAGE } from '@/shared/og'
 import { getPublicPlans } from '@/server/queries/plans'
 import { MarketingFooter, MarketingHeader } from '@/client/components/marketing/chrome'
 import { PricingTable } from '@/client/components/pricing/pricing-table'
@@ -29,6 +30,7 @@ export const metadata: Metadata = {
     type: 'website',
     title: pageTitle('Pricing'),
     description: 'Free forever at country level. Paid plans add photos, storage and detail.',
+    images: [SITE_OG_IMAGE],
   },
 }
 

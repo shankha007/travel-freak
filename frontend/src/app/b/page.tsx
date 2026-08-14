@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ArrowRight, BookOpen, Clock, Luggage } from 'lucide-react'
 import { listPublicPosts, type PublicPostCard } from '@/server/queries/public-blogs'
 import { BRAND, SITE_URL, pageTitle } from '@/shared/brand'
+import { SITE_OG_IMAGE } from '@/shared/og'
 import { MarketingFooter, MarketingHeader } from '@/client/components/marketing/chrome'
 import { Badge } from '@/client/components/ui/badge'
 import { Button } from '@/client/components/ui/button'
@@ -30,6 +31,7 @@ export const metadata: Metadata = {
     type: 'website',
     title: pageTitle('Travel blogs'),
     description: 'Published trip writing from people filling in their own maps.',
+    images: [SITE_OG_IMAGE],
   },
 }
 

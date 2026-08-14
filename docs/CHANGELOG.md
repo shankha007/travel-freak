@@ -55,6 +55,18 @@ their own line — nobody outside the repo ever saw them.
 
 ### Added
 
+- **Share cards** — a link to this pasted into a chat or a timeline now
+  unfurls as a picture instead of a grey box. A public profile gets its own
+  globe: the real world map with the countries that person has actually been to
+  filled in, their name, and how many countries, trips, days and years it adds
+  up to. A public trip gets the countries that trip reached, its dates and its
+  title. A post gets its headline, byline and reading time. Everything else gets
+  the site card. A private trip, an unpublished post and a private profile all
+  get the site card too — the same one a URL that never existed gets, because
+  the alternative is an image endpoint that tells a stranger which usernames are
+  real.
+
+
 - **Export and account deletion** — the two rights the privacy policy has been
   promising by email are buttons now. **Download my data** gives you a JSON file
   with every row this account owns: trips, places, photo details, notes, posts,
@@ -314,6 +326,11 @@ their own line — nobody outside the repo ever saw them.
 
 ### Fixed
 
+- **Public trips without a cover photo had no share card at all.** The page said
+  "use the cover image" and, for a trip with no cover, said it in a way that
+  suppressed the fallback rather than leaving room for one. Trips with a cover
+  still use the photograph — a real picture of the place beats any card we could
+  draw.
 - **A rejected profile save no longer eats what you wrote.** Choosing a username
   someone already has used to hand back the error and quietly restore the old
   bio, so the ten minutes spent rewriting it went with it. Everything typed
@@ -326,6 +343,18 @@ their own line — nobody outside the repo ever saw them.
 
 ### Infrastructure
 
+- **The share cards draw a real map, from the geometry the maps already use.**
+  `shared/geo/project.ts` turns country outlines into SVG path data with an
+  equirectangular projection — crude, and indistinguishable from a good one at
+  1200 pixels behind a headline. Every country becomes one of two paths rather
+  than 177 elements, because Satori lays out everything it is handed. Pure and
+  unit-tested on four invented countries; the 432KB of real geometry is parsed
+  once per process and kept.
+- **Every public page names a card explicitly.** Next merges metadata shallowly,
+  so a page that declares its own `openGraph` replaces the parent's — images
+  included. The root card therefore reached `/` and nothing else, and eight
+  pages had silently had no image since they were written. `SITE_OG_IMAGE` is
+  the one line that fixes each of them.
 - **The cascade behind account deletion is asserted, not assumed.** Deleting one
   `auth.users` row is trusted to take the profile, trips, places, media rows,
   posts, wishlist, share tokens, subscription, usage counters and the globe

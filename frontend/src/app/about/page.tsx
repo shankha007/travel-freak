@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowRight, EyeOff, FileDown, Globe2, Mail, ScrollText, Sparkles } from 'lucide-react'
 import { BRAND, SITE_URL, pageTitle } from '@/shared/brand'
+import { SITE_OG_IMAGE } from '@/shared/og'
 import { MarketingFooter, MarketingHeader } from '@/client/components/marketing/chrome'
 import { RevealGroup, RevealItem } from '@/client/components/motion/reveal'
 import { Badge } from '@/client/components/ui/badge'
@@ -26,6 +27,7 @@ export const metadata: Metadata = {
     type: 'website',
     title: pageTitle('About'),
     description: 'A personal travel OS built around memories rather than itineraries.',
+    images: [SITE_OG_IMAGE],
   },
 }
 

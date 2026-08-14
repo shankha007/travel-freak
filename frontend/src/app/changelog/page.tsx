@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ArrowRight, CalendarDays, GitCommitVertical, Rocket, Sparkles } from 'lucide-react'
 import { getReleases } from '@/server/content/changelog'
 import { BRAND, SITE_URL, pageTitle } from '@/shared/brand'
+import { SITE_OG_IMAGE } from '@/shared/og'
 import {
   CHANGE_KINDS,
   CHANGE_KIND_META,
@@ -38,6 +39,7 @@ export const metadata: Metadata = {
     type: 'website',
     title: pageTitle('Changelog'),
     description: `Everything shipped in ${BRAND.name}, newest first.`,
+    images: [SITE_OG_IMAGE],
   },
 }
 
