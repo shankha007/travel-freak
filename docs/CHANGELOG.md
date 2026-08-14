@@ -278,6 +278,10 @@ their own line — nobody outside the repo ever saw them.
 
 ### Infrastructure
 
+- **`.gitattributes` fixes the line endings for good.** The repository is LF
+  everywhere, in the tree and in the working copy, so it no longer depends on
+  each machine's `core.autocrlf` — which on Windows asks for CRLF, argues with
+  Prettier, and leaves files permanently listed as modified with empty diffs.
 - **Framer Motion, with one vocabulary.** Three durations and one easing curve
   live in `shared/motion.ts`; `Reveal`, `RevealGroup` and `RevealItem` are the
   only entrance animation any page uses. `MotionConfig reducedMotion="user"` is

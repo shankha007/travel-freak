@@ -1,0 +1,22 @@
+# Line endings are LF, everywhere, in the repository and in the working tree.
+#
+# Without this the answer depends on each developer's `core.autocrlf`, which on
+# Windows defaults to `true` and asks for CRLF in the working tree. Prettier
+# then writes LF back (its `endOfLine` default), and git spends the rest of the
+# day announcing that "LF will be replaced by CRLF" for files whose contents
+# have not changed. `eol=lf` states the repository's answer once, so the setting
+# on any one machine stops mattering.
+#
+# `text=auto` still lets git decide what is text; only the ending is forced.
+* text=auto eol=lf
+
+# Binaries git must never touch. The geo build writes JSON, which is text, so it
+# is deliberately absent from this list.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
