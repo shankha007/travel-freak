@@ -39,7 +39,14 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
 
       <div className="flex min-h-0 flex-1">
         <AppSidebar />
-        <main className="flex min-h-0 flex-1 flex-col">{children}</main>
+        {/* `min-w-0` alongside `min-h-0`, and for the same reason in the other
+            axis: a flex item defaults to `min-width: auto`, so it refuses to
+            shrink below the widest thing inside it. Anything genuinely wide — a
+            chart measuring its container, the analytics heatmap's year of
+            squares — then pushes `main` past the viewport and gives the whole
+            app a horizontal scrollbar, rather than scrolling inside the one
+            element that is too wide. */}
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</main>
       </div>
 
       <AppBottomNav />

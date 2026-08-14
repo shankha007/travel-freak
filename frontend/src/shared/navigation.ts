@@ -120,7 +120,7 @@ export const NAV_ITEMS: NavItem[] = [
     href: '/analytics',
     label: 'Analytics',
     icon: 'ChartNoAxesColumn',
-    status: 'stub',
+    status: 'live',
     phase: '1.1',
     screen: 32,
     summary: 'Per-year charts, distance, world percentage and a heatmap calendar.',

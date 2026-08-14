@@ -25,6 +25,7 @@ export interface PlanLimits {
   audios_per_trip: number | null
   storage_bytes: number | null
   globe_region_detail: boolean
+  analytics_advanced: boolean
   planned_trips: number | null
   collaborators_per_trip: number | null
   albums: boolean
@@ -258,4 +259,16 @@ export async function checkStorageQuota(bytes: number): Promise<MediaQuotaCheck>
 export async function canUseRegionDetail(): Promise<boolean> {
   const { limits } = await getEntitlements()
   return limits.globe_region_detail === true
+}
+
+/**
+ * The deeper half of `/analytics` — the heatmap, the breakdowns, the budgets.
+ *
+ * The pricing table already sells "Advanced analytics" as a paid row, so this
+ * is not a decision being made here; it is the same row, read from the same
+ * column, so the two cannot come apart.
+ */
+export async function canUseAdvancedAnalytics(): Promise<boolean> {
+  const { limits } = await getEntitlements()
+  return limits.analytics_advanced === true
 }

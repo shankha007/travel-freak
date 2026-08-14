@@ -55,6 +55,17 @@ their own line — nobody outside the repo ever saw them.
 
 ### Added
 
+- **Analytics** `/analytics` — the screen behind the last stub in the sidebar.
+  `/timeline` says what happened and `/resume` says what it adds up to; this
+  says what shape it is. Days away per year as a chart, with travel booked
+  stacked separately from travel taken and the empty years drawn as empty —
+  a year you did not travel is the story, not a gap to be closed up. Your
+  longest and shortest trip, the average over the ones that can be measured,
+  and the distance covered with the number of trips it was actually able to
+  measure printed beside it. Behind the paid plans: a calendar of every day you
+  were away, one square each, with days you have booked drawn hollow; who you
+  travel with; the countries you keep going back to; and what you have planned
+  to spend, per currency, never added together.
 - **Contact** `/contact` — a form that reaches the people who build this, with
   no account required and no ticket queue in front of it. Pick what it is about,
   say what happened, and it lands in the same inbox the developers read; a
@@ -276,8 +287,24 @@ their own line — nobody outside the repo ever saw them.
 - An unlisted post is never indexed, and neither is any page reached with a
   token.
 
+### Fixed
+
+- **A wide screen no longer drags the whole app sideways.** `main` in the app
+  shell could not shrink below its widest child, so anything genuinely wide gave
+  every page a horizontal scrollbar instead of scrolling inside the one element
+  that needed it. Found while building the analytics heatmap, which is a year of
+  squares and the first thing wide enough to expose it.
+
 ### Infrastructure
 
+- **`shared/analytics.ts`, and the line it draws.** The per-year arithmetic,
+  trip lengths, budget grouping and destination ranking are pure and unit-tested
+  — 28 assertions, several of which are about refusing to answer. `HAPPENED` is
+  now exported from `timeline.ts` and used by both, because two copies of "which
+  trips count as travel taken" is two numbers that can disagree about the same
+  year. Two bugs the tests caught before anyone saw them: a trip ending in
+  January was dropping its days off the end of the chart, and a country you are
+  in right now was listed under "where you keep going back" with zero visits.
 - **`.gitattributes` fixes the line endings for good.** The repository is LF
   everywhere, in the tree and in the working copy, so it no longer depends on
   each machine's `core.autocrlf` — which on Windows asks for CRLF, argues with

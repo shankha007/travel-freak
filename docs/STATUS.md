@@ -36,10 +36,10 @@ open, revoke and pull-back.
 | Dashboard & globe | 5 | 2 | 0 | 0 |
 | Trips & planner | 5 | 1 | 0 | 4 |
 | Memory & content | 7 | 0 | 0 | 0 |
-| Analytics & resume | 1 | 0 | 1 | 2 |
+| Analytics & resume | 2 | 0 | 0 | 2 |
 | Public sharing | 5 | 0 | 0 | 0 |
 | Account | 0 | 0 | 1 | 6 |
-| **Total** | **54** | **3** | **2** | **18** |
+| **Total** | **55** | **3** | **1** | **18** |
 
 ---
 
@@ -138,7 +138,7 @@ open, revoke and pull-back.
 
 | # | Feature | Status | Notes |
 |---|---|---|---|
-| 32 | Analytics `/analytics` | 🔵 Stub | Phase 1.1 |
+| 32 | **Analytics** `/analytics` | ✅ Done | Days away per year, with travel booked stacked apart from travel taken and the empty years drawn rather than skipped; longest, shortest and average trip; distance with the count of trips it could actually measure. Behind `analytics_advanced`: the day-by-day calendar, who you travel with, the countries you return to, and planned budgets grouped per currency — never summed across them, because there is no exchange rate here. `shared/analytics.ts` is pure and holds all of it, with 28 assertions |
 | 33 | **Travel resume** `/resume` | ✅ Done | Countries, regions, trips, travel days, years travelling, distance, and distinct places by kind — cities, mountains, beaches, UNESCO sites. Plus the share panel: public URL, copy button, the switch that publishes the profile, and display name and bio |
 | 34 | Travel Wrapped | ⬜ Not started | Phase 1.2 |
 | 35 | Achievements & XP | ⬜ Not started | Phase 1.2; tables not migrated |
@@ -172,6 +172,7 @@ open, revoke and pull-back.
 | Sidebar + mobile bottom nav | ✅ Done | Driven by `shared/navigation.ts`; stubs marked "soon". Of the four in the phone's bottom bar, none is a stub now that the wishlist is built |
 | Theme picker | ✅ Done | Six palettes plus System, from `shared/themes.ts`. Dark palettes join the `dark` variant in `globals.css`, which `themes.test.ts` enforces; each retunes the region-state and map colours, not just the chrome |
 | Skeleton loaders | 🟡 Partial | Globe and login only |
+| Charts | ✅ Done | `recharts` was a dependency nothing used. `client/components/analytics` is the first, reading `--chart-1`…`--chart-5`, so a chart retunes with the theme picker like everything else |
 | Empty states | 🟡 Partial | Globe, trips, dashboard activity |
 | Command palette (⌘K) | ⬜ Not started | |
 | Sidebar quota meter | ⬜ Not started | Needs `entitlements.ts` |
@@ -225,7 +226,12 @@ open, revoke and pull-back.
    nothing in the repo makes that happen. A database webhook or a scheduled digest to
    `BRAND.support.email` would close it, and `handled_at` is already there to mark what has been
    answered.
-10. **A partially pinned trip reads as unmeasured.** `totalDistanceKm` skips places without
+10. **Analytics can only show budgets that were *planned*.** `trips.budget_planned` is the
+   only money in the schema; the `expenses` table screen 22 needs is not migrated, so there is
+   nothing to compare a plan against. The screen says so rather than labelling a plan as spend,
+   and the arithmetic groups by currency rather than converting — adding ₹40,000 to $400 needs an
+   exchange rate this codebase does not have and should not invent.
+11. **A partially pinned trip reads as unmeasured.** `totalDistanceKm` skips places without
    coordinates, so one pin among three measures nothing. That is the honest answer — the legs it
    cannot see are real distance — but the resume shows no explanation for why a trip with places
    has no number.

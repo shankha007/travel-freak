@@ -59,8 +59,15 @@ export interface TimelineYear {
   scheduledDaysAway: number
 }
 
-/** Trip statuses that have actually happened, or are happening now. */
-const HAPPENED: ReadonlySet<string> = new Set(['completed', 'ongoing'])
+/**
+ * Trip statuses that have actually happened, or are happening now.
+ *
+ * Exported because `analytics.ts` has to draw the same line, and a second copy
+ * of "which trips count as travel taken" is a second copy that can disagree —
+ * the timeline saying 41 days and the analytics screen saying 52 for the same
+ * year is the kind of thing that costs a reader their trust in both.
+ */
+export const HAPPENED: ReadonlySet<string> = new Set(['completed', 'ongoing'])
 
 /** The calendar year of an ISO date, or null when there is not one. */
 export function yearOf(iso: string | null): number | null {
