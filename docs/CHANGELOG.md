@@ -59,10 +59,10 @@ their own line — nobody outside the repo ever saw them.
   promise: things came back inside the 30 days, and nothing ever went once the
   window closed. A trip binned forty days ago was unreachable to you, to a
   visitor and to the restore button, and was still every byte it had ever been.
-  A daily job now removes what is past its window — the trip, its places, its
-  notes, its media rows and the photographs themselves — along with expired
-  posts. Nothing inside the window is touched, and the countdown on the trash
-  screen now counts down to something.
+  A daily job now removes what is past its window: a trip with its places, its
+  notes, its media rows and the photographs themselves, and a post with the
+  pictures that were inside it. Nothing inside the window is touched, and the
+  countdown on the trash screen now counts down to something.
 - **Share cards** — a link to this pasted into a chat or a timeline now
   unfurls as a picture instead of a grey box. A public profile gets its own
   globe: the real world map with the countries that person has actually been to
@@ -73,8 +73,6 @@ their own line — nobody outside the repo ever saw them.
   get the site card too — the same one a URL that never existed gets, because
   the alternative is an image endpoint that tells a stranger which usernames are
   real.
-
-
 - **Export and account deletion** — the two rights the privacy policy has been
   promising by email are buttons now. **Download my data** gives you a JSON file
   with every row this account owns: trips, places, photo details, notes, posts,
@@ -117,10 +115,9 @@ their own line — nobody outside the repo ever saw them.
 - **Legal** `/privacy`, `/terms` and `/refunds` — the three documents the
   product has been operating without. Each states the date it took effect, has a
   contents list beside it, and says plainly where the software does not yet do
-  what a policy would like to claim: trash past its 30 days is unreachable but
-  not yet purged, export and account deletion are done by hand until the screens
-  exist, and nothing can be charged because nothing is on sale. The refund policy
-  is published before the first payment rather than after the first dispute.
+  what a policy would like to claim — nothing can be charged, for instance,
+  because nothing is on sale. The refund policy is published before the first
+  payment rather than after the first dispute.
   Linked from the footer of every public page and listed in `sitemap.xml`.
 - **Onboarding** `/welcome` — three steps for a new account: your username and
   where you are based, then the one that matters — tap every country you have
@@ -359,6 +356,14 @@ their own line — nobody outside the repo ever saw them.
 
 ### Infrastructure
 
+- **`media.post_id` gives a post's images a way back to the post.** An image
+  placed in the editor was a row with `trip_id` null and no other link to
+  anything: the post's HTML held a URL and the object key held the post id, and
+  neither is a relationship the database can follow — so the purge could delete
+  a post and never find its pictures. The column cascades, so the post takes
+  them with it, and a check constraint keeps a row from claiming a trip and a
+  post at once. Existing rows are backfilled by reading the post id out of the
+  object key, skipping any whose post is already gone.
 - **The purge is a route on a schedule, not a database job.** Half the work is
   not in the database: photographs are objects in a bucket, and only the
   application holds a key that can delete them. `/api/cron/purge-trash` lists

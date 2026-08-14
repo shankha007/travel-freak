@@ -273,6 +273,11 @@ export async function confirmPostImage(
     id: mediaId,
     user_id: user.id,
     trip_id: null,
+    // The post this image belongs to. Without it the row's only link to the
+    // post is the object key, which the database cannot follow — so purging an
+    // expired post left its pictures behind. Cascades, so the post taking them
+    // with it needs no code.
+    post_id: postId,
     kind: 'image',
     storage_path: path,
     mime: sniffed,

@@ -216,6 +216,7 @@ export type Database = {
           is_featured: boolean
           kind: Database["public"]["Enums"]["media_kind"]
           mime: string
+          post_id: string | null
           processing_status: Database["public"]["Enums"]["processing_status"]
           public_path: string | null
           storage_path: string
@@ -241,6 +242,7 @@ export type Database = {
           is_featured?: boolean
           kind: Database["public"]["Enums"]["media_kind"]
           mime: string
+          post_id?: string | null
           processing_status?: Database["public"]["Enums"]["processing_status"]
           public_path?: string | null
           storage_path: string
@@ -266,6 +268,7 @@ export type Database = {
           is_featured?: boolean
           kind?: Database["public"]["Enums"]["media_kind"]
           mime?: string
+          post_id?: string | null
           processing_status?: Database["public"]["Enums"]["processing_status"]
           public_path?: string | null
           storage_path?: string
@@ -281,6 +284,13 @@ export type Database = {
             columns: ["album_id"]
             isOneToOne: false
             referencedRelation: "albums"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "blog_posts"
             referencedColumns: ["id"]
           },
           {

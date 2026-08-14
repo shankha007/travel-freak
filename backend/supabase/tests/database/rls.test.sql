@@ -1098,17 +1098,37 @@ values ('a1111111-0000-4000-8000-0000000000e3', 'aaaaaaaa-0000-4000-8000-0000000
         'a1111111-0000-4000-8000-0000000000e1', 'image',
         'aaaaaaaa/expired/photo.jpg', 'image/jpeg', 'aaaaaaaa/expired/photo.webp');
 
-insert into public.blog_posts (user_id, title, slug, deleted_at)
-values ('aaaaaaaa-0000-4000-8000-000000000001', 'Old draft', 'rls-purge-post',
-        now() - interval '40 days');
+insert into public.blog_posts (id, user_id, title, slug, deleted_at)
+values ('a1111111-0000-4000-8000-0000000000e4', 'aaaaaaaa-0000-4000-8000-000000000001',
+        'Old draft', 'rls-purge-post', now() - interval '40 days');
+
+-- An image placed inside that post. Before `media.post_id` there was no way to
+-- reach it from the post, so the purge left it behind for ever.
+insert into public.media (id, user_id, post_id, kind, storage_path, mime, public_path)
+values ('a1111111-0000-4000-8000-0000000000e5', 'aaaaaaaa-0000-4000-8000-000000000001',
+        'a1111111-0000-4000-8000-0000000000e4', 'image',
+        'aaaaaaaa/posts/expired/image.jpg', 'image/jpeg', 'aaaaaaaa/posts/expired/image.webp');
+
+select throws_ok(
+  $$ insert into public.media (user_id, trip_id, post_id, kind, storage_path, mime)
+     values ('aaaaaaaa-0000-4000-8000-000000000001',
+             'a1111111-0000-4000-8000-0000000000e1',
+             'a1111111-0000-4000-8000-0000000000e4',
+             'image', 'aaaaaaaa/both/parents.jpg', 'image/jpeg') $$,
+  '23514',
+  null,
+  'a media row cannot belong to a trip and a post at once'
+);
 
 -- The caller removes the files first, while the rows that name them still
 -- exist. Both paths come back, because both are real objects in two buckets.
 select results_eq(
   $$ select storage_path, public_path
-     from public.expired_trash_media(now() - interval '30 days') $$,
-  $$ values ('aaaaaaaa/expired/photo.jpg'::text, 'aaaaaaaa/expired/photo.webp'::text) $$,
-  'the purge is told which files to remove before the rows naming them go'
+     from public.expired_trash_media(now() - interval '30 days')
+     order by storage_path $$,
+  $$ values ('aaaaaaaa/expired/photo.jpg'::text, 'aaaaaaaa/expired/photo.webp'::text),
+            ('aaaaaaaa/posts/expired/image.jpg'::text, 'aaaaaaaa/posts/expired/image.webp'::text) $$,
+  'the purge is told about the files of an expired trip and an expired post alike'
 );
 
 select is(
@@ -1141,6 +1161,13 @@ select is(
    where id = 'a1111111-0000-4000-8000-0000000000e3')::int,
   0,
   'and its media rows'
+);
+
+select is(
+  (select count(*) from public.media
+   where id = 'a1111111-0000-4000-8000-0000000000e5')::int,
+  0,
+  'and a purged post takes the images that were inside it'
 );
 
 select is(

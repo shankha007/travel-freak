@@ -65,7 +65,7 @@ open, revoke and pull-back.
 | — | **Public image derivatives** | ✅ Done | `media-public` bucket; sharp re-encodes to WebP ≤1600px, dropping every metadata block — on first publication for trip photos, at upload for post images, whose URL has to live in stored HTML. Tested with the same EXIF parser the uploader uses to read GPS |
 | — | **Framer Motion** | ✅ Done | `shared/motion.ts` owns three durations and one easing curve; `client/components/motion/reveal.tsx` owns the only entrance animation. `MotionConfig reducedMotion="user"` in `providers.tsx` drops the movement and keeps the fade for anyone who asks, so no component has to check. Reveals ship as `opacity: 0`, so the root layout carries a `<noscript>` rule that pins them visible |
 | — | **`contact_messages`** | ✅ Done | RLS on with no policy: nobody reads it through the Data API but the service role. Writes go through `submit_contact_message()`, a security-definer function holding the length checks and a limit of five per address per hour. 12 pgTAP assertions |
-| — | **Scheduled purge** | ✅ Done | `/api/cron/purge-trash` empties trash past its 30 days: files first, while the rows naming them still exist, then the rows. Guarded by `CRON_SECRET` compared in constant time; unset closes the endpoint rather than opening it. `vercel.json` runs it daily. Idempotent — everything is chosen by a cutoff — so a missed day costs a day and a double run costs nothing |
+| — | **Scheduled purge** | ✅ Done | `/api/cron/purge-trash` empties trash past its 30 days — trips and posts alike, including the images inside a post now that `media.post_id` exists — files first, while the rows naming them still exist, then the rows. Guarded by `CRON_SECRET` compared in constant time; unset closes the endpoint rather than opening it. `vercel.json` runs it daily. Idempotent — everything is chosen by a cutoff — so a missed day costs a day and a double run costs nothing |
 | — | CI (GitHub Actions) | ⬜ Not started | lint/typecheck/test all pass locally |
 | — | Sentry + PostHog | ⬜ Not started | Plan wants the funnel instrumented on day one |
 
@@ -209,31 +209,26 @@ open, revoke and pull-back.
    working — a signed URL would expire within the hour. That makes it as exposed as an unlisted
    link before the post is published, which the studio states next to the button. Serving post
    images through a resolver that checks the post's visibility would close it properly.
-6. **A purged post keeps its pictures.** The daily purge removes expired trips, their media
-   rows and the files behind them, and expired posts — but `media` has no `post_id`, so an image
-   placed inside a post cannot be found from the post that held it. Those objects survive their
-   post. Closing it needs a column and a migration, and until then it is stated in the SQL
-   function's own comment rather than left to be discovered.
-7. **The trip page still has no route map.** `MapView` now takes markers, a route line and a
+6. **The trip page still has no route map.** `MapView` now takes markers, a route line and a
    set of points to frame itself to — that is what the vault's map tab is built on — so the
    same three props would draw the route timeline on `/trips/[id]` and on the public `/t/[slug]`.
    Nothing blocks it but the work.
-8. **The marketing nav has no mobile equivalent.** `MarketingHeader` hides its links below
+7. **The marketing nav has no mobile equivalent.** `MarketingHeader` hides its links below
    `sm`, which was survivable at two and is not at five — a phone visitor reaches Blogs, About,
    Pricing, Changelog and Contact only through the footer, which now also carries the three legal
    documents. It needs a menu, or the links need to wrap.
-9. **Nothing tells anyone a contact message arrived.** `submit_contact_message()` writes the row
+8. **Nothing tells anyone a contact message arrived.** `submit_contact_message()` writes the row
    and the sender is told it reached us, which is true; but the inbox is a table that somebody has
    to remember to open in Studio. The page promises an answer within about three working days, and
    nothing in the repo makes that happen. A database webhook or a scheduled digest to
    `BRAND.support.email` would close it, and `handled_at` is already there to mark what has been
    answered.
-10. **Analytics can only show budgets that were *planned*.** `trips.budget_planned` is the
+9. **Analytics can only show budgets that were *planned*.** `trips.budget_planned` is the
    only money in the schema; the `expenses` table screen 22 needs is not migrated, so there is
    nothing to compare a plan against. The screen says so rather than labelling a plan as spend,
    and the arithmetic groups by currency rather than converting — adding ₹40,000 to $400 needs an
    exchange rate this codebase does not have and should not invent.
-11. **A partially pinned trip reads as unmeasured.** `totalDistanceKm` skips places without
+10. **A partially pinned trip reads as unmeasured.** `totalDistanceKm` skips places without
    coordinates, so one pin among three measures nothing. That is the honest answer — the legs it
    cannot see are real distance — but the resume shows no explanation for why a trip with places
    has no number.

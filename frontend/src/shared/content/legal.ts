@@ -188,10 +188,6 @@ const privacy: LegalDoc = {
             'Server logs are kept briefly for security and debugging, then discarded.',
           ],
         },
-        {
-          kind: 'note',
-          text: 'One exception, stated because it is ours rather than yours: an image placed inside a blog post is not linked to that post in a way we can follow, so purging an expired post reclaims the post and leaves its pictures. They are unreachable from anywhere in the product; they are still on disk. Deleting your account removes them, because that goes by account rather than by post.',
-        },
       ],
     },
     {
