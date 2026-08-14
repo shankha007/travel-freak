@@ -55,6 +55,17 @@ their own line — nobody outside the repo ever saw them.
 
 ### Added
 
+- **Export and account deletion** — the two rights the privacy policy has been
+  promising by email are buttons now. **Download my data** gives you a JSON file
+  with every row this account owns: trips, places, photo details, notes, posts,
+  wishlist and globe. It is on every plan including the free one, because a
+  right to your own data is not something to sell back to you. The file
+  documents itself — a version, a date, and a readme saying, among other things,
+  that photographs are files rather than rows, so it lists them and where they
+  live without carrying the bytes. **Delete my account** removes the rows *and*
+  the files behind them, and stops every public page you have resolving. It asks
+  for your username and your password, and it cannot be undone — the 30-day
+  window is the trash, and this is not the trash.
 - **Settings** `/settings` — the last placeholder in the sidebar, and three
   screens on one page. **Profile**: username, display name, bio, where you are
   based and what you travel for. Renaming yourself says, before you save it,
@@ -191,6 +202,9 @@ their own line — nobody outside the repo ever saw them.
 
 ### Changed
 
+- **The privacy policy no longer says "write to us" about export and deletion.**
+  It said both were being built and were done by hand within 30 days. They are
+  on the settings page now, so it says that instead.
 - **Public pages now move a little.** Cards and sections rise into place as you
   scroll to them, once — scrolling back up replays nothing. Anyone whose system
   asks for reduced motion gets the fade without the movement, and a visitor with
@@ -312,6 +326,20 @@ their own line — nobody outside the repo ever saw them.
 
 ### Infrastructure
 
+- **The cascade behind account deletion is asserted, not assumed.** Deleting one
+  `auth.users` row is trusted to take the profile, trips, places, media rows,
+  posts, wishlist, share tokens, subscription, usage counters and the globe
+  aggregate with it. Sixteen new pgTAP assertions prove it does — including that
+  another account keeps everything it had, and that a contact message survives
+  its sender with the user id cleared rather than vanishing mid-conversation.
+  A foreign key added later without `on delete cascade` now fails a test rather
+  than quietly leaving a deleted person's trips in the database.
+- **Storage does not cascade, so it is purged by hand.** `server/account/purge.ts`
+  walks `<userId>/` in both buckets — recursively, because the keys are two and
+  three segments deep and Supabase lists one level at a time — and removes what
+  it finds in batches. Unit-tested against a fake bucket for the recursion, the
+  paging and the refusal to stray into another user's prefix; the assumptions the
+  fake encodes were then checked against the real storage API.
 - **`default_trip_visibility` is a setting rather than a column.** It has been in
   `profiles` since the first migration with nothing reading it; `/trips/new` now
   does. Editing a trip deliberately does not — an existing trip's visibility is

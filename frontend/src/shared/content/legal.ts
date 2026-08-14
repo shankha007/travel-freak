@@ -204,7 +204,7 @@ const privacy: LegalDoc = {
         },
         {
           kind: 'p',
-          text: `Export and account deletion are being built as self-service screens. Until those ship, write to ${PRIVACY} and we will do it by hand within 30 days. You may also complain to your data protection authority, or in India to the Data Protection Board.`,
+          text: `Export and deletion are buttons rather than requests: both live on your settings page and neither needs to go through us. The export is a JSON file containing every row this account owns; deleting removes those rows and the files behind them, and cannot be undone. For anything else — a correction you cannot make yourself, or a question about what we hold — write to ${PRIVACY} and we will answer within 30 days. You may also complain to your data protection authority, or in India to the Data Protection Board.`,
         },
       ],
     },

@@ -38,8 +38,8 @@ open, revoke and pull-back.
 | Memory & content | 7 | 0 | 0 | 0 |
 | Analytics & resume | 2 | 0 | 0 | 2 |
 | Public sharing | 5 | 0 | 0 | 0 |
-| Account | 2 | 1 | 0 | 4 |
-| **Total** | **57** | **4** | **0** | **16** |
+| Account | 3 | 1 | 0 | 3 |
+| **Total** | **58** | **4** | **0** | **15** |
 
 ---
 
@@ -162,7 +162,7 @@ open, revoke and pull-back.
 | 41 | **Privacy** | ✅ Done | The public-profile switch, and the visibility a new trip starts on — read by `/trips/new`, so it is a setting rather than a stored preference nothing consults. Editing a trip ignores it deliberately. **Not a toggle: EXIF.** `strip_exif_on_publish` still has nothing reading it and publication always strips; the screen says so plainly rather than offering a control whose off position would publish the GPS in someone's photographs |
 | 42 | Notifications | ⬜ Not started | Phase 1.1 |
 | 43 | Subscription & billing | ⬜ Not started | Phase 1.2 |
-| 44 | Data export & deletion | ⬜ Not started | Legal requirement (GDPR / DPDP) |
+| 44 | **Data export & deletion** | ✅ Done | `GET /api/export` streams every row the account owns as JSON, read through the *user's* client so RLS decides what is in it — a bug in that file cannot become a breach. Free on every plan; the file carries a version, a date and a readme saying photographs are files rather than rows. Deletion asks for username and password, purges both storage buckets by prefix (`server/account/purge.ts`, unit-tested and checked against the real storage API), then deletes the `auth.users` row and lets the cascade take the rest — 16 pgTAP assertions prove it does |
 | 46 | Admin panel | ⬜ Not started | Phase 1.2 |
 
 ## Global UI
@@ -226,11 +226,10 @@ open, revoke and pull-back.
    nothing in the repo makes that happen. A database webhook or a scheduled digest to
    `BRAND.support.email` would close it, and `handled_at` is already there to mark what has been
    answered.
-10. **Export and account deletion are now promised on screen, and still done by hand.** The
-   privacy policy said it, and `/settings` says it again next to an email address — which makes it
-   the most visible unbuilt thing in the product. Screen 44 is the fix: a route that assembles the
-   user's rows as JSON, and a confirmed deletion that also clears their storage objects. Until
-   then every request is a person doing it manually inside 30 days.
+10. **A deleted account's photographs go, but the trash is still never purged.** Deletion
+   removes a leaving user's storage objects by prefix, which closes that hole. Gap 6 is the one
+   still open: a trip soft-deleted 40 days ago is unreachable to everyone and still on disk,
+   because nothing runs on a schedule to hard-delete past the window.
 11. **Analytics can only show budgets that were *planned*.** `trips.budget_planned` is the
    only money in the schema; the `expenses` table screen 22 needs is not migrated, so there is
    nothing to compare a plan against. The screen says so rather than labelling a plan as spend,

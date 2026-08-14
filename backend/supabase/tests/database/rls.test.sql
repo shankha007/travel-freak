@@ -1034,6 +1034,145 @@ select throws_ok(
   'and so is a topic that is not one of the seven'
 );
 
+-- ---------------------------------------------------------------------------
+-- Account deletion — screen 44
+--
+-- `deleteAccount` removes the storage objects itself and then deletes one row
+-- from auth.users, trusting `on delete cascade` for everything else. That trust
+-- is the thing worth testing: a foreign key added later without the cascade
+-- would leave a deleted person's trips in the database, and nothing in the
+-- application would notice or ever look again.
+--
+-- Alice is the fixture and is deleted here, which is why this is last.
+-- ---------------------------------------------------------------------------
+
+reset role;
+
+-- Something in every table that hangs off a user, so "it cascaded" is a claim
+-- about all of them rather than about the two that happen to have rows.
+insert into public.wishlist_items (user_id, country_code, title)
+values ('aaaaaaaa-0000-4000-8000-000000000001', 'PER', 'Machu Picchu');
+
+insert into public.visited_countries (user_id, country_code)
+values ('aaaaaaaa-0000-4000-8000-000000000001', 'ISL');
+
+select isnt(
+  (select count(*) from public.trips
+   where user_id = 'aaaaaaaa-0000-4000-8000-000000000001')::int,
+  0,
+  'alice has rows before the account is deleted'
+);
+
+delete from auth.users where id = 'aaaaaaaa-0000-4000-8000-000000000001';
+
+select is(
+  (select count(*) from public.profiles
+   where id = 'aaaaaaaa-0000-4000-8000-000000000001')::int,
+  0,
+  'deleting the auth user takes the profile'
+);
+
+select is(
+  (select count(*) from public.trips
+   where user_id = 'aaaaaaaa-0000-4000-8000-000000000001')::int,
+  0,
+  'and the trips'
+);
+
+select is(
+  (select count(*) from public.trip_places
+   where user_id = 'aaaaaaaa-0000-4000-8000-000000000001')::int,
+  0,
+  'and the places on them'
+);
+
+select is(
+  (select count(*) from public.media
+   where user_id = 'aaaaaaaa-0000-4000-8000-000000000001')::int,
+  0,
+  'and the media rows'
+);
+
+select is(
+  (select count(*) from public.blog_posts
+   where user_id = 'aaaaaaaa-0000-4000-8000-000000000001')::int,
+  0,
+  'and the posts'
+);
+
+select is(
+  (select count(*) from public.wishlist_items
+   where user_id = 'aaaaaaaa-0000-4000-8000-000000000001')::int,
+  0,
+  'and the wishlist'
+);
+
+select is(
+  (select count(*) from public.visited_countries
+   where user_id = 'aaaaaaaa-0000-4000-8000-000000000001')::int,
+  0,
+  'and the bare "been there" marks'
+);
+
+select is(
+  (select count(*) from public.visited_regions
+   where user_id = 'aaaaaaaa-0000-4000-8000-000000000001')::int,
+  0,
+  'and the globe aggregate built from them'
+);
+
+select is(
+  (select count(*) from public.share_links
+   where user_id = 'aaaaaaaa-0000-4000-8000-000000000001')::int,
+  0,
+  'and every share token, so no old link outlives the account'
+);
+
+select is(
+  (select count(*) from public.subscriptions
+   where user_id = 'aaaaaaaa-0000-4000-8000-000000000001')::int,
+  0,
+  'and the subscription'
+);
+
+select is(
+  (select count(*) from public.usage_counters
+   where user_id = 'aaaaaaaa-0000-4000-8000-000000000001')::int,
+  0,
+  'and the usage counters'
+);
+
+-- The other half of the claim: one person leaving takes nothing of anyone
+-- else's with them.
+select isnt(
+  (select count(*) from public.trips
+   where user_id = 'bbbbbbbb-0000-4000-8000-000000000002')::int,
+  0,
+  'and bob still has everything he had'
+);
+
+select is(
+  (select count(*) from public.profiles
+   where id = 'bbbbbbbb-0000-4000-8000-000000000002')::int,
+  1,
+  'including his profile'
+);
+
+-- A contact message deliberately survives its sender, detached: the column is
+-- `on delete set null`, because a support thread that vanishes mid-conversation
+-- helps nobody.
+select is(
+  (select count(*) from public.contact_messages where email = 'alice@rls.test')::int,
+  1,
+  'a message sent from the account outlives it, with its user id cleared'
+);
+
+select is(
+  (select user_id from public.contact_messages where email = 'alice@rls.test'),
+  null,
+  'and no longer points at a user that does not exist'
+);
+
 select * from finish();
 
 rollback;

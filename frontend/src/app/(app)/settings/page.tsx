@@ -1,10 +1,11 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { ArrowRight, Download, Trash2, Undo2, UserRound } from 'lucide-react'
+import { ArrowRight, Download, Undo2, UserRound } from 'lucide-react'
 import { getSettings } from '@/server/queries/settings'
 import { BRAND } from '@/shared/brand'
 import { ProfileForm } from '@/client/components/settings/profile-form'
 import { PrivacyForm } from '@/client/components/settings/privacy-form'
+import { DeleteAccount } from '@/client/components/settings/delete-account'
 import { ChangeEmailForm, ChangePasswordForm } from '@/client/components/settings/security-forms'
 import { Badge } from '@/client/components/ui/badge'
 import { Button } from '@/client/components/ui/button'
@@ -95,37 +96,26 @@ export default async function SettingsPage() {
             title="Your data"
             description="Everything you have written is yours, and leaving is not a punishment."
           >
-            <div className="space-y-5 text-sm text-muted-foreground">
-              <div className="flex gap-3">
-                <Download className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <div className="space-y-6 text-sm text-muted-foreground">
+              <div className="space-y-2">
+                <p className="font-medium text-foreground">Export everything</p>
                 <p>
-                  <span className="font-medium text-foreground">Export everything.</span> A full
-                  copy of your trips, places, notes and posts, on every plan including the free one.
-                  The self-service screen is not built yet — write to{' '}
-                  <a
-                    href={`mailto:${BRAND.support.privacyEmail}`}
-                    className="underline underline-offset-4 hover:text-foreground"
-                  >
-                    {BRAND.support.privacyEmail}
-                  </a>{' '}
-                  and we do it by hand within 30 days.
+                  A complete copy of your trips, places, photo details, notes, posts, wishlist and
+                  globe, as JSON. On every plan including the free one — a right to your own data is
+                  not something this product sells you back. The photographs themselves are files
+                  rather than rows, so the export lists them and says where each one lives without
+                  carrying the bytes; the file says so too.
                 </p>
+                <Button variant="outline" nativeButton={false} render={<a href="/api/export" />}>
+                  <Download className="size-4" aria-hidden />
+                  Download my data
+                </Button>
               </div>
 
-              <div className="flex gap-3">
-                <Trash2 className="mt-0.5 size-4 shrink-0" aria-hidden />
-                <p>
-                  <span className="font-medium text-foreground">Delete your account.</span> Also by
-                  hand today, from the same address, and also within 30 days. It removes your rows
-                  and your files; backups roll off on their own cycle. Ask for the export first if
-                  you want one — deletion does not keep a copy for you.
-                </p>
-              </div>
-
-              <div className="flex gap-3">
+              <div className="flex gap-3 border-t pt-5">
                 <Undo2 className="mt-0.5 size-4 shrink-0" aria-hidden />
                 <p>
-                  <span className="font-medium text-foreground">Something deleted by mistake?</span>{' '}
+                  <span className="font-medium text-foreground">Deleted something by mistake?</span>{' '}
                   Trips and posts sit in the{' '}
                   <Link
                     href="/trash"
@@ -133,21 +123,37 @@ export default async function SettingsPage() {
                   >
                     trash
                   </Link>{' '}
-                  for 30 days, and come back with everything still attached.
+                  for 30 days and come back with everything still attached. That is a different
+                  thing from what is below.
                 </p>
               </div>
 
-              <p>
-                The first two are rights rather than favours, and the{' '}
+              <div className="space-y-2 border-t pt-5">
+                <p className="font-medium text-foreground">Delete your account</p>
+                <p>
+                  Removes your rows and the files behind them, and stops every public page you have
+                  resolving. It cannot be undone and there is no 30-day window on it. Take the
+                  export first if you want one — deleting does not keep a copy for you.
+                </p>
+                <DeleteAccount username={settings.username} />
+              </div>
+
+              <p className="border-t pt-5">
+                Both of these are rights rather than favours, and the{' '}
                 <Link
                   href="/privacy#your-rights"
                   className="underline underline-offset-4 hover:text-foreground"
                 >
                   privacy policy
                 </Link>{' '}
-                says so in the same words. They will become buttons on this page; until they do, the
-                address is the honest answer rather than a control that opens a ticket you cannot
-                see.
+                says so in the same words. Anything you would rather ask a person about goes to{' '}
+                <a
+                  href={`mailto:${BRAND.support.privacyEmail}`}
+                  className="underline underline-offset-4 hover:text-foreground"
+                >
+                  {BRAND.support.privacyEmail}
+                </a>
+                .
               </p>
             </div>
           </Section>

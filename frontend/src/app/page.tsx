@@ -58,12 +58,24 @@ const FEATURES = [
   },
 ]
 
-export default function Home() {
+export default async function Home({ searchParams }: PageProps<'/'>) {
+  // Where `deleteAccount` lands. The account is gone by the time this renders,
+  // so there is nowhere else to say it — an acknowledgement on a screen behind
+  // a login would be a message nobody can reach.
+  const { deleted } = await searchParams
+
   return (
     <div className="flex flex-1 flex-col">
       <MarketingHeader />
 
       <main className="flex flex-1 flex-col">
+        {deleted && (
+          <div role="status" className="border-b bg-muted/40 px-4 py-3 text-center text-sm md:px-6">
+            Your account and everything in it have been deleted. Thank you for having tried this —
+            you are welcome back any time, and you would be starting fresh.
+          </div>
+        )}
+
         {/* Hero */}
         <section className="mx-auto grid w-full max-w-6xl flex-1 items-center gap-8 px-4 py-12 md:px-6 lg:grid-cols-2 lg:py-20">
           <div className="space-y-6">
