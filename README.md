@@ -70,6 +70,70 @@ Run these from `backend/`:
 `db:types` writes to `frontend/src/shared/types/database.ts` — the one file that crosses
 the boundary, because both Supabase clients are typed against it.
 
+## Making a change
+
+`master` is protected. Pushing to it directly is rejected by the remote, whatever
+your permissions:
+
+```
+remote: error: GH013: Repository rule violations found for refs/heads/master.
+remote: - 2 of 2 required status checks are expected.
+```
+
+That is not a misconfiguration to work around — a brand-new commit cannot already
+have passing checks, so every change goes through a pull request:
+
+```bash
+git switch -c what-you-are-doing
+# work, commit
+git push -u origin what-you-are-doing
+```
+
+Open a pull request. CI runs two jobs — **Frontend** and **Database** — and both
+must pass before the merge button unlocks. The branch also has to be up to date
+with `master` first, so if someone lands something while yours is open, merge
+`master` into your branch and let CI run again.
+
+### Before you push
+
+CI runs exactly this. Running it yourself takes about a minute and saves waiting
+three to be told the same thing:
+
+```bash
+cd frontend && npm run format:check && npm run lint && npm run typecheck && npm test && npm run build
+cd ../backend && npm run db:test
+```
+
+The second line needs the local stack up (`npm run db:start`, and therefore
+Docker). If you have not touched `backend/`, the first line is what CI's Frontend
+job runs and is usually enough.
+
+### Two things that are easy to forget
+
+**The changelog entry.** `docs/CHANGELOG.md` is published at `/changelog`, so it
+is part of the product rather than a courtesy. Anything a user could notice gets
+an entry under `## Unreleased`, in the same commit that ships it.
+
+Note what is and is not enforced. The suite *parses* the file, so a malformed
+entry — an unknown section heading, a repeated one, an undated release — fails
+`npm test` rather than the page. Nothing checks that you added one. Forgetting is
+green in CI and invisible until someone reads the changelog looking for a change
+that is in the product and not in the list.
+
+**The database types.** If you touch anything in `backend/supabase/migrations`,
+run `npm run db:types` in `backend/` and commit the result. This one CI does
+catch, and it is the only thing that would: a migration that changes a table
+without regenerating the types compiles, passes every test, and is wrong only at
+runtime.
+
+### Commits
+
+Titles here read as sentences about what changed for the person using the app —
+"Make leaving as easy as arriving, and take the photographs with you" — rather
+than as a summary of the diff. The body is for the *why*, especially the
+decisions that a reader would otherwise have to reconstruct: what was rejected,
+what is deliberately not covered, and what is known to be still wrong.
+
 ## Why the app is not split further
 
 `frontend/` is a full-stack Next.js app, so some of it genuinely runs on a server: Route
