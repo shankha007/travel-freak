@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { checkTripQuota } from '@/server/entitlements'
+import { getDefaultTripVisibility } from '@/server/queries/settings'
 import { TripForm } from '@/client/components/trips/trip-form'
 import { Button } from '@/client/components/ui/button'
 import { Card, CardContent } from '@/client/components/ui/card'
@@ -16,7 +17,10 @@ export const dynamic = 'force-dynamic'
 export default async function NewTripPage() {
   // Checked here as well as in the action: this turns the wall into a page the
   // user can read before filling in a form they cannot submit.
-  const quota = await checkTripQuota()
+  const [quota, defaultVisibility] = await Promise.all([
+    checkTripQuota(),
+    getDefaultTripVisibility(),
+  ])
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
@@ -36,7 +40,12 @@ export default async function NewTripPage() {
 
       <div className="max-w-2xl">
         {quota.allowed ? (
-          <TripForm mode="create" tripsUsed={quota.used} tripLimit={quota.limit} />
+          <TripForm
+            mode="create"
+            tripsUsed={quota.used}
+            tripLimit={quota.limit}
+            defaultVisibility={defaultVisibility}
+          />
         ) : (
           <Card>
             <CardContent className="space-y-3 p-6">

@@ -55,6 +55,17 @@ their own line — nobody outside the repo ever saw them.
 
 ### Added
 
+- **Settings** `/settings` — the last placeholder in the sidebar, and three
+  screens on one page. **Profile**: username, display name, bio, where you are
+  based and what you travel for. Renaming yourself says, before you save it,
+  that your public address moves and the old links stop working. **Privacy**:
+  the switch that decides whether `/u/<you>` exists at all, and what a new trip
+  starts as — private, unlisted or public — which is applied the next time you
+  create one and never to the trips you already have. **Account**: change your
+  email, which sends a link to the new address and changes nothing until you
+  open it, and change your password, which asks for the current one first.
+  Photo metadata is stated rather than offered: publishing always strips GPS,
+  and the position that would leave it in is not a preference worth having.
 - **Analytics** `/analytics` — the screen behind the last stub in the sidebar.
   `/timeline` says what happened and `/resume` says what it adds up to; this
   says what shape it is. Days away per year as a chart, with travel booked
@@ -289,6 +300,10 @@ their own line — nobody outside the repo ever saw them.
 
 ### Fixed
 
+- **A rejected profile save no longer eats what you wrote.** Choosing a username
+  someone already has used to hand back the error and quietly restore the old
+  bio, so the ten minutes spent rewriting it went with it. Everything typed
+  comes back with the message now.
 - **A wide screen no longer drags the whole app sideways.** `main` in the app
   shell could not shrink below its widest child, so anything genuinely wide gave
   every page a horizontal scrollbar instead of scrolling inside the one element
@@ -297,6 +312,11 @@ their own line — nobody outside the repo ever saw them.
 
 ### Infrastructure
 
+- **`default_trip_visibility` is a setting rather than a column.** It has been in
+  `profiles` since the first migration with nothing reading it; `/trips/new` now
+  does. Editing a trip deliberately does not — an existing trip's visibility is
+  a stored fact, and re-deriving it from a preference changed afterwards would
+  republish something on the next save.
 - **`shared/analytics.ts`, and the line it draws.** The per-year arithmetic,
   trip lengths, budget grouping and destination ranking are pure and unit-tested
   — 28 assertions, several of which are about refusing to answer. `HAPPENED` is

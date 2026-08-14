@@ -129,10 +129,10 @@ export const NAV_ITEMS: NavItem[] = [
     href: '/settings',
     label: 'Settings',
     icon: 'Settings',
-    status: 'stub',
+    status: 'live',
     phase: 'M',
     screen: 39,
-    summary: 'Profile, account and security, privacy including the EXIF-strip toggle.',
+    summary: 'Profile, privacy and default trip visibility, email and password.',
   },
   {
     href: '/trash',

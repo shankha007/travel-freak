@@ -108,12 +108,20 @@ export function TripForm({
   initial,
   tripsUsed,
   tripLimit,
+  defaultVisibility = 'private',
 }: {
   mode?: 'create' | 'edit'
   tripId?: string
   initial?: TripFormInitial
   tripsUsed?: number
   tripLimit?: number | null
+  /**
+   * What a new trip starts as, from `profiles.default_trip_visibility` — the
+   * setting on `/settings`. Only consulted when creating: an existing trip's
+   * visibility is a stored fact, and re-deriving it from a preference changed
+   * afterwards would republish something on the next save.
+   */
+  defaultVisibility?: string
 }) {
   const isEdit = mode === 'edit'
   const [state, formAction] = useActionState(isEdit ? updateTrip : createTrip, initialState)
@@ -129,7 +137,7 @@ export function TripForm({
   // its dates — a completed trip stays completed.
   const [statusTouched, setStatusTouched] = useState(isEdit)
   const [status, setStatus] = useState<string>(initial?.status ?? 'planning')
-  const [visibility, setVisibility] = useState<string>(initial?.visibility ?? 'private')
+  const [visibility, setVisibility] = useState<string>(initial?.visibility ?? defaultVisibility)
   const [budget, setBudget] = useState(initial?.budgetPlanned ?? '')
   const [places, setPlaces] = useState<PlaceDraft[]>(
     initial?.places.length ? initial.places.map((p) => ({ key: p.id, ...p })) : [emptyPlace()]

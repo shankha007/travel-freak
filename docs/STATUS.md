@@ -38,8 +38,8 @@ open, revoke and pull-back.
 | Memory & content | 7 | 0 | 0 | 0 |
 | Analytics & resume | 2 | 0 | 0 | 2 |
 | Public sharing | 5 | 0 | 0 | 0 |
-| Account | 0 | 0 | 1 | 6 |
-| **Total** | **55** | **3** | **1** | **18** |
+| Account | 2 | 1 | 0 | 4 |
+| **Total** | **57** | **4** | **0** | **16** |
 
 ---
 
@@ -157,9 +157,9 @@ open, revoke and pull-back.
 
 | # | Feature | Status | Notes |
 |---|---|---|---|
-| 39 | Profile settings | 🔵 Stub | One `/settings` route covers 39–41 for now |
-| 40 | Account & security | ⬜ Not started | |
-| 41 | Privacy + EXIF toggle | ⬜ Not started | `strip_exif_on_publish` column exists, defaults on |
+| 39 | **Profile settings** `/settings` | ✅ Done | Username, display name, bio, home country and city, and interests. A rename warns — before it is saved — that the public address moves and old links break, and a taken username comes back as a sentence with everything else you typed still in the form. Interests are parsed by `parseInterests`, which is unit-tested because it is the one lossy step: duplicates, blanks and runs of whitespace have to disappear rather than land on a public profile |
+| 40 | **Account & security** | 🟡 Partial | Change of email — the link goes to the new address and nothing changes until it is opened, with the pending address shown so the wait is visible — and change of password, which verifies the current one by hand rather than relying on `secure_password_change` being set. **2FA and session management are not built** |
+| 41 | **Privacy** | ✅ Done | The public-profile switch, and the visibility a new trip starts on — read by `/trips/new`, so it is a setting rather than a stored preference nothing consults. Editing a trip ignores it deliberately. **Not a toggle: EXIF.** `strip_exif_on_publish` still has nothing reading it and publication always strips; the screen says so plainly rather than offering a control whose off position would publish the GPS in someone's photographs |
 | 42 | Notifications | ⬜ Not started | Phase 1.1 |
 | 43 | Subscription & billing | ⬜ Not started | Phase 1.2 |
 | 44 | Data export & deletion | ⬜ Not started | Legal requirement (GDPR / DPDP) |
@@ -226,12 +226,17 @@ open, revoke and pull-back.
    nothing in the repo makes that happen. A database webhook or a scheduled digest to
    `BRAND.support.email` would close it, and `handled_at` is already there to mark what has been
    answered.
-10. **Analytics can only show budgets that were *planned*.** `trips.budget_planned` is the
+10. **Export and account deletion are now promised on screen, and still done by hand.** The
+   privacy policy said it, and `/settings` says it again next to an email address — which makes it
+   the most visible unbuilt thing in the product. Screen 44 is the fix: a route that assembles the
+   user's rows as JSON, and a confirmed deletion that also clears their storage objects. Until
+   then every request is a person doing it manually inside 30 days.
+11. **Analytics can only show budgets that were *planned*.** `trips.budget_planned` is the
    only money in the schema; the `expenses` table screen 22 needs is not migrated, so there is
    nothing to compare a plan against. The screen says so rather than labelling a plan as spend,
    and the arithmetic groups by currency rather than converting — adding ₹40,000 to $400 needs an
    exchange rate this codebase does not have and should not invent.
-11. **A partially pinned trip reads as unmeasured.** `totalDistanceKm` skips places without
+12. **A partially pinned trip reads as unmeasured.** `totalDistanceKm` skips places without
    coordinates, so one pin among three measures nothing. That is the honest answer — the legs it
    cannot see are real distance — but the resume shows no explanation for why a trip with places
    has no number.
