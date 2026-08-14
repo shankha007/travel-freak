@@ -232,3 +232,13 @@ open, revoke and pull-back.
    coordinates, so one pin among three measures nothing. That is the honest answer — the legs it
    cannot see are real distance — but the resume shows no explanation for why a trip with places
    has no number.
+11. **Every navigation revalidates the session twice.** `src/proxy.ts` calls
+   `supabase.auth.getUser()` so the auth cookies are refreshed, and then the app shell calls it
+   again through `getSessionUser()`. `cache()` dedupes the second one within a render, but the
+   proxy runs in a separate pass, so both hit the Supabase auth server — two network round trips
+   in front of every screen, before any of the page's own queries start. Both calls are load
+   bearing as written: the proxy is the only place that can write refreshed cookies, and
+   `getUser()` is deliberate where `getSession()` would trust the cookie. Passing the verified
+   user from the proxy to the render — a request header, or a short-lived per-request cache — is
+   the fix, and it is the largest latency left on an authenticated page now that the screens
+   paint immediately.

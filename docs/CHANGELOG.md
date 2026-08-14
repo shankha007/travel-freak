@@ -49,10 +49,28 @@ their own line — nobody outside the repo ever saw them.
 
 ## Unreleased
 
+### Changed
+
+- **The app responds the moment you click.** Every screen behind the login is
+  rendered per request, and Next.js will not prefetch a route like that unless
+  it declares a loading state — so none of them were prefetched, and a click
+  bought a full server round trip with the old screen still on screen and
+  nothing to say the click had landed. Each screen now has one, so the layout
+  and a skeleton of the page paint immediately and the content fills in behind
+  them. The sidebar stays live while it happens, and a second click can change
+  its mind without waiting for the first to finish.
+- **Going back is instant.** Returning to a screen you have already opened no
+  longer re-runs its queries from scratch; results are held for 30 seconds, and
+  anything you change yourself clears them straight away, so an edit still shows
+  up the moment you navigate.
+- **Roughly 595 KB less to download.** The sidebar was pulling in the whole
+  icon library — about 1,500 icons — to draw the eleven it uses, on every
+  authenticated page. It now asks for the eleven.
+
 ### Infrastructure
 
 - **CI runs on every push and pull request.** Two jobs: the frontend one checks
-  formatting, lint, types, the 379 unit tests and a production build; the
+  formatting, lint, types, the 381 unit tests and a production build; the
   database one boots the Supabase stack and runs the 122 pgTAP assertions that
   are the real guarantee one traveller cannot read another's trips. It also
   regenerates the database types and fails if they differ from what is

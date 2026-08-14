@@ -28,6 +28,25 @@ const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]', '::1']
 const usingLocalSupabase = supabase !== null && LOCAL_HOSTS.includes(supabase.hostname)
 
 const nextConfig: NextConfig = {
+  /**
+   * Every screen behind the login is `force-dynamic`, and the client cache does
+   * not retain a dynamic segment at all by default. That makes returning to a
+   * page a full server round trip even when you left it four seconds ago —
+   * stepping back from a trip to the trip list re-runs the list's queries, and
+   * the back button costs as much as the first visit did.
+   *
+   * Thirty seconds is Next's own pre-15 default and is short enough that the
+   * app never feels like it is showing yesterday's data. It is also not the
+   * only thing keeping the cache honest: every mutation in `server/actions`
+   * calls `revalidatePath`, which drops the affected entries immediately, so an
+   * edit is reflected on the next navigation rather than up to 30s later. The
+   * window that remains is a change made in another tab or by another device.
+   */
+  experimental: {
+    staleTimes: {
+      dynamic: 30,
+    },
+  },
   images: {
     dangerouslyAllowLocalIP: usingLocalSupabase,
     remotePatterns: supabase
