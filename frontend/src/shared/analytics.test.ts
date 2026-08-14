@@ -3,7 +3,6 @@ import {
   budgetByCurrency,
   byTripType,
   favouriteDestinations,
-  inclusiveDays,
   perYear,
   travelDaysOfYear,
   tripLengths,
@@ -87,17 +86,6 @@ describe('perYear', () => {
 })
 
 describe('tripLengths', () => {
-  it('counts both ends, the way people count holidays', () => {
-    // Friday to Sunday is a three-day weekend, not two.
-    expect(inclusiveDays('2026-03-06', '2026-03-08')).toBe(3)
-    expect(inclusiveDays('2026-03-06', '2026-03-06')).toBe(1)
-  })
-
-  it('refuses dates that run backwards', () => {
-    expect(inclusiveDays('2026-03-08', '2026-03-06')).toBeNull()
-    expect(inclusiveDays('not a date', '2026-03-06')).toBeNull()
-  })
-
   it('reports the longest, the shortest and the mean', () => {
     const summary = tripLengths([
       trip({ startDate: '2026-01-01', endDate: '2026-01-10' }), // 10

@@ -139,7 +139,7 @@ open, revoke and pull-back.
 | # | Feature | Status | Notes |
 |---|---|---|---|
 | 32 | **Analytics** `/analytics` | ✅ Done | Days away per year, with travel booked stacked apart from travel taken and the empty years drawn rather than skipped; longest, shortest and average trip; distance with the count of trips it could actually measure. Behind `analytics_advanced`: the day-by-day calendar, who you travel with, the countries you return to, and planned budgets grouped per currency — never summed across them, because there is no exchange rate here. `shared/analytics.ts` is pure and holds all of it, with 28 assertions |
-| 33 | **Travel resume** `/resume` | ✅ Done | Countries, regions, trips, travel days, years travelling, distance, and distinct places by kind — cities, mountains, beaches, UNESCO sites. Plus the share panel: public URL, copy button, the switch that publishes the profile, and display name and bio |
+| 33 | **Travel resume** `/resume` | ✅ Done | Countries, regions, trips, travel days — counted by `totalDaysAway` in `shared/timeline.ts`, the same definition the timeline and analytics use, so the three cannot disagree — years travelling, distance, and distinct places by kind — cities, mountains, beaches, UNESCO sites. Plus the share panel: public URL, copy button, the switch that publishes the profile, and display name and bio |
 | 34 | Travel Wrapped | ⬜ Not started | Phase 1.2 |
 | 35 | Achievements & XP | ⬜ Not started | Phase 1.2; tables not migrated |
 
@@ -226,22 +226,16 @@ open, revoke and pull-back.
    nothing in the repo makes that happen. A database webhook or a scheduled digest to
    `BRAND.support.email` would close it, and `handled_at` is already there to mark what has been
    answered.
-10. **`/resume` and `/analytics` disagree about how many days you have been away.** The
-   share card for the demo profile says 103 days and the analytics screen says 104, because
-   `resume.ts` measures a trip as end minus start while `analytics.ts` and `timeline.ts` count
-   both ends the way people count holidays. Two of the three agree; the resume — and the
-   `public_resume_stats()` function behind a visitor's view of it — is the one to change, which
-   means a migration as well as a file.
-11. **A deleted account's photographs go, but the trash is still never purged.** Deletion
+10. **A deleted account's photographs go, but the trash is still never purged.** Deletion
    removes a leaving user's storage objects by prefix, which closes that hole. Gap 6 is the one
    still open: a trip soft-deleted 40 days ago is unreachable to everyone and still on disk,
    because nothing runs on a schedule to hard-delete past the window.
-12. **Analytics can only show budgets that were *planned*.** `trips.budget_planned` is the
+11. **Analytics can only show budgets that were *planned*.** `trips.budget_planned` is the
    only money in the schema; the `expenses` table screen 22 needs is not migrated, so there is
    nothing to compare a plan against. The screen says so rather than labelling a plan as spend,
    and the arithmetic groups by currency rather than converting — adding ₹40,000 to $400 needs an
    exchange rate this codebase does not have and should not invent.
-13. **A partially pinned trip reads as unmeasured.** `totalDistanceKm` skips places without
+12. **A partially pinned trip reads as unmeasured.** `totalDistanceKm` skips places without
    coordinates, so one pin among three measures nothing. That is the honest answer — the legs it
    cannot see are real distance — but the resume shows no explanation for why a trip with places
    has no number.

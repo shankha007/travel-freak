@@ -12,6 +12,7 @@ import {
   type ResumePlace,
 } from '@/shared/resume'
 import { TOTAL_COUNTRIES } from '@/shared/geo/countries'
+import { totalDaysAway } from '@/shared/timeline'
 import { pointFrom } from '@/shared/geo/point'
 import type { Database } from '@/shared/types/database'
 
@@ -184,7 +185,7 @@ export async function getResumeData(
     supabase
       .from('trips')
       .select(
-        'id, title, slug, summary, start_date, end_date, visibility, published_at, cover_media_id, trip_places ( country_code )'
+        'id, title, slug, summary, start_date, end_date, status, visibility, published_at, cover_media_id, trip_places ( country_code )'
       )
       .eq('user_id', profile.id)
       .is('deleted_at', null)
@@ -278,7 +279,7 @@ type ResumeCounters = Pick<
   'trips' | 'places' | 'yearsTravelling' | 'travelDays' | 'firstTrip' | 'latestTrip'
 >
 
-type TripRow = { start_date: string | null; end_date: string | null }
+type TripRow = { start_date: string | null; end_date: string | null; status: string }
 
 function ownCounters(trips: TripRow[], places: ResumePlace[]): ResumeCounters {
   const dates = trips.map((t) => t.start_date)
@@ -288,11 +289,14 @@ function ownCounters(trips: TripRow[], places: ResumePlace[]): ResumeCounters {
     trips: trips.length,
     places: countByKind(places),
     yearsTravelling: yearsTravelling(dates),
-    travelDays: trips.reduce((sum, t) => {
-      if (!t.start_date || !t.end_date) return sum
-      const ms = new Date(t.end_date).getTime() - new Date(t.start_date).getTime()
-      return sum + Math.max(0, Math.round(ms / 86_400_000))
-    }, 0),
+    // `totalDaysAway` rather than the subtraction that used to live here. That
+    // one measured a trip as its end minus its start — a Friday-to-Sunday
+    // weekend as two days — and counted trips nobody had taken yet, so the same
+    // account read 103 days on the resume and 104 on the analytics screen. The
+    // definition is the timeline's now, and all three read it from there.
+    travelDays: totalDaysAway(
+      trips.map((t) => ({ startDate: t.start_date, endDate: t.end_date, status: t.status }))
+    ),
     firstTrip: sorted[0] ?? null,
     latestTrip: sorted.at(-1) ?? null,
   }

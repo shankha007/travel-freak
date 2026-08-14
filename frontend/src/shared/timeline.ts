@@ -1,10 +1,18 @@
 /**
- * The Travel Timeline — screen 31.
+ * The Travel Timeline — screen 31 — and the day arithmetic three screens share.
  *
  * Everything that happened, by year. The arithmetic lives here rather than in
  * the page because a timeline is a set of claims about someone's life — "you
  * spent 41 days away in 2025", "Japan was new that year" — and claims of that
  * kind deserve tests rather than a rendering that looks about right.
+ *
+ * `HAPPENED`, `inclusiveDays` and `daysInYear` are exported because the
+ * timeline, the analytics screen and the travel resume all answer "how many
+ * days have you been away", and for a while they answered it differently: the
+ * resume measured a trip as its end minus its start and counted trips that had
+ * not happened yet, so the same account read 103 days on one screen and 104 on
+ * another. Two numbers for one life is worse than either number being slightly
+ * off, so the definition lives in one place and the three of them import it.
  */
 
 export interface TimelineTripInput {
@@ -74,6 +82,40 @@ export function yearOf(iso: string | null): number | null {
   if (!iso) return null
   const year = Number(iso.slice(0, 4))
   return Number.isInteger(year) ? year : null
+}
+
+/**
+ * A whole trip's length in days, both ends counted.
+ *
+ * Friday to Sunday is a three-day weekend, not two, which is how people count
+ * holidays and therefore how a product about holidays has to count them.
+ * Returns null rather than 0 for dates that are missing or backwards, so a
+ * caller can tell "no length" from "a trip of no days".
+ */
+export function inclusiveDays(start: string | null, end: string | null): number | null {
+  if (!start || !end) return null
+
+  const from = new Date(`${start.slice(0, 10)}T00:00:00Z`)
+  const to = new Date(`${end.slice(0, 10)}T00:00:00Z`)
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to < from) return null
+
+  return Math.round((to.getTime() - from.getTime()) / 86_400_000) + 1
+}
+
+/**
+ * Total days away over a set of trips.
+ *
+ * Only trips that have happened, and only the ones that carry both dates. A
+ * booking in November is not time spent away, and counting it would make the
+ * number climb every time somebody planned something.
+ */
+export function totalDaysAway(
+  trips: { startDate: string | null; endDate: string | null; status: string }[]
+): number {
+  return trips.reduce((sum, trip) => {
+    if (!HAPPENED.has(trip.status)) return sum
+    return sum + (inclusiveDays(trip.startDate, trip.endDate) ?? 0)
+  }, 0)
 }
 
 /**

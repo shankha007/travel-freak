@@ -326,6 +326,14 @@ their own line — nobody outside the repo ever saw them.
 
 ### Fixed
 
+- **Your travel resume was undercounting your days away.** It measured a trip as
+  its end date minus its start — a Friday-to-Sunday weekend as two days — while
+  counting trips you had only booked. The timeline and the analytics screen have
+  always counted both ends and only travel actually taken, so the same account
+  read 103 days in one place and 104 in another. The two mistakes pulled in
+  opposite directions, which is why the number looked plausible for as long as
+  it did. One definition now, in one file, read by all three — and by the share
+  card and the public profile, which get it from the database.
 - **Public trips without a cover photo had no share card at all.** The page said
   "use the cover image" and, for a trip with no cover, said it in a way that
   suppressed the fallback rather than leaving room for one. Trips with a cover
@@ -343,6 +351,12 @@ their own line — nobody outside the repo ever saw them.
 
 ### Infrastructure
 
+- **`inclusiveDays` and `totalDaysAway` live in `shared/timeline.ts`**, beside
+  `HAPPENED` and `daysInYear`, because "how many days have you been away" is one
+  question three screens ask. `public_resume_stats()` gets the same treatment in
+  migration `20260814000200` — the SQL half of the same definition — with two
+  pgTAP assertions holding it there: five days for 1–5 April, and a ten-day
+  booking that adds nothing until its status says it happened.
 - **The share cards draw a real map, from the geometry the maps already use.**
   `shared/geo/project.ts` turns country outlines into SVG path data with an
   equirectangular projection — crude, and indistinguishable from a good one at

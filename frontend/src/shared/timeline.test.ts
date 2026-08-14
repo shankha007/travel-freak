@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   buildTimeline,
   daysInYear,
+  inclusiveDays,
+  totalDaysAway,
   yearOf,
   type TimelinePostInput,
   type TimelineTripInput,
@@ -39,6 +41,54 @@ describe('yearOf', () => {
 
   it('has no year for a missing date', () => {
     expect(yearOf(null)).toBeNull()
+  })
+})
+
+describe('inclusiveDays', () => {
+  it('counts both ends, the way people count holidays', () => {
+    // Friday to Sunday is a three-day weekend, not two.
+    expect(inclusiveDays('2026-03-06', '2026-03-08')).toBe(3)
+    expect(inclusiveDays('2026-03-06', '2026-03-06')).toBe(1)
+  })
+
+  it('refuses dates that are missing, nonsense or backwards', () => {
+    expect(inclusiveDays('2026-03-08', '2026-03-06')).toBeNull()
+    expect(inclusiveDays('not a date', '2026-03-06')).toBeNull()
+    expect(inclusiveDays(null, '2026-03-06')).toBeNull()
+    expect(inclusiveDays('2026-03-06', null)).toBeNull()
+  })
+})
+
+describe('totalDaysAway', () => {
+  const away = (startDate: string | null, endDate: string | null, status = 'completed') => ({
+    startDate,
+    endDate,
+    status,
+  })
+
+  it('sums the trips that happened, both ends counted', () => {
+    // 5 + 3, not 4 + 2. This is the number the resume used to get wrong.
+    expect(
+      totalDaysAway([away('2026-03-01', '2026-03-05'), away('2026-04-10', '2026-04-12')])
+    ).toBe(8)
+  })
+
+  it('leaves out travel that has only been booked', () => {
+    expect(
+      totalDaysAway([
+        away('2026-03-01', '2026-03-05'),
+        away('2026-11-01', '2026-11-10', 'upcoming'),
+      ])
+    ).toBe(5)
+    expect(totalDaysAway([away('2026-11-01', '2026-11-10', 'planning')])).toBe(0)
+  })
+
+  it('counts a trip in progress, which is time already being spent away', () => {
+    expect(totalDaysAway([away('2026-08-08', '2026-08-15', 'ongoing')])).toBe(8)
+  })
+
+  it('skips a trip it cannot measure rather than guessing at one', () => {
+    expect(totalDaysAway([away('2026-03-01', null), away(null, null)])).toBe(0)
   })
 })
 

@@ -575,6 +575,43 @@ select is_empty(
   'while the trips themselves stay hidden'
 );
 
+-- Days away, counted the way the timeline and the analytics screen count them:
+-- both ends, and only trips that have happened. The function used to do neither,
+-- and the two errors cancelled just enough to look plausible.
+reset role;
+
+update public.trips
+set start_date = date '2025-04-01', end_date = date '2025-04-05', status = 'completed'
+where slug = 'rls-alice-public';
+
+update public.trips
+set start_date = date '2026-11-01', end_date = date '2026-11-10', status = 'upcoming'
+where slug = 'rls-alice-private';
+
+select set_config('request.jwt.claims', '{"role":"anon"}', true);
+set local role anon;
+
+-- Five, not four: 1 to 5 April is five days. And not fifteen: the ten-day
+-- November trip is booked, not taken.
+select is(
+  (select travel_days from public.public_resume_stats('aaaaaaaa-0000-4000-8000-000000000001')),
+  5,
+  'days away counts both ends, and counts only travel that has happened'
+);
+
+-- The same ten days, once they have been. Proves it is the status deciding
+-- rather than the date being in the future.
+reset role;
+update public.trips set status = 'completed' where slug = 'rls-alice-private';
+select set_config('request.jwt.claims', '{"role":"anon"}', true);
+set local role anon;
+
+select is(
+  (select travel_days from public.public_resume_stats('aaaaaaaa-0000-4000-8000-000000000001')),
+  15,
+  'and a booking that becomes a trip taken starts counting'
+);
+
 select is_empty(
   $$ select * from public.public_place_counts('bbbbbbbb-0000-4000-8000-000000000002') $$,
   'and bob, who is still private, is unchanged'

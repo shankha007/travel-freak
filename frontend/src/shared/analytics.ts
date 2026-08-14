@@ -1,4 +1,4 @@
-import { HAPPENED, daysInYear, yearOf } from '@/shared/timeline'
+import { HAPPENED, daysInYear, inclusiveDays, yearOf } from '@/shared/timeline'
 
 /**
  * The arithmetic behind Analytics — screen 32.
@@ -39,6 +39,9 @@ export interface AnalyticsTrip {
 export const TRIP_TYPES = ['solo', 'couple', 'friends', 'family', 'business'] as const
 
 export type TripType = (typeof TRIP_TYPES)[number]
+
+/** Re-exported: the length of a trip is the same question the timeline answers. */
+export { inclusiveDays }
 
 export const TRIP_TYPE_LABELS: Record<TripType, string> = {
   solo: 'Solo',
@@ -177,14 +180,6 @@ export function tripLengths(trips: AnalyticsTrip[]): TripLengthSummary | null {
     averageDays: Math.round((total / measured.length) * 10) / 10,
     measured: measured.length,
   }
-}
-
-/** Days from start to end with both ends counted, or null if the dates are nonsense. */
-export function inclusiveDays(start: string, end: string): number | null {
-  const from = new Date(`${start.slice(0, 10)}T00:00:00Z`)
-  const to = new Date(`${end.slice(0, 10)}T00:00:00Z`)
-  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to < from) return null
-  return Math.round((to.getTime() - from.getTime()) / 86_400_000) + 1
 }
 
 // ---------------------------------------------------------------------------
