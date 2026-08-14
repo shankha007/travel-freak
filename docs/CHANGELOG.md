@@ -49,7 +49,15 @@ their own line — nobody outside the repo ever saw them.
 
 ## Unreleased
 
-> Nothing since 0.12.0. Entries land here as they are merged.
+### Infrastructure
+
+- **CI runs on every push and pull request.** Two jobs: the frontend one checks
+  formatting, lint, types, the 379 unit tests and a production build; the
+  database one boots the Supabase stack and runs the 122 pgTAP assertions that
+  are the real guarantee one traveller cannot read another's trips. It also
+  regenerates the database types and fails if they differ from what is
+  committed — a migration that changes a table without them compiles fine and is
+  wrong only at runtime, and nothing else would have noticed.
 
 ## 0.12.0 — 2026-08-15 — Every screen in the sidebar, and the promises to go with them
 

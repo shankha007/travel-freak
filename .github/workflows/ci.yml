@@ -1,0 +1,116 @@
+name: CI
+
+# Everything the contributing notes ask you to run before pushing, run again
+# where forgetting is not an option. Two jobs rather than one: the frontend
+# checks take about a minute and the database job spends most of its time
+# waiting for Docker images, and there is no reason for the first to wait on the
+# second to tell you a type is wrong.
+on:
+  push:
+    branches: [master]
+  pull_request:
+  # So a red build can be re-run after a flake without an empty commit.
+  workflow_dispatch:
+
+# Least privilege: nothing here writes to the repository.
+permissions:
+  contents: read
+
+# A second push to the same branch makes the first run's answer irrelevant.
+# `master` is excluded from cancellation — its runs are the record of what the
+# default branch did, and cancelling one leaves a commit with no verdict.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+jobs:
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # `ci` rather than `install`: it installs exactly the lockfile and fails
+      # if package.json has drifted from it, which is the point of having one.
+      - run: npm ci
+
+      - name: Formatting
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Types
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      # The two variables the build actually reads. Both are validated by Zod at
+      # startup, so they have to parse — a URL and a non-empty string — but
+      # nothing here talks to Supabase: every page that would is dynamic, and
+      # the ones prerendered at build time (the changelog, the legal pages, the
+      # share cards) read committed files. Deliberately not real keys: a build
+      # that needs production credentials is a build nobody can reproduce.
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://ci.invalid.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: not-a-real-key
+
+  database:
+    name: Database
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pinned rather than `latest`. The generated-types check below compares
+      # this CLI's output against a committed file, so a CLI release that
+      # changes that output by a line would turn every unrelated pull request
+      # red. Bump it deliberately, with the regenerated types in the same commit.
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.113.0
+
+      # The whole stack, not just Postgres. `auth.users` is created by GoTrue's
+      # own migrations at startup, and every table in this schema has a foreign
+      # key to it — so excluding the services to save a minute means every
+      # migration fails on a table that does not exist.
+      - name: Start Supabase
+        run: supabase start
+
+      # The suite that matters most in this repository: RLS is what stops one
+      # traveller reading another's trips, and a regression here is a privacy
+      # incident rather than a bug.
+      - name: Row-level security and database tests
+        run: supabase test db
+
+      # A migration that changes a table without the generated types being
+      # regenerated compiles fine and is wrong at runtime. This is the only
+      # check that would notice.
+      - name: Generated types are current
+        run: |
+          supabase gen types typescript --local > ../frontend/src/shared/types/database.ts
+          if ! git diff --quiet -- ../frontend/src/shared/types/database.ts; then
+            echo "::error file=frontend/src/shared/types/database.ts::Generated types are out of date. Run 'npm run db:types' in backend/ and commit the result."
+            git diff -- ../frontend/src/shared/types/database.ts
+            exit 1
+          fi
+
+      - name: Supabase logs
+        if: failure()
+        run: supabase status || true

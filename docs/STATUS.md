@@ -30,7 +30,7 @@ open, revoke and pull-back.
 
 | Area | Done | Partial | Stub | Not started |
 |---|---|---|---|---|
-| Infrastructure | 19 | 0 | 0 | 2 |
+| Infrastructure | 20 | 0 | 0 | 1 |
 | Public / marketing | 8 | 0 | 0 | 2 |
 | Auth | 6 | 0 | 0 | 1 |
 | Dashboard & globe | 5 | 2 | 0 | 0 |
@@ -39,7 +39,7 @@ open, revoke and pull-back.
 | Analytics & resume | 2 | 0 | 0 | 2 |
 | Public sharing | 5 | 0 | 0 | 0 |
 | Account | 3 | 1 | 0 | 3 |
-| **Total** | **60** | **4** | **0** | **14** |
+| **Total** | **61** | **4** | **0** | **13** |
 
 ---
 
@@ -66,7 +66,7 @@ open, revoke and pull-back.
 | — | **Framer Motion** | ✅ Done | `shared/motion.ts` owns three durations and one easing curve; `client/components/motion/reveal.tsx` owns the only entrance animation. `MotionConfig reducedMotion="user"` in `providers.tsx` drops the movement and keeps the fade for anyone who asks, so no component has to check. Reveals ship as `opacity: 0`, so the root layout carries a `<noscript>` rule that pins them visible |
 | — | **`contact_messages`** | ✅ Done | RLS on with no policy: nobody reads it through the Data API but the service role. Writes go through `submit_contact_message()`, a security-definer function holding the length checks and a limit of five per address per hour. 12 pgTAP assertions |
 | — | **Scheduled purge** | ✅ Done | `/api/cron/purge-trash` empties trash past its 30 days — trips and posts alike, including the images inside a post now that `media.post_id` exists — files first, while the rows naming them still exist, then the rows. Guarded by `CRON_SECRET` compared in constant time; unset closes the endpoint rather than opening it. `vercel.json` runs it daily. Idempotent — everything is chosen by a cutoff — so a missed day costs a day and a double run costs nothing |
-| — | CI (GitHub Actions) | ⬜ Not started | lint/typecheck/test all pass locally |
+| — | **CI (GitHub Actions)** | ✅ Done | `.github/workflows/ci.yml`, on every push and pull request. Frontend: format, lint, types, tests, production build — with dummy Supabase env, because a build that needs production credentials is one nobody can reproduce. Database: the full stack, `supabase test db`, and a check that the generated types match the migrations. The CLI is pinned rather than `latest`, so a CLI release cannot turn an unrelated pull request red |
 | — | Sentry + PostHog | ⬜ Not started | Plan wants the funnel instrumented on day one |
 
 ## Public / marketing
