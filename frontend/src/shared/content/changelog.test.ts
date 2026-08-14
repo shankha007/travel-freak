@@ -135,6 +135,24 @@ describe('parseChangelog', () => {
       ChangelogFormatError
     )
   })
+
+  it('rejects a release that repeats a section', () => {
+    // Two "### Fixed" headings render as two Fixed blocks in one release, which
+    // looks like a broken page rather than what it is — an entry added under a
+    // new heading instead of the one already there.
+    expect(() =>
+      parseChangelog(
+        '## 1.0.0 — 2026-01-01 — X\n\n### Fixed\n\n- a\n\n### Added\n\n- b\n\n### Fixed\n\n- c\n'
+      )
+    ).toThrow(/more than one "fixed" section/i)
+  })
+
+  it('still allows two releases to each have the same section', () => {
+    const releases = parseChangelog(
+      '## 1.1.0 — 2026-02-01 — Y\n\n### Fixed\n\n- a\n\n## 1.0.0 — 2026-01-01 — X\n\n### Fixed\n\n- b\n'
+    )
+    expect(releases.map((r) => r.sections.length)).toEqual([1, 1])
+  })
 })
 
 describe('releaseSlug', () => {
@@ -145,9 +163,13 @@ describe('releaseSlug', () => {
 })
 
 describe('summarizeChangelog', () => {
-  it('takes the date range from dated releases only', () => {
+  it('counts the releases that shipped, and every entry including the uncut ones', () => {
     expect(summarizeChangelog(parseChangelog(SAMPLE))).toEqual({
-      releaseCount: 3,
+      // Two, not three: `Unreleased` is a heading, not a release. Cutting a
+      // version leaves an empty one at the top, and counting it would announce
+      // a release on the day nothing shipped.
+      releaseCount: 2,
+      // Four: its entry is still a change a reader can see in the product.
       entryCount: 4,
       latestDate: '2026-08-12',
       firstDate: '2026-08-11',
@@ -172,8 +194,13 @@ describe('docs/CHANGELOG.md', () => {
     expect(new Set(slugs).size).toBe(slugs.length)
   })
 
-  it('gives every release a title and at least one entry', () => {
-    for (const release of releases) {
+  it('gives every shipped release a title and at least one entry', () => {
+    // Dated releases only. The `Unreleased` block is legitimately empty and
+    // untitled for as long as it takes someone to merge the next thing — that
+    // is the state a version cut leaves behind, and failing the suite on it
+    // would mean every cut ships broken until it is filled in. What the rule is
+    // actually for is a *released* version going out nameless or hollow.
+    for (const release of releases.filter((r) => r.date !== null)) {
       expect(release.title, `${release.version} has no title`).not.toBe('')
       expect(release.entryCount, `${release.version} has no entries`).toBeGreaterThan(0)
     }

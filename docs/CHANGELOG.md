@@ -47,11 +47,19 @@ their own line — nobody outside the repo ever saw them.
 
 <!-- releases -->
 
-## Unreleased — Onboarding, the changelog, and four gaps closed
+## Unreleased
 
-> A new account used to land on an empty grey globe with no idea what this was
-> for. Now the first thing it does is tap the countries it has already been to
-> and watch them fill in.
+> Nothing since 0.12.0. Entries land here as they are merged.
+
+## 0.12.0 — 2026-08-15 — Every screen in the sidebar, and the promises to go with them
+
+> The last placeholder is gone: onboarding, the timeline, the wishlist,
+> analytics, settings — every tab in the sidebar now opens something that reads
+> real data. Around them, the things a product has to have before it can ask
+> anyone to trust it with a decade of photographs. Legal pages that say what
+> actually happens. A contact form that reaches a person. Export and deletion as
+> buttons rather than an email address. A trash that empties when it said it
+> would. And a link to any of it now arrives with your own globe attached.
 
 ### Added
 
@@ -265,6 +273,29 @@ their own line — nobody outside the repo ever saw them.
 
 ### Fixed
 
+- **Your travel resume was undercounting your days away.** It measured a trip as
+  its end date minus its start — a Friday-to-Sunday weekend as two days — while
+  counting trips you had only booked. The timeline and the analytics screen have
+  always counted both ends and only travel actually taken, so the same account
+  read 103 days in one place and 104 in another. The two mistakes pulled in
+  opposite directions, which is why the number looked plausible for as long as
+  it did. One definition now, in one file, read by all three — and by the share
+  card and the public profile, which get it from the database.
+- **Public trips without a cover photo had no share card at all.** The page said
+  "use the cover image" and, for a trip with no cover, said it in a way that
+  suppressed the fallback rather than leaving room for one. Trips with a cover
+  still use the photograph — a real picture of the place beats any card we could
+  draw.
+- **A rejected profile save no longer eats what you wrote.** Choosing a username
+  someone already has used to hand back the error and quietly restore the old
+  bio, so the ten minutes spent rewriting it went with it. Everything typed
+  comes back with the message now.
+- **A wide screen no longer drags the whole app sideways.** `main` in the app
+  shell could not shrink below its widest child, so anything genuinely wide gave
+  every page a horizontal scrollbar instead of scrolling inside the one element
+  that needed it. Found while building the analytics heatmap, which is a year of
+  squares and the first thing wide enough to expose it.
+
 - **A stripe ran across the world map.** Russia and Fiji arrive from Natural
   Earth as rings holding both -180° and +180°, and a renderer joins those two
   points the only way it can: straight across the map. It was always there,
@@ -328,31 +359,6 @@ their own line — nobody outside the repo ever saw them.
   applied by hand on that path, matching what the public trip page does.
 - An unlisted post is never indexed, and neither is any page reached with a
   token.
-
-### Fixed
-
-- **Your travel resume was undercounting your days away.** It measured a trip as
-  its end date minus its start — a Friday-to-Sunday weekend as two days — while
-  counting trips you had only booked. The timeline and the analytics screen have
-  always counted both ends and only travel actually taken, so the same account
-  read 103 days in one place and 104 in another. The two mistakes pulled in
-  opposite directions, which is why the number looked plausible for as long as
-  it did. One definition now, in one file, read by all three — and by the share
-  card and the public profile, which get it from the database.
-- **Public trips without a cover photo had no share card at all.** The page said
-  "use the cover image" and, for a trip with no cover, said it in a way that
-  suppressed the fallback rather than leaving room for one. Trips with a cover
-  still use the photograph — a real picture of the place beats any card we could
-  draw.
-- **A rejected profile save no longer eats what you wrote.** Choosing a username
-  someone already has used to hand back the error and quietly restore the old
-  bio, so the ten minutes spent rewriting it went with it. Everything typed
-  comes back with the message now.
-- **A wide screen no longer drags the whole app sideways.** `main` in the app
-  shell could not shrink below its widest child, so anything genuinely wide gave
-  every page a horizontal scrollbar instead of scrolling inside the one element
-  that needed it. Found while building the analytics heatmap, which is a year of
-  squares and the first thing wide enough to expose it.
 
 ### Infrastructure
 

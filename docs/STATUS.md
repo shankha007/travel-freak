@@ -8,7 +8,7 @@ shipped, when, and why lives in [CHANGELOG.md](CHANGELOG.md) — the notes that
 used to accumulate at the bottom of this file are there now, and new ones go
 there rather than here. Keep the gaps at the end of this file current.
 
-Last updated: 2026-08-14
+Last updated: 2026-08-15 · current release: 0.12.0
 
 Every ✅ below was re-checked in a browser against the local stack on 2026-08-13,
 including sign-in, the globe and both maps on a free and a paid plan, the trip

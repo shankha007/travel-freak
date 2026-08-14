@@ -285,6 +285,19 @@ export function parseChangelog(markdown: string): Release[] {
     const sectionHeading = SECTION_HEADING.exec(text)
     if (sectionHeading) {
       const kind = parseSectionHeading(sectionHeading[1], line)
+
+      // One section of each kind per release. Two `### Fixed` headings render as
+      // two "Fixed" blocks in the same release, which reads as a bug in the page
+      // rather than as what it is — someone adding an entry under a new heading
+      // instead of finding the one already there. Easy to do, invisible in a
+      // diff, and caught here instead.
+      if (release.sections.some((s) => s.kind === kind)) {
+        throw new ChangelogFormatError(
+          `Release ${release.version} has more than one "${kind}" section`,
+          line
+        )
+      }
+
       section = { kind, entries: [] }
       release.sections.push(section)
       return
@@ -343,6 +356,7 @@ export function segmentsToText(segments: InlineSegment[]): string {
 }
 
 export interface ChangelogSummary {
+  /** Dated releases only — the `Unreleased` block has not been released. */
   releaseCount: number
   entryCount: number
   /** Newest dated release, ignoring an undated `Unreleased` block. */
@@ -351,9 +365,17 @@ export interface ChangelogSummary {
 }
 
 export function summarizeChangelog(releases: Release[]): ChangelogSummary {
-  const dates = releases.map((r) => r.date).filter((d): d is string => d !== null)
+  const dated = releases.filter((r) => r.date !== null)
+  const dates = dated.map((r) => r.date as string)
+
   return {
-    releaseCount: releases.length,
+    // Counted over dated releases, not over every heading. The moment a version
+    // is cut, a fresh and empty `Unreleased` block appears at the top; counting
+    // it would have the page announce one more release than has ever shipped,
+    // and announce it on the day nothing shipped.
+    releaseCount: dated.length,
+    // Entries are counted over everything, including what is merged and not yet
+    // cut — those are changes a reader can see in the product today.
     entryCount: releases.reduce((n, r) => n + r.entryCount, 0),
     latestDate: dates.length > 0 ? dates.reduce((a, b) => (a > b ? a : b)) : null,
     firstDate: dates.length > 0 ? dates.reduce((a, b) => (a < b ? a : b)) : null,
