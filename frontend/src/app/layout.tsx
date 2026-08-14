@@ -43,6 +43,19 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        {/*
+          Anything wrapped in `Reveal` ships as `opacity: 0` in the server HTML
+          and is uncovered by JavaScript when it scrolls into view. With
+          JavaScript off that second half never happens, so the page would be
+          blank rather than un-animated. This pins it back to visible — the only
+          rule in the app that has to live outside globals.css, because a
+          `<noscript>` stylesheet cannot be expressed in a class.
+        */}
+        <noscript>
+          <style>{'[data-reveal]{opacity:1!important;transform:none!important}'}</style>
+        </noscript>
+      </head>
       <body className="flex min-h-full flex-col">
         <Providers>{children}</Providers>
       </body>

@@ -8,7 +8,7 @@ shipped, when, and why lives in [CHANGELOG.md](CHANGELOG.md) — the notes that
 used to accumulate at the bottom of this file are there now, and new ones go
 there rather than here. Keep the gaps at the end of this file current.
 
-Last updated: 2026-08-13
+Last updated: 2026-08-14
 
 Every ✅ below was re-checked in a browser against the local stack on 2026-08-13,
 including sign-in, the globe and both maps on a free and a paid plan, the trip
@@ -30,8 +30,8 @@ open, revoke and pull-back.
 
 | Area | Done | Partial | Stub | Not started |
 |---|---|---|---|---|
-| Infrastructure | 16 | 0 | 0 | 3 |
-| Public / marketing | 5 | 0 | 0 | 5 |
+| Infrastructure | 18 | 0 | 0 | 2 |
+| Public / marketing | 7 | 0 | 0 | 3 |
 | Auth | 6 | 0 | 0 | 1 |
 | Dashboard & globe | 5 | 2 | 0 | 0 |
 | Trips & planner | 5 | 1 | 0 | 4 |
@@ -39,7 +39,7 @@ open, revoke and pull-back.
 | Analytics & resume | 1 | 0 | 1 | 2 |
 | Public sharing | 5 | 0 | 0 | 0 |
 | Account | 0 | 0 | 1 | 6 |
-| **Total** | **50** | **3** | **2** | **21** |
+| **Total** | **54** | **3** | **2** | **18** |
 
 ---
 
@@ -63,7 +63,8 @@ open, revoke and pull-back.
 | — | **Storage + signed uploads** | ✅ Done | Private `media` bucket, keys `<user>/<trip>/<media>.<ext>` — or `<user>/posts/<post>/<media>.<ext>` for post images — matching the storage policies, which only read the first segment. Reads go out as one-hour signed URLs; `next/image` is allow-listed to the storage host only |
 | — | **Geo assets** | ✅ Done | `npm run build:geo` writes country outlines plus admin-1 split one file per country, simplified 4% with mapshaper. Natural Earth 50m carries ISO 3166-2 for nine large countries, India among them. The map reads `admin1/index.json` before fetching, so an uncovered country costs no request |
 | — | **Public image derivatives** | ✅ Done | `media-public` bucket; sharp re-encodes to WebP ≤1600px, dropping every metadata block — on first publication for trip photos, at upload for post images, whose URL has to live in stored HTML. Tested with the same EXIF parser the uploader uses to read GPS |
-| — | Framer Motion | ⬜ Not started | Not installed |
+| — | **Framer Motion** | ✅ Done | `shared/motion.ts` owns three durations and one easing curve; `client/components/motion/reveal.tsx` owns the only entrance animation. `MotionConfig reducedMotion="user"` in `providers.tsx` drops the movement and keeps the fade for anyone who asks, so no component has to check. Reveals ship as `opacity: 0`, so the root layout carries a `<noscript>` rule that pins them visible |
+| — | **`contact_messages`** | ✅ Done | RLS on with no policy: nobody reads it through the Data API but the service role. Writes go through `submit_contact_message()`, a security-definer function holding the length checks and a limit of five per address per hour. 12 pgTAP assertions |
 | — | CI (GitHub Actions) | ⬜ Not started | lint/typecheck/test all pass locally |
 | — | Sentry + PostHog | ⬜ Not started | Plan wants the funnel instrumented on day one |
 
@@ -76,8 +77,8 @@ open, revoke and pull-back.
 | 4 | **Public blogs** `/b` | ✅ Done | Every published public post, newest first — byline, linked trip and reading time, with the newest in a wide card. **Not at `/blogs`**: the authenticated My Blogs screen owns that path, and `/b` is the index of the `/b/[slug]` posts it lists. Read through the visitor's client, so RLS decides the contents; a post whose trip is not published links to no trip. `Blog` JSON-LD and a sitemap entry |
 | 5 | **About** `/about` | ✅ Done | Why the product exists and the four promises it is built to — private by default, no ads on any plan, exportable data, free at country level. Statically rendered, `AboutPage` JSON-LD. Deliberately about the product, not an invented team |
 | 2 | Features `/features` | ⬜ Not started | |
-| 6 | Contact | ⬜ Not started | Phase 1.1 |
-| 11 | Legal (privacy/terms/refunds) | ⬜ Not started | MVP requirement |
+| 6 | **Contact** `/contact` | ✅ Done | Seven topics, Zod-validated, no account needed. A rejected message comes back with every field still filled, including the topic. A honeypot is answered with the same acknowledgement a person gets, so a bot learns nothing. The path you wrote from is sent; nothing else about the visit is |
+| 11 | **Legal** `/privacy`, `/terms`, `/refunds` | ✅ Done | One renderer over `shared/content/legal.ts`, so three documents cannot drift into three typographic treatments. Each states its effective date and carries a contents list — capped and scrollable on a phone, sticky on desktop. `legal.test.ts` enforces unique anchors, non-empty blocks, a date that has already arrived and a contact address in every document. Written by the people who built the product, not by counsel |
 | 12 | **Changelog** `/changelog` | ✅ Done | Public, no login, statically rendered from `docs/CHANGELOG.md` at build time. Timeline of releases with per-kind sections; the parser refuses a malformed entry rather than dropping it |
 | — | OG image endpoint | ⬜ Not started | Phase 1.1 |
 | — | SEO (JSON-LD, sitemap, RSS) | ⬜ Not started | |
@@ -215,9 +216,16 @@ open, revoke and pull-back.
    same three props would draw the route timeline on `/trips/[id]` and on the public `/t/[slug]`.
    Nothing blocks it but the work.
 8. **The marketing nav has no mobile equivalent.** `MarketingHeader` hides its links below
-   `sm`, which was survivable at two and is not at four — a phone visitor reaches Blogs, About
-   and Pricing only through the footer. It needs a menu, or the links need to wrap.
-9. **A partially pinned trip reads as unmeasured.** `totalDistanceKm` skips places without
+   `sm`, which was survivable at two and is not at five — a phone visitor reaches Blogs, About,
+   Pricing, Changelog and Contact only through the footer, which now also carries the three legal
+   documents. It needs a menu, or the links need to wrap.
+9. **Nothing tells anyone a contact message arrived.** `submit_contact_message()` writes the row
+   and the sender is told it reached us, which is true; but the inbox is a table that somebody has
+   to remember to open in Studio. The page promises an answer within about three working days, and
+   nothing in the repo makes that happen. A database webhook or a scheduled digest to
+   `BRAND.support.email` would close it, and `handled_at` is already there to mark what has been
+   answered.
+10. **A partially pinned trip reads as unmeasured.** `totalDistanceKm` skips places without
    coordinates, so one pin among three measures nothing. That is the honest answer — the legs it
    cannot see are real distance — but the resume shows no explanation for why a trip with places
    has no number.

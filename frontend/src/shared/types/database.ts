@@ -163,6 +163,42 @@ export type Database = {
           },
         ]
       }
+      contact_messages: {
+        Row: {
+          created_at: string
+          email: string
+          handled_at: string | null
+          id: string
+          message: string
+          name: string
+          source_path: string | null
+          topic: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          handled_at?: string | null
+          id?: string
+          message: string
+          name: string
+          source_path?: string | null
+          topic: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          handled_at?: string | null
+          id?: string
+          message?: string
+          name?: string
+          source_path?: string | null
+          topic?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       media: {
         Row: {
           album_id: string | null
@@ -1893,6 +1929,16 @@ export type Database = {
       st_wrapx: {
         Args: { geom: unknown; move: number; wrap: number }
         Returns: unknown
+      }
+      submit_contact_message: {
+        Args: {
+          p_email: string
+          p_message: string
+          p_name: string
+          p_source_path?: string
+          p_topic: string
+        }
+        Returns: string
       }
       trip_shows_branding_badge: {
         Args: { p_trip_id: string }

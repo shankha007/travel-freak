@@ -20,6 +20,24 @@ export const BRAND = {
   freePlanBadge: 'Made with TravelFreak',
   support: {
     email: 'support@travelfreak.app',
+    /** Privacy requests — export, correction, deletion. Separated so it can be routed. */
+    privacyEmail: 'privacy@travelfreak.app',
+  },
+  /**
+   * The details the legal pages have to state and nothing else may guess.
+   *
+   * `entity` is the working name until the service is incorporated; the pages
+   * say so rather than implying a company that does not exist yet. Changing
+   * these three lines is what turns the published policies from honest drafts
+   * into the terms of a registered business — no page hardcodes them.
+   */
+  legal: {
+    entity: 'TravelFreak',
+    /** Whose law governs, and whose courts hear a dispute. */
+    jurisdiction: 'India',
+    courts: 'the courts at Kolkata, West Bengal',
+    /** Where user data physically lives, stated on the privacy page. */
+    dataRegion: 'Singapore (ap-southeast-1)',
   },
   social: {
     x: '@travelfreak',

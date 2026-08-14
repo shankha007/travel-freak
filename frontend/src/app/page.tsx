@@ -14,6 +14,7 @@ import { BRAND, pageTitle } from '@/shared/brand'
 import { DEMO_REGIONS } from '@/client/features/globe/fixtures'
 import { HeroGlobe } from '@/client/components/globe/hero-globe'
 import { MarketingFooter, MarketingHeader } from '@/client/components/marketing/chrome'
+import { Reveal, RevealGroup, RevealItem } from '@/client/components/motion/reveal'
 import { RegionLegend } from '@/client/components/globe/region-legend'
 import { Button } from '@/client/components/ui/button'
 import { Card, CardContent } from '@/client/components/ui/card'
@@ -118,9 +119,13 @@ export default function Home() {
               built around.
             </p>
 
-            <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {/* The cards arrive one after another as the grid scrolls in. The
+                hero above deliberately does not: it holds the globe and the
+                largest text on the page, and animating what a visitor is
+                already looking at delays the only thing they came for. */}
+            <RevealGroup as="ul" className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {FEATURES.map(({ icon: Icon, title, body }) => (
-                <li key={title}>
+                <RevealItem as="li" key={title}>
                   <Card className="h-full">
                     <CardContent className="space-y-2 p-5">
                       <Icon className="size-5 text-muted-foreground" aria-hidden />
@@ -128,9 +133,9 @@ export default function Home() {
                       <p className="text-sm text-muted-foreground">{body}</p>
                     </CardContent>
                   </Card>
-                </li>
+                </RevealItem>
               ))}
-            </ul>
+            </RevealGroup>
           </div>
         </section>
 
@@ -139,7 +144,7 @@ export default function Home() {
             the tiers themselves were three cards of small print between the
             reader and the sign-up button. */}
         <section className="border-t">
-          <div className="mx-auto flex w-full max-w-6xl flex-col items-start gap-6 px-4 py-16 md:flex-row md:items-center md:justify-between md:px-6">
+          <Reveal className="mx-auto flex w-full max-w-6xl flex-col items-start gap-6 px-4 py-16 md:flex-row md:items-center md:justify-between md:px-6">
             <div>
               <h2 className="font-heading text-2xl font-semibold tracking-tight">
                 Free where it counts
@@ -164,7 +169,7 @@ export default function Home() {
                 Start free
               </Button>
             </div>
-          </div>
+          </Reveal>
         </section>
       </main>
 

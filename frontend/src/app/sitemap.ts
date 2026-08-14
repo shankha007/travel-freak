@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next'
 import { createClient } from '@/server/supabase/server'
 import { SITE_URL } from '@/shared/brand'
+import { LEGAL_DOCS } from '@/shared/content/legal'
 
 /**
  * Sitemap of everything publicly readable.
@@ -42,7 +43,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/pricing`, changeFrequency: 'monthly', priority: 0.8 },
     { url: `${SITE_URL}/b`, changeFrequency: 'daily', priority: 0.7 },
     { url: `${SITE_URL}/about`, changeFrequency: 'monthly', priority: 0.5 },
+    { url: `${SITE_URL}/contact`, changeFrequency: 'yearly', priority: 0.4 },
     { url: `${SITE_URL}/changelog`, changeFrequency: 'weekly', priority: 0.4 },
+    // Listed rather than hidden: a policy a crawler cannot find is a policy a
+    // reader cannot find either. `lastModified` is the date the document itself
+    // states, so a rewrite is visible to a crawler on the same day it ships.
+    ...LEGAL_DOCS.map((doc) => ({
+      url: `${SITE_URL}${doc.path}`,
+      lastModified: new Date(`${doc.effective}T00:00:00Z`),
+      changeFrequency: 'yearly' as const,
+      priority: 0.3,
+    })),
     { url: `${SITE_URL}/login`, changeFrequency: 'yearly', priority: 0.3 },
     { url: `${SITE_URL}/register`, changeFrequency: 'yearly', priority: 0.5 },
   ]

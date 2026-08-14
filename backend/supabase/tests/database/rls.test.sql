@@ -945,6 +945,95 @@ select is(
   'and sees only his own marks'
 );
 
+-- ---------------------------------------------------------------------------
+-- contact_messages — screen 6
+--
+-- The one table in the schema that a signed-out stranger may write to, so the
+-- interesting assertions are about what that write cannot become: a way to read
+-- the inbox, or a way to fill it.
+-- ---------------------------------------------------------------------------
+
+reset role;
+select set_config('request.jwt.claims', '{"role":"anon"}', true);
+set local role anon;
+
+select throws_ok(
+  $$ insert into public.contact_messages (name, email, topic, message)
+     values ('Mallory', 'm@rls.test', 'support', 'straight at the table') $$,
+  '42501',
+  null,
+  'anon cannot insert into contact_messages directly'
+);
+
+select lives_ok(
+  $$ select public.submit_contact_message(
+       'Mallory', 'M@RLS.test', 'support', 'the globe will not load for me') $$,
+  'but may send one through submit_contact_message()'
+);
+
+select throws_ok(
+  $$ select * from public.contact_messages $$,
+  '42501',
+  null,
+  'and cannot read the inbox back'
+);
+
+-- Four more takes the address to the limit of five; the sixth is refused.
+select public.submit_contact_message('Mallory', 'm@rls.test', 'support', 'message number two');
+select public.submit_contact_message('Mallory', 'm@rls.test', 'support', 'message number three');
+select public.submit_contact_message('Mallory', 'm@rls.test', 'support', 'message number four');
+select public.submit_contact_message('Mallory', 'm@rls.test', 'support', 'message number five');
+
+select throws_ok(
+  $$ select public.submit_contact_message(
+       'Mallory', 'm@rls.test', 'support', 'message number six') $$,
+  'P0001',
+  'contact rate limit reached',
+  'the sixth message from one address within the hour is refused'
+);
+
+select lives_ok(
+  $$ select public.submit_contact_message(
+       'Someone else', 'other@rls.test', 'bug', 'a different address is unaffected') $$,
+  'and the limit is per address, not global'
+);
+
+-- A signed-in sender is recorded as themselves, so a reply can find the account.
+reset role;
+select set_config('request.jwt.claims',
+  '{"sub":"aaaaaaaa-0000-4000-8000-000000000001","role":"authenticated"}', true);
+set local role authenticated;
+
+select public.submit_contact_message('Alice', 'alice@rls.test', 'billing', 'a question about plans');
+
+reset role;
+
+select is(
+  (select user_id from public.contact_messages where email = 'alice@rls.test'),
+  'aaaaaaaa-0000-4000-8000-000000000001'::uuid,
+  'a message from a signed-in sender carries their user id'
+);
+
+select is(
+  (select email from public.contact_messages where message = 'the globe will not load for me'),
+  'm@rls.test',
+  'the address is stored folded to lower case, which is what the rate limit counts on'
+);
+
+select throws_ok(
+  $$ select public.submit_contact_message('Mallory', 'short@rls.test', 'support', 'too short') $$,
+  '23514',
+  null,
+  'a message under ten characters is refused by the constraint, not silently stored'
+);
+
+select throws_ok(
+  $$ select public.submit_contact_message('Mallory', 'new@rls.test', 'marketing', 'a topic nobody offered') $$,
+  '23514',
+  null,
+  'and so is a topic that is not one of the seven'
+);
+
 select * from finish();
 
 rollback;

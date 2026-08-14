@@ -2,7 +2,9 @@
 
 import { useState } from 'react'
 import { ThemeProvider } from 'next-themes'
+import { MotionConfig } from 'framer-motion'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { DURATION, EASE_OUT } from '@/shared/motion'
 import { TooltipProvider } from '@/client/components/ui/tooltip'
 import { Toaster } from '@/client/components/ui/sonner'
 import { THEME_IDS, THEME_VALUES } from '@/shared/themes'
@@ -36,10 +38,22 @@ export function Providers({ children }: { children: React.ReactNode }) {
       value={THEME_VALUES}
     >
       <QueryClientProvider client={queryClient}>
-        <TooltipProvider delay={200}>
-          {children}
-          <Toaster richColors closeButton />
-        </TooltipProvider>
+        {/*
+          `reducedMotion="user"` is the whole accessibility story for animation:
+          every motion component below drops its transforms — and keeps its
+          fades, which do not trigger vestibular symptoms — when the operating
+          system asks for reduced motion. Doing it here means no individual
+          component has to remember, and none of them can forget.
+
+          The transition is the app-wide default, so a component that animates
+          without stating one still moves like the rest of the product.
+        */}
+        <MotionConfig reducedMotion="user" transition={{ duration: DURATION.base, ease: EASE_OUT }}>
+          <TooltipProvider delay={200}>
+            {children}
+            <Toaster richColors closeButton />
+          </TooltipProvider>
+        </MotionConfig>
       </QueryClientProvider>
     </ThemeProvider>
   )

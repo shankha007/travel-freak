@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ArrowRight, EyeOff, FileDown, Globe2, Mail, ScrollText, Sparkles } from 'lucide-react'
 import { BRAND, SITE_URL, pageTitle } from '@/shared/brand'
 import { MarketingFooter, MarketingHeader } from '@/client/components/marketing/chrome'
+import { RevealGroup, RevealItem } from '@/client/components/motion/reveal'
 import { Badge } from '@/client/components/ui/badge'
 import { Button } from '@/client/components/ui/button'
 import { Card, CardContent } from '@/client/components/ui/card'
@@ -109,9 +110,9 @@ export default function AboutPage() {
 
             <div>
               <h2 className="text-2xl font-semibold tracking-tight">What it promises</h2>
-              <ul className="mt-4 grid gap-4 sm:grid-cols-2">
+              <RevealGroup as="ul" className="mt-4 grid gap-4 sm:grid-cols-2">
                 {PRINCIPLES.map(({ icon: Icon, title, body }) => (
-                  <li key={title}>
+                  <RevealItem as="li" key={title}>
                     <Card className="h-full">
                       <CardContent className="space-y-2 p-5">
                         <Icon className="size-5 text-muted-foreground" aria-hidden />
@@ -119,9 +120,9 @@ export default function AboutPage() {
                         <p className="text-sm text-muted-foreground">{body}</p>
                       </CardContent>
                     </Card>
-                  </li>
+                  </RevealItem>
                 ))}
-              </ul>
+              </RevealGroup>
             </div>
           </div>
         </section>
@@ -152,14 +153,21 @@ export default function AboutPage() {
                 </h2>
                 <p className="text-pretty text-muted-foreground">
                   Something broken, something missing, or a country whose states you want mapped
-                  next? Write to{' '}
+                  next? Use the{' '}
+                  <Link
+                    href="/contact"
+                    className="font-medium text-foreground underline underline-offset-4"
+                  >
+                    contact form
+                  </Link>
+                  , or write to{' '}
                   <a
                     href={`mailto:${BRAND.support.email}`}
                     className="font-medium text-foreground underline underline-offset-4"
                   >
                     {BRAND.support.email}
                   </a>
-                  . It is read by the people who build this, not by a queue.
+                  . Both are read by the people who build this, not by a queue.
                 </p>
               </div>
             </div>

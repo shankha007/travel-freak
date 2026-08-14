@@ -55,6 +55,20 @@ their own line — nobody outside the repo ever saw them.
 
 ### Added
 
+- **Contact** `/contact` — a form that reaches the people who build this, with
+  no account required and no ticket queue in front of it. Pick what it is about,
+  say what happened, and it lands in the same inbox the developers read; a
+  signed-in visitor gets their address filled in already. A rejected message is
+  handed back with every word still in it, and the screen you wrote from is sent
+  along, so a report about a broken page arrives with the page attached.
+- **Legal** `/privacy`, `/terms` and `/refunds` — the three documents the
+  product has been operating without. Each states the date it took effect, has a
+  contents list beside it, and says plainly where the software does not yet do
+  what a policy would like to claim: trash past its 30 days is unreachable but
+  not yet purged, export and account deletion are done by hand until the screens
+  exist, and nothing can be charged because nothing is on sale. The refund policy
+  is published before the first payment rather than after the first dispute.
+  Linked from the footer of every public page and listed in `sitemap.xml`.
 - **Onboarding** `/welcome` — three steps for a new account: your username and
   where you are based, then the one that matters — tap every country you have
   already been to, on a map that turns green as you go, with a searchable list
@@ -155,6 +169,10 @@ their own line — nobody outside the repo ever saw them.
 
 ### Changed
 
+- **Public pages now move a little.** Cards and sections rise into place as you
+  scroll to them, once — scrolling back up replays nothing. Anyone whose system
+  asks for reduced motion gets the fade without the movement, and a visitor with
+  JavaScript off gets the whole page with neither.
 - **The delete dialogs now say where things go.** Trips and posts link to the
   trash; the photo dialog asks for confirmation and says plainly that a photo
   cannot be brought back. Deleting a photo releases its bytes from storage
@@ -260,6 +278,19 @@ their own line — nobody outside the repo ever saw them.
 
 ### Infrastructure
 
+- **Framer Motion, with one vocabulary.** Three durations and one easing curve
+  live in `shared/motion.ts`; `Reveal`, `RevealGroup` and `RevealItem` are the
+  only entrance animation any page uses. `MotionConfig reducedMotion="user"` is
+  set once in `providers.tsx`, so no component has to remember the preference
+  and none of them can forget it. A `<noscript>` rule in the root layout pins
+  every revealed element visible, because these ship as `opacity: 0`.
+- **`contact_messages` is write-only.** RLS is on with no policy at all, so
+  neither `anon` nor a signed-in user can read the inbox back — only the service
+  role. Writes go through `submit_contact_message()`, a security-definer
+  function that owns the length checks and a limit of five messages per address
+  per hour, so a caller cannot skip either. Twelve new pgTAP assertions cover
+  the direct insert, the read-back, the sixth message and a signed-in sender's
+  user id.
 - **The auth emails point at the app.** `backend/supabase/templates/` holds the
   recovery and confirmation templates, and both link to `/auth/confirm` carrying
   a token hash rather than a PKCE code. A code has to be exchanged in the browser
