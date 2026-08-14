@@ -1159,6 +1159,13 @@ export type Database = {
         | { Args: { table_name: string }; Returns: string }
       enablelongtransactions: { Args: never; Returns: string }
       equals: { Args: { geom1: unknown; geom2: unknown }; Returns: boolean }
+      expired_trash_media: {
+        Args: { p_cutoff: string }
+        Returns: {
+          public_path: string
+          storage_path: string
+        }[]
+      }
       geometry: { Args: { "": string }; Returns: unknown }
       geometry_above: {
         Args: { geom1: unknown; geom2: unknown }
@@ -1335,6 +1342,13 @@ export type Database = {
           travel_days: number
           trips_count: number
           years_travelling: number
+        }[]
+      }
+      purge_expired_trash: {
+        Args: { p_cutoff: string }
+        Returns: {
+          posts_purged: number
+          trips_purged: number
         }[]
       }
       refresh_visited_regions: {

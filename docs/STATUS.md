@@ -30,7 +30,7 @@ open, revoke and pull-back.
 
 | Area | Done | Partial | Stub | Not started |
 |---|---|---|---|---|
-| Infrastructure | 18 | 0 | 0 | 2 |
+| Infrastructure | 19 | 0 | 0 | 2 |
 | Public / marketing | 8 | 0 | 0 | 2 |
 | Auth | 6 | 0 | 0 | 1 |
 | Dashboard & globe | 5 | 2 | 0 | 0 |
@@ -39,7 +39,7 @@ open, revoke and pull-back.
 | Analytics & resume | 2 | 0 | 0 | 2 |
 | Public sharing | 5 | 0 | 0 | 0 |
 | Account | 3 | 1 | 0 | 3 |
-| **Total** | **59** | **4** | **0** | **14** |
+| **Total** | **60** | **4** | **0** | **14** |
 
 ---
 
@@ -65,6 +65,7 @@ open, revoke and pull-back.
 | — | **Public image derivatives** | ✅ Done | `media-public` bucket; sharp re-encodes to WebP ≤1600px, dropping every metadata block — on first publication for trip photos, at upload for post images, whose URL has to live in stored HTML. Tested with the same EXIF parser the uploader uses to read GPS |
 | — | **Framer Motion** | ✅ Done | `shared/motion.ts` owns three durations and one easing curve; `client/components/motion/reveal.tsx` owns the only entrance animation. `MotionConfig reducedMotion="user"` in `providers.tsx` drops the movement and keeps the fade for anyone who asks, so no component has to check. Reveals ship as `opacity: 0`, so the root layout carries a `<noscript>` rule that pins them visible |
 | — | **`contact_messages`** | ✅ Done | RLS on with no policy: nobody reads it through the Data API but the service role. Writes go through `submit_contact_message()`, a security-definer function holding the length checks and a limit of five per address per hour. 12 pgTAP assertions |
+| — | **Scheduled purge** | ✅ Done | `/api/cron/purge-trash` empties trash past its 30 days: files first, while the rows naming them still exist, then the rows. Guarded by `CRON_SECRET` compared in constant time; unset closes the endpoint rather than opening it. `vercel.json` runs it daily. Idempotent — everything is chosen by a cutoff — so a missed day costs a day and a double run costs nothing |
 | — | CI (GitHub Actions) | ⬜ Not started | lint/typecheck/test all pass locally |
 | — | Sentry + PostHog | ⬜ Not started | Plan wants the funnel instrumented on day one |
 
@@ -208,10 +209,11 @@ open, revoke and pull-back.
    working — a signed URL would expire within the hour. That makes it as exposed as an unlisted
    link before the post is published, which the studio states next to the button. Serving post
    images through a resolver that checks the post's visibility would close it properly.
-6. **Nothing purges the trash.** `deleted_at` rows stay forever and both restore paths refuse
-   after 30 days, so expired trips and posts are unreachable but still stored. The plan wants a
-   scheduled job that hard-deletes past the window, including the storage objects a trip's
-   photos still occupy.
+6. **A purged post keeps its pictures.** The daily purge removes expired trips, their media
+   rows and the files behind them, and expired posts — but `media` has no `post_id`, so an image
+   placed inside a post cannot be found from the post that held it. Those objects survive their
+   post. Closing it needs a column and a migration, and until then it is stated in the SQL
+   function's own comment rather than left to be discovered.
 7. **The trip page still has no route map.** `MapView` now takes markers, a route line and a
    set of points to frame itself to — that is what the vault's map tab is built on — so the
    same three props would draw the route timeline on `/trips/[id]` and on the public `/t/[slug]`.
@@ -226,16 +228,12 @@ open, revoke and pull-back.
    nothing in the repo makes that happen. A database webhook or a scheduled digest to
    `BRAND.support.email` would close it, and `handled_at` is already there to mark what has been
    answered.
-10. **A deleted account's photographs go, but the trash is still never purged.** Deletion
-   removes a leaving user's storage objects by prefix, which closes that hole. Gap 6 is the one
-   still open: a trip soft-deleted 40 days ago is unreachable to everyone and still on disk,
-   because nothing runs on a schedule to hard-delete past the window.
-11. **Analytics can only show budgets that were *planned*.** `trips.budget_planned` is the
+10. **Analytics can only show budgets that were *planned*.** `trips.budget_planned` is the
    only money in the schema; the `expenses` table screen 22 needs is not migrated, so there is
    nothing to compare a plan against. The screen says so rather than labelling a plan as spend,
    and the arithmetic groups by currency rather than converting — adding ₹40,000 to $400 needs an
    exchange rate this codebase does not have and should not invent.
-12. **A partially pinned trip reads as unmeasured.** `totalDistanceKm` skips places without
+11. **A partially pinned trip reads as unmeasured.** `totalDistanceKm` skips places without
    coordinates, so one pin among three measures nothing. That is the honest answer — the legs it
    cannot see are real distance — but the resume shows no explanation for why a trip with places
    has no number.

@@ -1072,6 +1072,87 @@ select throws_ok(
 );
 
 -- ---------------------------------------------------------------------------
+-- Purging expired trash
+--
+-- The window is the whole feature: one day inside it and the trip must survive,
+-- one day outside and it must go, along with everything hanging off it. Both
+-- functions take the cutoff as an argument, so this can ask about a trip
+-- deleted forty days ago without waiting forty days.
+-- ---------------------------------------------------------------------------
+
+reset role;
+
+insert into public.trips (id, user_id, title, slug, visibility, status, deleted_at)
+values
+  ('a1111111-0000-4000-8000-0000000000e1', 'aaaaaaaa-0000-4000-8000-000000000001',
+   'Long gone', 'rls-purge-old', 'private', 'completed', now() - interval '40 days'),
+  ('a1111111-0000-4000-8000-0000000000e2', 'aaaaaaaa-0000-4000-8000-000000000001',
+   'Recently binned', 'rls-purge-recent', 'private', 'completed', now() - interval '3 days');
+
+insert into public.trip_places (trip_id, user_id, country_code, city_name, order_index)
+values ('a1111111-0000-4000-8000-0000000000e1', 'aaaaaaaa-0000-4000-8000-000000000001',
+        'PER', 'Cusco', 0);
+
+insert into public.media (id, user_id, trip_id, kind, storage_path, mime, public_path)
+values ('a1111111-0000-4000-8000-0000000000e3', 'aaaaaaaa-0000-4000-8000-000000000001',
+        'a1111111-0000-4000-8000-0000000000e1', 'image',
+        'aaaaaaaa/expired/photo.jpg', 'image/jpeg', 'aaaaaaaa/expired/photo.webp');
+
+insert into public.blog_posts (user_id, title, slug, deleted_at)
+values ('aaaaaaaa-0000-4000-8000-000000000001', 'Old draft', 'rls-purge-post',
+        now() - interval '40 days');
+
+-- The caller removes the files first, while the rows that name them still
+-- exist. Both paths come back, because both are real objects in two buckets.
+select results_eq(
+  $$ select storage_path, public_path
+     from public.expired_trash_media(now() - interval '30 days') $$,
+  $$ values ('aaaaaaaa/expired/photo.jpg'::text, 'aaaaaaaa/expired/photo.webp'::text) $$,
+  'the purge is told which files to remove before the rows naming them go'
+);
+
+select is(
+  (select count(*) from public.expired_trash_media(now() - interval '90 days'))::int,
+  0,
+  'and nothing is listed for trash that is still inside its window'
+);
+
+select results_eq(
+  $$ select trips_purged, posts_purged from public.purge_expired_trash(now() - interval '30 days') $$,
+  $$ values (1, 1) $$,
+  'exactly the trip and the post past their 30 days are purged'
+);
+
+select is(
+  (select count(*) from public.trips where slug = 'rls-purge-recent')::int,
+  1,
+  'a trip binned three days ago is left alone'
+);
+
+select is(
+  (select count(*) from public.trip_places
+   where trip_id = 'a1111111-0000-4000-8000-0000000000e1')::int,
+  0,
+  'the purged trip takes its places with it'
+);
+
+select is(
+  (select count(*) from public.media
+   where id = 'a1111111-0000-4000-8000-0000000000e3')::int,
+  0,
+  'and its media rows'
+);
+
+select is(
+  (select count(*) from public.trips where slug = 'rls-alice-public')::int,
+  1,
+  'and a trip nobody deleted is untouched'
+);
+
+-- Cleaned up so the account-deletion block below counts what it expects to.
+delete from public.trips where slug = 'rls-purge-recent';
+
+-- ---------------------------------------------------------------------------
 -- Account deletion — screen 44
 --
 -- `deleteAccount` removes the storage objects itself and then deletes one row

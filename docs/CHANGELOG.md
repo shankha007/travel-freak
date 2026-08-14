@@ -55,6 +55,14 @@ their own line — nobody outside the repo ever saw them.
 
 ### Added
 
+- **The trash actually empties now.** Soft delete has only ever kept half its
+  promise: things came back inside the 30 days, and nothing ever went once the
+  window closed. A trip binned forty days ago was unreachable to you, to a
+  visitor and to the restore button, and was still every byte it had ever been.
+  A daily job now removes what is past its window — the trip, its places, its
+  notes, its media rows and the photographs themselves — along with expired
+  posts. Nothing inside the window is touched, and the countdown on the trash
+  screen now counts down to something.
 - **Share cards** — a link to this pasted into a chat or a timeline now
   unfurls as a picture instead of a grey box. A public profile gets its own
   globe: the real world map with the countries that person has actually been to
@@ -351,6 +359,15 @@ their own line — nobody outside the repo ever saw them.
 
 ### Infrastructure
 
+- **The purge is a route on a schedule, not a database job.** Half the work is
+  not in the database: photographs are objects in a bucket, and only the
+  application holds a key that can delete them. `/api/cron/purge-trash` lists
+  the files first — while the rows naming them still exist, because storage does
+  not cascade — removes them, and only then deletes the rows. It is guarded by a
+  shared secret compared in constant time, and a missing `CRON_SECRET` closes
+  the endpoint rather than opening it. `vercel.json` runs it daily; anything
+  that can make a timed HTTP request does as well. Seven pgTAP assertions cover
+  the window on both sides and the cascade.
 - **`inclusiveDays` and `totalDaysAway` live in `shared/timeline.ts`**, beside
   `HAPPENED` and `daysInYear`, because "how many days have you been away" is one
   question three screens ask. `public_resume_stats()` gets the same treatment in

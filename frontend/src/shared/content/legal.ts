@@ -183,14 +183,14 @@ const privacy: LegalDoc = {
           kind: 'list',
           items: [
             'While your account exists, what you have written stays until you delete it.',
-            'A deleted trip or post goes to the trash and is restorable for 30 days. After that it is no longer reachable and is scheduled for permanent deletion.',
+            'A deleted trip or post goes to the trash and is restorable for 30 days. After that a daily job deletes it for good — the rows and the photographs both.',
             'Delete your account and we remove your rows and your files. Backups roll off on their own cycle, within 30 days.',
             'Server logs are kept briefly for security and debugging, then discarded.',
           ],
         },
         {
           kind: 'note',
-          text: 'Automatic purging of expired trash is not yet running. Until it is, an item past its 30 days is unreachable to you and to everyone else but is still on disk. This will be announced on the changelog when it ships.',
+          text: 'One exception, stated because it is ours rather than yours: an image placed inside a blog post is not linked to that post in a way we can follow, so purging an expired post reclaims the post and leaves its pictures. They are unreachable from anywhere in the product; they are still on disk. Deleting your account removes them, because that goes by account rather than by post.',
         },
       ],
     },
