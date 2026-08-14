@@ -1,6 +1,6 @@
 {
   "name": "travel-app-backend",
-  "version": "0.1.0",
+  "version": "0.12.0",
   "private": true,
   "description": "Supabase database: schema migrations, local stack config and type generation.",
   "scripts": {
