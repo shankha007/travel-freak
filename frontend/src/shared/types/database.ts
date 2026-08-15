@@ -163,6 +163,114 @@ export type Database = {
           },
         ]
       }
+      checklist_items: {
+        Row: {
+          category: string
+          checklist_id: string
+          created_at: string
+          id: string
+          is_done: boolean
+          label: string
+          notes: string
+          order_index: number
+          quantity: number
+          trip_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          checklist_id: string
+          created_at?: string
+          id?: string
+          is_done?: boolean
+          label: string
+          notes?: string
+          order_index?: number
+          quantity?: number
+          trip_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          checklist_id?: string
+          created_at?: string
+          id?: string
+          is_done?: boolean
+          label?: string
+          notes?: string
+          order_index?: number
+          quantity?: number
+          trip_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_items_checklist_id_fkey"
+            columns: ["checklist_id"]
+            isOneToOne: false
+            referencedRelation: "checklists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checklist_items_list_trip_fk"
+            columns: ["checklist_id", "trip_id"]
+            isOneToOne: false
+            referencedRelation: "checklists"
+            referencedColumns: ["id", "trip_id"]
+          },
+          {
+            foreignKeyName: "checklist_items_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklists: {
+        Row: {
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["checklist_kind"]
+          order_index: number
+          title: string
+          trip_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["checklist_kind"]
+          order_index?: number
+          title: string
+          trip_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["checklist_kind"]
+          order_index?: number
+          title?: string
+          trip_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklists_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_messages: {
         Row: {
           created_at: string
@@ -198,6 +306,185 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      expenses: {
+        Row: {
+          amount: number
+          category: Database["public"]["Enums"]["expense_category"]
+          created_at: string
+          currency: string
+          id: string
+          notes: string
+          paid_by: string
+          spent_at: string | null
+          title: string
+          trip_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          category?: Database["public"]["Enums"]["expense_category"]
+          created_at?: string
+          currency?: string
+          id?: string
+          notes?: string
+          paid_by?: string
+          spent_at?: string | null
+          title?: string
+          trip_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          category?: Database["public"]["Enums"]["expense_category"]
+          created_at?: string
+          currency?: string
+          id?: string
+          notes?: string
+          paid_by?: string
+          spent_at?: string | null
+          title?: string
+          trip_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      itinerary_days: {
+        Row: {
+          created_at: string
+          day_date: string | null
+          id: string
+          notes: string
+          order_index: number
+          title: string
+          trip_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          day_date?: string | null
+          id?: string
+          notes?: string
+          order_index?: number
+          title?: string
+          trip_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          day_date?: string | null
+          id?: string
+          notes?: string
+          order_index?: number
+          title?: string
+          trip_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "itinerary_days_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      itinerary_items: {
+        Row: {
+          booking_ref: string
+          cost: number | null
+          created_at: string
+          currency: string
+          day_id: string
+          id: string
+          kind: Database["public"]["Enums"]["itinerary_kind"]
+          notes: string
+          order_index: number
+          status: Database["public"]["Enums"]["itinerary_status"]
+          time_end: string | null
+          time_start: string | null
+          title: string
+          trip_id: string
+          updated_at: string
+          url: string
+          user_id: string
+        }
+        Insert: {
+          booking_ref?: string
+          cost?: number | null
+          created_at?: string
+          currency?: string
+          day_id: string
+          id?: string
+          kind?: Database["public"]["Enums"]["itinerary_kind"]
+          notes?: string
+          order_index?: number
+          status?: Database["public"]["Enums"]["itinerary_status"]
+          time_end?: string | null
+          time_start?: string | null
+          title: string
+          trip_id: string
+          updated_at?: string
+          url?: string
+          user_id: string
+        }
+        Update: {
+          booking_ref?: string
+          cost?: number | null
+          created_at?: string
+          currency?: string
+          day_id?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["itinerary_kind"]
+          notes?: string
+          order_index?: number
+          status?: Database["public"]["Enums"]["itinerary_status"]
+          time_end?: string | null
+          time_start?: string | null
+          title?: string
+          trip_id?: string
+          updated_at?: string
+          url?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "itinerary_items_day_id_fkey"
+            columns: ["day_id"]
+            isOneToOne: false
+            referencedRelation: "itinerary_days"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "itinerary_items_day_trip_fk"
+            columns: ["day_id", "trip_id"]
+            isOneToOne: false
+            referencedRelation: "itinerary_days"
+            referencedColumns: ["id", "trip_id"]
+          },
+          {
+            foreignKeyName: "itinerary_items_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       media: {
         Row: {
@@ -1981,7 +2268,23 @@ export type Database = {
       }
     }
     Enums: {
+      checklist_kind: "packing" | "todo"
       collaborator_role: "owner" | "editor" | "viewer"
+      expense_category:
+        | "flights"
+        | "hotels"
+        | "food"
+        | "activities"
+        | "shopping"
+        | "misc"
+      itinerary_kind:
+        | "activity"
+        | "hotel"
+        | "restaurant"
+        | "transport"
+        | "booking"
+        | "note"
+      itinerary_status: "planned" | "booked" | "done" | "skipped"
       media_kind: "image" | "video" | "audio"
       memory_kind:
         | "note"
@@ -2148,7 +2451,25 @@ export const Constants = {
   },
   public: {
     Enums: {
+      checklist_kind: ["packing", "todo"],
       collaborator_role: ["owner", "editor", "viewer"],
+      expense_category: [
+        "flights",
+        "hotels",
+        "food",
+        "activities",
+        "shopping",
+        "misc",
+      ],
+      itinerary_kind: [
+        "activity",
+        "hotel",
+        "restaurant",
+        "transport",
+        "booking",
+        "note",
+      ],
+      itinerary_status: ["planned", "booked", "done", "skipped"],
       media_kind: ["image", "video", "audio"],
       memory_kind: [
         "note",

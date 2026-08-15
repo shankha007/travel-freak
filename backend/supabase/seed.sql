@@ -325,6 +325,116 @@ values
    'Trains the whole way if the timings work.', 160000, 'INR', 3, 'Oct-Apr');
 
 -- ---------------------------------------------------------------------------
+-- The planner — screens 21, 22 and 23
+--
+-- Two trips carry planner rows, chosen so both halves of each screen are
+-- reachable in a fresh checkout:
+--
+--   Bhutan in autumn (planning, Nov 2026) gets the itinerary and the packing.
+--     A trip being planned is where a plan and a packing list belong, and its
+--     dates run past the range the "lay out the days" button covers in part, so
+--     the missing-days path is visible too.
+--   Ladakh on two wheels (completed, ₹85,000 planned) gets the expenses, one of
+--     them in USD — so the multi-currency case, which is the one the arithmetic
+--     refuses to collapse, is on screen rather than only in a unit test.
+--
+-- Deliberately partial: Bhutan's later days are left empty and its list is only
+-- half ticked, because a screen that is complete on first sight never shows its
+-- empty states.
+-- ---------------------------------------------------------------------------
+
+insert into public.itinerary_days (id, trip_id, user_id, day_date, title, notes, order_index)
+values
+  ('1a000001-0000-4000-8000-000000000001', 'a0000001-0000-4000-8000-000000000012',
+   '11111111-1111-1111-1111-111111111111', '2026-11-02', 'Land at Paro',
+   'The approach is the famous bit. Left window if the seat map allows.', 0),
+  ('1a000001-0000-4000-8000-000000000002', 'a0000001-0000-4000-8000-000000000012',
+   '11111111-1111-1111-1111-111111111111', '2026-11-03', 'Paro to Thimphu', '', 1),
+  ('1a000001-0000-4000-8000-000000000003', 'a0000001-0000-4000-8000-000000000012',
+   '11111111-1111-1111-1111-111111111111', '2026-11-04', 'Thimphu, slowly', '', 2),
+  -- Undated, and last: the idea nobody has placed yet.
+  ('1a000001-0000-4000-8000-000000000004', 'a0000001-0000-4000-8000-000000000012',
+   '11111111-1111-1111-1111-111111111111', null, 'Tiger''s Nest, whenever the knees agree',
+   'Six hours up and back. Start before seven.', 3);
+
+insert into public.itinerary_items (
+  day_id, trip_id, user_id, kind, title, notes,
+  time_start, time_end, cost, currency, booking_ref, status, order_index
+)
+values
+  ('1a000001-0000-4000-8000-000000000001', 'a0000001-0000-4000-8000-000000000012',
+   '11111111-1111-1111-1111-111111111111', 'transport', 'Flight to Paro', '',
+   '09:20', '11:45', 42000, 'INR', 'KB-204-PBH', 'booked', 0),
+  ('1a000001-0000-4000-8000-000000000001', 'a0000001-0000-4000-8000-000000000012',
+   '11111111-1111-1111-1111-111111111111', 'hotel', 'Guesthouse near the bridge',
+   'Three nights, breakfast included.', '14:00', null, 18000, 'INR', 'GH-8891', 'booked', 1),
+  ('1a000001-0000-4000-8000-000000000002', 'a0000001-0000-4000-8000-000000000012',
+   '11111111-1111-1111-1111-111111111111', 'transport', 'Road to Thimphu', 'Two hours, hired car.',
+   '10:00', '12:00', 3500, 'INR', '', 'planned', 0),
+  ('1a000001-0000-4000-8000-000000000002', 'a0000001-0000-4000-8000-000000000012',
+   '11111111-1111-1111-1111-111111111111', 'restaurant', 'Ema datshi, properly',
+   'Ask for it hot and regret it.', '13:30', null, null, 'INR', '', 'planned', 1),
+  ('1a000001-0000-4000-8000-000000000003', 'a0000001-0000-4000-8000-000000000012',
+   '11111111-1111-1111-1111-111111111111', 'activity', 'Buddha Dordenma at sunset', '',
+   '16:30', '18:00', null, 'INR', '', 'planned', 0),
+  ('1a000001-0000-4000-8000-000000000004', 'a0000001-0000-4000-8000-000000000012',
+   '11111111-1111-1111-1111-111111111111', 'activity', 'Taktsang monastery hike', '',
+   null, null, 2000, 'INR', '', 'planned', 0);
+
+insert into public.expenses (
+  trip_id, user_id, category, title, amount, currency, spent_at, paid_by, notes
+)
+values
+  ('a0000001-0000-4000-8000-000000000001', '11111111-1111-1111-1111-111111111111',
+   'flights', 'Delhi to Manali, coach', 4200, 'INR', '2026-05-07', 'me', ''),
+  ('a0000001-0000-4000-8000-000000000001', '11111111-1111-1111-1111-111111111111',
+   'hotels', 'Guesthouses, fourteen nights', 31500, 'INR', '2026-05-22', 'split three ways', ''),
+  ('a0000001-0000-4000-8000-000000000001', '11111111-1111-1111-1111-111111111111',
+   'activities', 'Bike hire and fuel', 26800, 'INR', '2026-05-22', 'me', 'Two punctures included.'),
+  ('a0000001-0000-4000-8000-000000000001', '11111111-1111-1111-1111-111111111111',
+   'food', 'Everything eaten on the road', 14300, 'INR', '2026-05-22', 'split three ways', ''),
+  ('a0000001-0000-4000-8000-000000000001', '11111111-1111-1111-1111-111111111111',
+   'shopping', 'Inner line permits and a new jacket', 6100, 'INR', '2026-05-10', 'me', ''),
+  -- The one in another currency. It gets its own total and no comparison
+  -- against the plan, because there is no exchange rate in this codebase.
+  ('a0000001-0000-4000-8000-000000000001', '11111111-1111-1111-1111-111111111111',
+   'misc', 'Spare GoPro battery, bought online', 39, 'USD', '2026-05-05', 'me', '');
+
+insert into public.checklists (id, trip_id, user_id, kind, title, order_index)
+values
+  ('1c000001-0000-4000-8000-000000000001', 'a0000001-0000-4000-8000-000000000012',
+   '11111111-1111-1111-1111-111111111111', 'packing', 'The bag', 0),
+  ('1c000001-0000-4000-8000-000000000002', 'a0000001-0000-4000-8000-000000000012',
+   '11111111-1111-1111-1111-111111111111', 'todo', 'Before we leave', 1);
+
+insert into public.checklist_items (
+  checklist_id, trip_id, user_id, label, category, quantity, is_done, order_index
+)
+values
+  ('1c000001-0000-4000-8000-000000000001', 'a0000001-0000-4000-8000-000000000012',
+   '11111111-1111-1111-1111-111111111111', 'Passport', 'Documents', 1, true, 0),
+  ('1c000001-0000-4000-8000-000000000001', 'a0000001-0000-4000-8000-000000000012',
+   '11111111-1111-1111-1111-111111111111', 'Bhutan permit printout', 'Documents', 1, true, 1),
+  ('1c000001-0000-4000-8000-000000000001', 'a0000001-0000-4000-8000-000000000012',
+   '11111111-1111-1111-1111-111111111111', 'Thermal base layers', 'Layers', 2, false, 2),
+  ('1c000001-0000-4000-8000-000000000001', 'a0000001-0000-4000-8000-000000000012',
+   '11111111-1111-1111-1111-111111111111', 'Down jacket', 'Layers', 1, false, 3),
+  ('1c000001-0000-4000-8000-000000000001', 'a0000001-0000-4000-8000-000000000012',
+   '11111111-1111-1111-1111-111111111111', 'Walking boots, broken in', 'Extremities', 1, true, 4),
+  ('1c000001-0000-4000-8000-000000000001', 'a0000001-0000-4000-8000-000000000012',
+   '11111111-1111-1111-1111-111111111111', 'Camera and spare batteries', 'Electronics', 1, false, 5),
+  -- Uncategorised on purpose: the screen has to render a group with no heading.
+  ('1c000001-0000-4000-8000-000000000001', 'a0000001-0000-4000-8000-000000000012',
+   '11111111-1111-1111-1111-111111111111', 'Altitude tablets', '', 1, false, 6),
+
+  ('1c000001-0000-4000-8000-000000000002', 'a0000001-0000-4000-8000-000000000012',
+   '11111111-1111-1111-1111-111111111111', 'Confirm the guide', 'Bookings', 1, true, 0),
+  ('1c000001-0000-4000-8000-000000000002', 'a0000001-0000-4000-8000-000000000012',
+   '11111111-1111-1111-1111-111111111111', 'Pay the daily levy', 'Bookings', 1, false, 1),
+  ('1c000001-0000-4000-8000-000000000002', 'a0000001-0000-4000-8000-000000000012',
+   '11111111-1111-1111-1111-111111111111', 'Download offline maps', 'Phone', 1, false, 2);
+
+-- ---------------------------------------------------------------------------
 -- Safety net
 --
 -- The triggers above rebuild visited_regions row by row. Running the refresh

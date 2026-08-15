@@ -7,17 +7,22 @@ import {
   BookOpen,
   CalendarDays,
   Camera,
+  ChevronRight,
   Clock,
   Globe2,
   Images,
+  ListChecks,
   MapPin,
   Pencil,
   Quote,
+  Route,
   Sparkles,
   Users,
   Wallet,
 } from 'lucide-react'
 import { getTripDetail } from '@/server/queries/trip-detail'
+import { getPlannerSummary } from '@/server/queries/planner'
+import { formatMoney } from '@/shared/budget'
 import { SITE_URL } from '@/shared/brand'
 import { ShareTripCard } from '@/client/components/trips/share-trip-card'
 import { countryFlag, countryName } from '@/shared/geo/countries'
@@ -67,6 +72,47 @@ export default async function TripDetailPage({ params }: PageProps<'/trips/[id]'
   // Covers both "does not exist" and "not yours" — RLS returns nothing either
   // way, so the two are indistinguishable from here. That is deliberate.
   if (!trip) notFound()
+
+  // Screens 21, 22 and 23 in three lines. Read after the trip rather than
+  // alongside it, because there is nothing to summarise for a trip that turns
+  // out not to be readable.
+  const planner = await getPlannerSummary(trip.id)
+
+  const plannerLinks = [
+    {
+      href: `/trips/${trip.id}/itinerary`,
+      icon: Route,
+      label: 'Itinerary',
+      detail:
+        planner.dayCount === 0
+          ? 'Plan it day by day'
+          : `${planner.dayCount} ${planner.dayCount === 1 ? 'day' : 'days'} · ${
+              planner.itemCount
+            } ${planner.itemCount === 1 ? 'entry' : 'entries'}`,
+    },
+    {
+      href: `/trips/${trip.id}/budget`,
+      icon: Wallet,
+      label: 'Budget',
+      detail:
+        planner.spent.length > 0
+          ? `${planner.spent.map((s) => formatMoney(s.total, s.currency)).join(' + ')} spent`
+          : trip.budgetPlanned !== null
+            ? `${formatMoney(trip.budgetPlanned, trip.currency)} planned, nothing spent yet`
+            : 'Set what it should cost',
+    },
+    {
+      href: `/trips/${trip.id}/packing`,
+      icon: ListChecks,
+      label: 'Packing',
+      detail:
+        planner.packing.total === 0
+          ? 'Nothing to forget yet'
+          : `${planner.packing.done} of ${planner.packing.total} done across ${
+              planner.listCount
+            } ${planner.listCount === 1 ? 'list' : 'lists'}`,
+    },
+  ]
 
   // How much of the route can actually be drawn. A place recorded by name alone
   // carries no pin, and the note under the timeline says so rather than claiming
@@ -156,6 +202,29 @@ export default async function TripDetailPage({ params }: PageProps<'/trips/[id]'
                   <span className="text-2xl leading-tight font-semibold tabular-nums">{value}</span>
                 </CardContent>
               </Card>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* The planner. Three screens that belong to this trip and are only
+          reachable from it — a bin of sub-routes in the sidebar would be
+          meaningless without a trip in hand. */}
+      <section aria-label="Planner">
+        <ul className="grid gap-3 sm:grid-cols-3">
+          {plannerLinks.map(({ href, icon: Icon, label, detail }) => (
+            <li key={href}>
+              <Link
+                href={href}
+                className="flex h-full items-center gap-3 rounded-xl border p-4 transition-colors hover:bg-accent"
+              >
+                <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium">{label}</span>
+                  <span className="block truncate text-sm text-muted-foreground">{detail}</span>
+                </span>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+              </Link>
             </li>
           ))}
         </ul>

@@ -59,6 +59,10 @@ export const NAV_ITEMS: NavItem[] = [
     phase: 'M',
     screen: 18,
     summary: 'Past, ongoing, upcoming and draft trips, with grid and timeline views.',
+    // Screens 21, 22 and 23 — itinerary, budget and packing — live under
+    // `/trips/[id]/…` and are deliberately absent from this list. Every entry
+    // here is a real, reachable href, and there is no meaningful `/itinerary`
+    // without a trip in hand; the trip page is what navigates to them.
   },
   {
     href: '/maps/world',

@@ -49,6 +49,41 @@ their own line — nobody outside the repo ever saw them.
 
 ## Unreleased
 
+### Added
+
+- **Itinerary builder** at `/trips/[id]/itinerary`. A trip is planned day by
+  day: each day holds activities, stays, food, travel, bookings and notes, and
+  a day needs neither a date nor a name to hold a plan — an idea gets written
+  down before anything is booked. A trip with dates offers to lay out every day
+  you are away in one click, skipping any you have already made. Costs roll up
+  per day and for the whole trip, and are shown one line per currency rather
+  than added together. Days, activities and notes are free on every plan; times,
+  costs, booking references and links come with the paid ones.
+- **Budget planner** at `/trips/[id]/budget`. What the trip was meant to cost,
+  against what it actually did. Recording an expense is free on every plan, as
+  is the planned total and what is left of it; the breakdown by category and
+  its chart come with the paid ones. **Nothing is ever converted between
+  currencies** — a trip paid for partly in rupees and partly in dollars gets two
+  totals and says why, because there is no exchange rate here and inventing one
+  would be worse than the extra line. The budget is the same field the trip page
+  and analytics already show, so setting it here sets it everywhere, and the
+  screen also totals what your itinerary expects to cost — a third number, and a
+  different one. Only you can see any of it: not collaborators, and never a
+  public trip page.
+- **Packing and checklists** at `/trips/[id]/packing`. Packing lists and to-do
+  lists per trip, grouped under headings you choose, with a progress count on
+  every list and one for the trip. Adding a line and ticking one off are each a
+  single gesture with no dialog in the way. Free plans get three lists per trip;
+  the unlimited plans get as many as you like plus six templates — essentials,
+  before-you-go, warm and cold weather, work trips and travelling with children
+  — copied in as ordinary lists you can gut and rewrite.
+- **A planner strip on every trip page**, linking to those three screens and
+  saying what is on each: how many days and entries are planned, what has been
+  spent, and how much of the packing is done.
+- **Everything above is in your data export.** Days, entries, expenses, lists
+  and their items are all rows the account owns, so `/api/export` carries them
+  like everything else.
+
 ### Changed
 
 - **The app responds the moment you click.** Every screen behind the login is
@@ -85,8 +120,8 @@ their own line — nobody outside the repo ever saw them.
 ### Infrastructure
 
 - **CI runs on every push and pull request.** Two jobs: the frontend one checks
-  formatting, lint, types, the 381 unit tests and a production build; the
-  database one boots the Supabase stack and runs the 122 pgTAP assertions that
+  formatting, lint, types, the 436 unit tests and a production build; the
+  database one boots the Supabase stack and runs the 158 pgTAP assertions that
   are the real guarantee one traveller cannot read another's trips. It also
   regenerates the database types and fails if they differ from what is
   committed — a migration that changes a table without them compiles fine and is
