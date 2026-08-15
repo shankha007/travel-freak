@@ -24,19 +24,39 @@ export async function getAccountExport(): Promise<ExportDocument> {
   const user = await requireUser()
   const entitlements = await getEntitlements()
 
-  const [profile, trips, places, media, memories, albums, posts, wishlist, countries, regions] =
-    await Promise.all([
-      supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
-      supabase.from('trips').select('*').eq('user_id', user.id),
-      supabase.from('trip_places').select('*').eq('user_id', user.id),
-      supabase.from('media').select('*').eq('user_id', user.id),
-      supabase.from('memories').select('*').eq('user_id', user.id),
-      supabase.from('albums').select('*').eq('user_id', user.id),
-      supabase.from('blog_posts').select('*').eq('user_id', user.id),
-      supabase.from('wishlist_items').select('*').eq('user_id', user.id),
-      supabase.from('visited_countries').select('*').eq('user_id', user.id),
-      supabase.from('visited_regions').select('*').eq('user_id', user.id),
-    ])
+  const [
+    profile,
+    trips,
+    places,
+    media,
+    memories,
+    albums,
+    posts,
+    wishlist,
+    itineraryDays,
+    itineraryItems,
+    expenses,
+    checklists,
+    checklistItems,
+    countries,
+    regions,
+  ] = await Promise.all([
+    supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
+    supabase.from('trips').select('*').eq('user_id', user.id),
+    supabase.from('trip_places').select('*').eq('user_id', user.id),
+    supabase.from('media').select('*').eq('user_id', user.id),
+    supabase.from('memories').select('*').eq('user_id', user.id),
+    supabase.from('albums').select('*').eq('user_id', user.id),
+    supabase.from('blog_posts').select('*').eq('user_id', user.id),
+    supabase.from('wishlist_items').select('*').eq('user_id', user.id),
+    supabase.from('itinerary_days').select('*').eq('user_id', user.id),
+    supabase.from('itinerary_items').select('*').eq('user_id', user.id),
+    supabase.from('expenses').select('*').eq('user_id', user.id),
+    supabase.from('checklists').select('*').eq('user_id', user.id),
+    supabase.from('checklist_items').select('*').eq('user_id', user.id),
+    supabase.from('visited_countries').select('*').eq('user_id', user.id),
+    supabase.from('visited_regions').select('*').eq('user_id', user.id),
+  ])
 
   const data: ExportContents = {
     profile: profile.data ?? null,
@@ -47,6 +67,11 @@ export async function getAccountExport(): Promise<ExportDocument> {
     albums: albums.data ?? [],
     posts: posts.data ?? [],
     wishlist: wishlist.data ?? [],
+    itineraryDays: itineraryDays.data ?? [],
+    itineraryItems: itineraryItems.data ?? [],
+    expenses: expenses.data ?? [],
+    checklists: checklists.data ?? [],
+    checklistItems: checklistItems.data ?? [],
     visitedCountries: countries.data ?? [],
     visitedRegions: regions.data ?? [],
   }

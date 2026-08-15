@@ -40,6 +40,12 @@ export interface ExportContents {
   albums: unknown[]
   posts: unknown[]
   wishlist: unknown[]
+  /** The planner: screens 21, 22 and 23. */
+  itineraryDays: unknown[]
+  itineraryItems: unknown[]
+  expenses: unknown[]
+  checklists: unknown[]
+  checklistItems: unknown[]
   visitedCountries: unknown[]
   visitedRegions: unknown[]
 }
@@ -63,6 +69,11 @@ export const EXPORT_SECTIONS: (keyof ExportContents)[] = [
   'albums',
   'posts',
   'wishlist',
+  'itineraryDays',
+  'itineraryItems',
+  'expenses',
+  'checklists',
+  'checklistItems',
   'visitedCountries',
   'visitedRegions',
 ]

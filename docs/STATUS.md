@@ -13,7 +13,9 @@ Last updated: 2026-08-15 · current release: 0.12.0
 Every ✅ below was re-checked in a browser against the local stack on 2026-08-13,
 including sign-in, the globe and both maps on a free and a paid plan, the trip
 and blog screens, delete → trash → restore, and a share link through create,
-open, revoke and pull-back.
+open, revoke and pull-back. The three planner screens were checked the same way
+on 2026-08-15, including a list ticked off and a fortnight of itinerary days
+laid out in one click, both confirmed in the database afterwards.
 
 ## Legend
 
@@ -34,12 +36,12 @@ open, revoke and pull-back.
 | Public / marketing | 8 | 0 | 0 | 2 |
 | Auth | 6 | 0 | 0 | 1 |
 | Dashboard & globe | 5 | 2 | 0 | 0 |
-| Trips & planner | 5 | 1 | 0 | 4 |
+| Trips & planner | 7 | 2 | 0 | 1 |
 | Memory & content | 7 | 0 | 0 | 0 |
 | Analytics & resume | 2 | 0 | 0 | 2 |
 | Public sharing | 5 | 0 | 0 | 0 |
 | Account | 3 | 1 | 0 | 3 |
-| **Total** | **61** | **4** | **0** | **13** |
+| **Total** | **63** | **5** | **0** | **10** |
 
 ---
 
@@ -51,14 +53,14 @@ open, revoke and pull-back.
 | — | shadcn/ui + Base UI component set | ✅ Done | 21 components installed |
 | — | Light/dark theming | ✅ Done | `next-themes`, system default, no flash |
 | — | Supabase local stack | ✅ Done | Docker; API 54321, DB 54322, Studio 54323 |
-| — | Postgres schema + RLS | ✅ Done | 14 tables, PostGIS, policies on every table. `trip_places.location` is written as EWKT and read back through generated `latitude`/`longitude` columns, because PostgREST returns geography as hex EWKB — see `shared/geo/point.ts` |
+| — | Postgres schema + RLS | ✅ Done | 19 tables, PostGIS, policies on every table. `trip_places.location` is written as EWKT and read back through generated `latitude`/`longitude` columns, because PostgREST returns geography as hex EWKB — see `shared/geo/point.ts` |
 | — | `visited_regions` aggregate + triggers | ✅ Done | Rebuilt from `trip_places` / `visited_countries` / `wishlist_items`, in that precedence — a bare "been there" mark never displaces what a logged trip knows |
 | — | Data API grants | ✅ Done | Migration `20260811000100` for `anon`/`authenticated`, `20260813000400` for `service_role` — without the latter every elevated read (share tokens, derivatives) 42501s |
-| — | Seed data | ✅ Done | 12 trips, 8 countries, 1 demo account. Places carry pins, so routes, distances and the vault's map are visible in a fresh checkout; Kolkata and Thimphu deliberately have none, covering the unpinned and part-pinned cases. No `media` rows — a row without a storage object breaks more than it demonstrates |
+| — | Seed data | ✅ Done | 12 trips, 8 countries, 1 demo account. Places carry pins, so routes, distances and the vault's map are visible in a fresh checkout; Kolkata and Thimphu deliberately have none, covering the unpinned and part-pinned cases. The Bhutan trip carries an itinerary and two checklists and Ladakh carries six expenses — one of them in USD, so the multi-currency case the arithmetic refuses to collapse is on screen rather than only in a unit test. All three are deliberately incomplete, because a screen that is full on first sight never shows its empty states. No `media` rows — a row without a storage object breaks more than it demonstrates |
 | — | Generated DB types | ✅ Done | `npm run db:types` → `shared/types/database.ts` |
 | — | `brand.ts` rename safety | ✅ Done | No component hardcodes the product name |
-| — | **`entitlements.ts`** | ✅ Done | Reads `plans.limits`; `checkTripQuota()` counts the caller's own live rows rather than trusting the denormalised counter. Gates both `/trips/new` and the create action |
-| — | **pgTAP RLS tests** | ✅ Done | `backend/supabase/tests/database/rls.test.sql`, 86 assertions, `npm run db:test`. Two users, cross-user reads and writes, anon visibility, unpublish, soft delete, trip and post share tokens, and the trash listing |
+| — | **`entitlements.ts`** | ✅ Done | Reads `plans.limits`; `checkTripQuota()` counts the caller's own live rows rather than trusting the denormalised counter. Gates both `/trips/new` and the create action. Also `itinerary_full`, `budget_full` and `checklists` — the last read **per trip**, which is the only reading under which "3 lists" makes sense on a screen that belongs to one |
+| — | **pgTAP RLS tests** | ✅ Done | 158 assertions over two files, `npm run db:test`. `rls.test.sql`: two users, cross-user reads and writes, anon visibility, unpublish, soft delete, trip and post share tokens, the trash listing and account deletion. `planner.test.sql`: the three visibility rules the planner tables do *not* share — and above all that publishing a trip publishes none of them, which is the failure that would otherwise go unnoticed because everything would still work |
 | — | HTML sanitisation | ✅ Done | `shared/content/sanitize.ts` — allowlist applied on read, so stored post markup cannot execute on the app's origin |
 | — | **Storage + signed uploads** | ✅ Done | Private `media` bucket, keys `<user>/<trip>/<media>.<ext>` — or `<user>/posts/<post>/<media>.<ext>` for post images — matching the storage policies, which only read the first segment. Reads go out as one-hour signed URLs; `next/image` is allow-listed to the storage host only |
 | — | **Geo assets** | ✅ Done | `npm run build:geo` writes country outlines plus admin-1 split one file per country, simplified 4% with mapshaper. Natural Earth 50m carries ISO 3166-2 for nine large countries, India among them. The map reads `admin1/index.json` before fetching, so an uncovered country costs no request |
@@ -118,9 +120,9 @@ open, revoke and pull-back.
 | — | **Edit trip** `/trips/[id]/edit` | ✅ Done | Same wizard as create (`TripForm`), saveable from any step. Slug and `published_at` are deliberately stable; places are matched by id so memories stay pinned |
 | — | **Delete trip** | ✅ Done | Confirm dialog → `soft_delete_trip()`; sets `deleted_at`, repaints the globe, frees quota, destroys nothing. Restorable from `/trash` for 30 days |
 | — | **Trash** `/trash` | ✅ Done | Trips and posts deleted in the last 30 days, with restore, a countdown and a count of what comes back. Reads deleted trips through `list_deleted_trips()`, because `trips_select_own` hides them from their own owner. Restoring is refused when it would breach the plan's trip limit |
-| 21 | Itinerary builder | ⬜ Not started | Tables not yet migrated |
-| 22 | Budget planner | ⬜ Not started | `expenses` table not yet migrated |
-| 23 | Packing / checklists | ⬜ Not started | Phase 1.1 |
+| 21 | **Itinerary builder** `/trips/[id]/itinerary` | 🟡 Partial | Days and entries over `itinerary_days` / `itinerary_items`. A day needs neither date nor title, so a trip in planning can be laid out before it has dates; a trip that has them offers to create every missing day in one click, capped at 60 so a mistyped year cannot write 370 rows. Six kinds, four statuses, per-day and per-trip cost roll-ups grouped by currency and never summed across. Times, costs, booking refs and links are gated on `itinerary_full` and **dropped rather than refused** on a free plan, which is what the pricing table sells. **No drag-and-drop and no map alongside** — `order_index` exists and nothing reorders it yet |
+| 22 | **Budget planner** `/trips/[id]/budget` | ✅ Done | `expenses` against `trips.budget_planned`, which is the same field the trip form and analytics read, so a budget set here is set everywhere. One panel per currency: the plan only applies to the currency it was written in, and spend in any other gets a total and no comparison, because there is no exchange rate here. Category breakdown and its chart are gated on `budget_full`; recording an expense and seeing the totals are free, since a budget you cannot write to is not a budget. Also totals what the itinerary expects to cost. `shared/budget.ts` is pure and holds all of it, with 20 assertions |
+| 23 | **Packing / checklists** `/trips/[id]/packing` | ✅ Done | `checklists` / `checklist_items`, packing and to-do, grouped by a free-text category in the order they were built. Adding a line and ticking one off are each one gesture and no dialog; the tick sends the value it means rather than a toggle, so two taps cannot race. `limits.checklists` is read **per trip** — three on the free plan — and templates are the unlimited plans' feature: six of them in `shared/packing.ts`, copied in as ordinary rows so a list can be gutted without breaking anything |
 | 24 | Collaborators | ⬜ Not started | Phase 1.2; `trip_collaborators` table and policies exist |
 
 ## Memory & content
@@ -223,11 +225,12 @@ open, revoke and pull-back.
    nothing in the repo makes that happen. A database webhook or a scheduled digest to
    `BRAND.support.email` would close it, and `handled_at` is already there to mark what has been
    answered.
-9. **Analytics can only show budgets that were *planned*.** `trips.budget_planned` is the
-   only money in the schema; the `expenses` table screen 22 needs is not migrated, so there is
-   nothing to compare a plan against. The screen says so rather than labelling a plan as spend,
-   and the arithmetic groups by currency rather than converting — adding ₹40,000 to $400 needs an
-   exchange rate this codebase does not have and should not invent.
+9. **Analytics still only shows budgets that were *planned*.** `expenses` now exists and the
+   budget screen compares the two per trip, but `/analytics` has not been taught to read it, so
+   its money section is still plans rather than spend. The arithmetic it would need is already
+   written and tested in `shared/budget.ts`; what is missing is the account-wide query and a
+   decision about how to present a figure that cannot be summed across currencies. Both screens
+   already refuse to convert, so whatever is added must too.
 10. **A partially pinned trip reads as unmeasured.** `totalDistanceKm` skips places without
    coordinates, so one pin among three measures nothing. That is the honest answer — the legs it
    cannot see are real distance — but the resume shows no explanation for why a trip with places
@@ -242,3 +245,19 @@ open, revoke and pull-back.
    user from the proxy to the render — a request header, or a short-lived per-request cache — is
    the fix, and it is the largest latency left on an authenticated page now that the screens
    paint immediately.
+12. **The itinerary cannot be reordered, and has no map.** `itinerary_days.order_index` and
+   `itinerary_items.order_index` are written on insert and never changed after it, so an entry
+   added late sits at the bottom of its day whatever time it carries — the sort puts timed
+   entries in time order first, which hides it for a full plan and not for a sparse one. The
+   plan asks for drag-and-drop and for a map beside the days; the second also wants a `location`
+   column on `itinerary_items`, which was deliberately left out rather than shipped as a column
+   nothing writes.
+13. **A collaborator can plan a trip but not see what it costs.** `expenses` has one policy,
+   `user_id = auth.uid()`, and no collaborator clause at all, which is the right default for
+   money and the wrong answer for four friends splitting a trip. `paid_by` is free text for that
+   reason — it records who paid without pretending to settle up. Splitting properly is Phase 1.2
+   and needs its own sharing model rather than an early guess at one.
+14. **Nothing connects a planned cost to what was actually spent.** The budget screen totals the
+   itinerary's costs beside the expenses, but the two are separate rows and nobody can say "this
+   hotel is that expense". Marking an itinerary entry paid, or generating an expense from one,
+   would close the loop; the day it does, per-day actual spend becomes possible too.

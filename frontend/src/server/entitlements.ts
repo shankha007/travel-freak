@@ -26,6 +26,10 @@ export interface PlanLimits {
   storage_bytes: number | null
   globe_region_detail: boolean
   analytics_advanced: boolean
+  itinerary_full: boolean
+  budget_full: boolean
+  /** Checklists per trip. null → unlimited. */
+  checklists: number | null
   planned_trips: number | null
   collaborators_per_trip: number | null
   albums: boolean
@@ -271,4 +275,69 @@ export async function canUseRegionDetail(): Promise<boolean> {
 export async function canUseAdvancedAnalytics(): Promise<boolean> {
   const { limits } = await getEntitlements()
   return limits.analytics_advanced === true
+}
+
+/**
+ * The paid half of the itinerary builder — screen 21.
+ *
+ * The pricing table sells the free tier as "days, activities, notes" and the
+ * paid one as "times, costs, bookings". So this gates four fields on an entry
+ * rather than the screen: a free plan is a real plan, and walling off the
+ * builder entirely would take away a tool people use before they pay for
+ * anything.
+ */
+export async function canUseFullItinerary(): Promise<boolean> {
+  const { limits } = await getEntitlements()
+  return limits.itinerary_full === true
+}
+
+/**
+ * The paid half of the budget planner — screen 22.
+ *
+ * Free gets the totals: planned, spent, what is left. Paid gets the category
+ * breakdown and its chart. Recording an expense is free on every plan, because
+ * a budget you cannot add to is not a budget.
+ */
+export async function canUseFullBudget(): Promise<boolean> {
+  const { limits } = await getEntitlements()
+  return limits.budget_full === true
+}
+
+/**
+ * Whether another checklist may be added to this trip — screen 23.
+ *
+ * `limits.checklists` is read as **per trip**, which is the reading the screen
+ * it gates makes sense under: the packing screen belongs to one trip, and
+ * "3 lists" spent across an account's fifteen trips would mean twelve trips
+ * with nothing to pack into.
+ *
+ * Counted live, and filtered by `user_id` as well as `trip_id`, for the same
+ * reason `checkTripQuota()` is: a quota gate should not depend on a
+ * denormalisation, and it should not charge anyone for rows that are not theirs.
+ */
+export async function checkChecklistQuota(tripId: string): Promise<QuotaCheck> {
+  const supabase = await createClient()
+  const user = await requireUser()
+  const { limits, planName } = await getEntitlements()
+
+  const limit = limits.checklists ?? null
+  const { count } = await supabase
+    .from('checklists')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .eq('trip_id', tripId)
+
+  const used = count ?? 0
+
+  if (limit === null) return { allowed: true, used, limit }
+
+  return {
+    allowed: used < limit,
+    used,
+    limit,
+    reason:
+      used < limit
+        ? undefined
+        : `${planName} includes ${limit} lists per trip and this trip has ${used}. Upgrade for as many as you like — nothing you have written is affected.`,
+  }
 }

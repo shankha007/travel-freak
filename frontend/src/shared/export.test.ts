@@ -17,6 +17,11 @@ const empty: ExportContents = {
   albums: [],
   posts: [],
   wishlist: [],
+  itineraryDays: [],
+  itineraryItems: [],
+  expenses: [],
+  checklists: [],
+  checklistItems: [],
   visitedCountries: [],
   visitedRegions: [],
 }
