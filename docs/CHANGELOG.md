@@ -49,10 +49,43 @@ their own line — nobody outside the repo ever saw them.
 
 ## Unreleased
 
+### Changed
+
+- **The app responds the moment you click.** Every screen behind the login is
+  rendered per request, and Next.js will not prefetch a route like that unless
+  it declares a loading state — so none of them were prefetched, and a click
+  bought a full server round trip with the old screen still on screen and
+  nothing to say the click had landed. Each screen now has one, so the layout
+  and a skeleton of the page paint immediately and the content fills in behind
+  them. The sidebar stays live while it happens, and a second click can change
+  its mind without waiting for the first to finish.
+- **Going back is instant.** Returning to a screen you have already opened no
+  longer re-runs its queries from scratch; results are held for 30 seconds, and
+  anything you change yourself clears them straight away, so an edit still shows
+  up the moment you navigate.
+- **Roughly 595 KB less to download.** The sidebar was pulling in the whole
+  icon library — about 1,500 icons — to draw the eleven it uses, on every
+  authenticated page. It now asks for the eleven.
+
+### Fixed
+
+- **A trip page no longer says your places have no coordinates when they do.**
+  The line under the route timeline was written before places could carry a pin
+  and never changed after they could. It now counts the stops that are actually
+  pinned, links to the vault's map — which has been drawing them in visit order
+  all along — and says plainly when nothing on the trip is pinned yet.
+- **Closing a country on the globe no longer flashes "Unknown".** The selection
+  lives in the URL, so it emptied while the dialog was still fading out, and the
+  last frame was an empty panel with no country name. The country you opened is
+  held until the panel has gone.
+- **"1 countries" on a new dashboard.** The opening line of the dashboard now
+  counts in singular where it should — the one screen where it was most likely
+  to be read, since it is what a new account sees first.
+
 ### Infrastructure
 
 - **CI runs on every push and pull request.** Two jobs: the frontend one checks
-  formatting, lint, types, the 379 unit tests and a production build; the
+  formatting, lint, types, the 381 unit tests and a production build; the
   database one boots the Supabase stack and runs the 122 pgTAP assertions that
   are the real guarantee one traveller cannot read another's trips. It also
   regenerates the database types and fails if they differ from what is

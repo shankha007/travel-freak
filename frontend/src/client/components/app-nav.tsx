@@ -2,8 +2,22 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import * as Icons from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
+import {
+  CalendarRange,
+  ChartNoAxesColumn,
+  Circle,
+  FileBadge,
+  Globe2,
+  Heart,
+  LayoutDashboard,
+  Luggage,
+  Map,
+  MapPin,
+  NotebookPen,
+  Settings,
+  Trash2,
+  type LucideIcon,
+} from 'lucide-react'
 import { MOBILE_NAV, PRIMARY_NAV, type NavItem } from '@/shared/navigation'
 import { cn } from '@/shared/utils'
 
@@ -15,8 +29,39 @@ import { cn } from '@/shared/utils'
  * product, and it keeps the information architecture reviewable.
  */
 
+/**
+ * The icons `shared/navigation.ts` names, listed one by one.
+ *
+ * This was `import * as Icons` with an `Icons[name]` lookup, which reads better
+ * and cost the whole library. A namespace object indexed by a runtime string
+ * has no statically knowable member set, so nothing can be dropped: the
+ * bundler has to keep every export, and `optimizePackageImports` — which works
+ * by rewriting named imports into deep paths — has no named import to rewrite.
+ * lucide-react is ~1,500 icon modules, and this component renders in the app
+ * shell on every authenticated page, so all of them landed in the shared chunk
+ * that gates first paint.
+ *
+ * The cost of the explicit map is that a new `icon:` in the nav must be added
+ * here too. It falls back to `Circle`, exactly as the old lookup did, so the
+ * failure is a wrong icon rather than a crash.
+ */
+export const NAV_ICONS: Record<string, LucideIcon> = {
+  CalendarRange,
+  ChartNoAxesColumn,
+  FileBadge,
+  Globe2,
+  Heart,
+  LayoutDashboard,
+  Luggage,
+  Map,
+  MapPin,
+  NotebookPen,
+  Settings,
+  Trash2,
+}
+
 function Icon({ name, className }: { name: string; className?: string }) {
-  const Resolved = (Icons as unknown as Record<string, LucideIcon>)[name] ?? Icons.Circle
+  const Resolved = NAV_ICONS[name] ?? Circle
   return <Resolved className={className} aria-hidden />
 }
 
