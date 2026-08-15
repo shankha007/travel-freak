@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { CalendarDays, ImageOff, MapPin, Plane } from 'lucide-react'
@@ -33,10 +34,36 @@ interface RegionModalProps {
  * Opened from the globe, the region list, and directly via `?region=XXX` — the
  * deep link is what makes an individual country shareable.
  */
-export function RegionModal({ countryCode, detail, isLoading, onClose }: RegionModalProps) {
+export function RegionModal({
+  countryCode,
+  detail: selectedDetail,
+  isLoading,
+  onClose,
+}: RegionModalProps) {
   const open = countryCode !== null
-  const name = detail?.countryName ?? countryName(countryCode)
-  const flag = countryFlag(countryCode)
+
+  // Closing empties the selection — it lives in the URL — while the dialog is
+  // still playing its exit animation. Rendered straight from the props, that
+  // last frame is a modal titled "Unknown" with nothing in it. So the last real
+  // country and its detail are held and drawn on the way out; they are replaced
+  // the moment another country opens, never read while one is selected.
+  const [shown, setShown] = useState<{ countryCode: string; detail: RegionDetail | null } | null>(
+    null
+  )
+  if (
+    countryCode !== null &&
+    (shown?.countryCode !== countryCode || shown.detail !== selectedDetail)
+  ) {
+    // Adjusting state during render rather than in an effect: an effect would
+    // land a frame late, and the frame it missed is the one being fixed.
+    setShown({ countryCode, detail: selectedDetail })
+  }
+
+  const shownCode = countryCode ?? shown?.countryCode ?? null
+  const detail = countryCode !== null ? selectedDetail : (shown?.detail ?? null)
+
+  const name = detail?.countryName ?? countryName(shownCode)
+  const flag = countryFlag(shownCode)
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>

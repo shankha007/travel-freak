@@ -67,6 +67,21 @@ their own line — nobody outside the repo ever saw them.
   icon library — about 1,500 icons — to draw the eleven it uses, on every
   authenticated page. It now asks for the eleven.
 
+### Fixed
+
+- **A trip page no longer says your places have no coordinates when they do.**
+  The line under the route timeline was written before places could carry a pin
+  and never changed after they could. It now counts the stops that are actually
+  pinned, links to the vault's map — which has been drawing them in visit order
+  all along — and says plainly when nothing on the trip is pinned yet.
+- **Closing a country on the globe no longer flashes "Unknown".** The selection
+  lives in the URL, so it emptied while the dialog was still fading out, and the
+  last frame was an empty panel with no country name. The country you opened is
+  held until the panel has gone.
+- **"1 countries" on a new dashboard.** The opening line of the dashboard now
+  counts in singular where it should — the one screen where it was most likely
+  to be read, since it is what a new account sees first.
+
 ### Infrastructure
 
 - **CI runs on every push and pull request.** Two jobs: the frontend one checks

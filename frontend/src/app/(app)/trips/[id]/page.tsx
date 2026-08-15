@@ -68,6 +68,11 @@ export default async function TripDetailPage({ params }: PageProps<'/trips/[id]'
   // way, so the two are indistinguishable from here. That is deliberate.
   if (!trip) notFound()
 
+  // How much of the route can actually be drawn. A place recorded by name alone
+  // carries no pin, and the note under the timeline says so rather than claiming
+  // — as it used to, for every trip — that nothing here has coordinates at all.
+  const pinnedPlaces = trip.places.filter((p) => p.lat !== null && p.lng !== null).length
+
   const stats = [
     { label: 'Countries', value: trip.countryCodes.length, icon: Globe2 },
     { label: 'Places', value: trip.places.length, icon: MapPin },
@@ -201,9 +206,29 @@ export default async function TripDetailPage({ params }: PageProps<'/trips/[id]'
                 </p>
               )}
 
-              <p className="mt-4 text-xs text-muted-foreground">
-                A route map lands with the world-map screen — places have no coordinates stored yet.
-              </p>
+              {trip.places.length > 0 && (
+                <p className="mt-4 text-xs text-muted-foreground">
+                  {pinnedPlaces === 0 ? (
+                    'No stop here carries a pin yet, so there is nothing to draw on a map. Add one from Edit.'
+                  ) : (
+                    <>
+                      {pinnedPlaces === trip.places.length
+                        ? 'Every stop carries a pin'
+                        : `${pinnedPlaces} of ${trip.places.length} stops ${
+                            pinnedPlaces === 1 ? 'carries' : 'carry'
+                          } a pin`}
+                      {' — the '}
+                      <Link
+                        href={`/trips/${trip.id}/vault`}
+                        className="underline underline-offset-2"
+                      >
+                        vault&rsquo;s map
+                      </Link>
+                      {' draws them in visit order.'}
+                    </>
+                  )}
+                </p>
+              )}
             </CardContent>
           </Card>
 

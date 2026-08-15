@@ -50,8 +50,9 @@ export default async function DashboardPage() {
           Welcome back, {user.displayName.split(' ')[0]}
         </h1>
         <p className="text-sm text-muted-foreground">
-          {stats.countries} countries and {stats.cities} cities so far — that is{' '}
-          {stats.percentOfWorld}% of the world.
+          {stats.countries} {stats.countries === 1 ? 'country' : 'countries'} and {stats.cities}{' '}
+          {stats.cities === 1 ? 'city' : 'cities'} so far — that is {stats.percentOfWorld}% of the
+          world.
         </p>
       </header>
 
