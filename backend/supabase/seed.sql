@@ -357,29 +357,40 @@ values
    '11111111-1111-1111-1111-111111111111', null, 'Tiger''s Nest, whenever the knees agree',
    'Six hours up and back. Start before seven.', 3);
 
+-- `location` is the optional pin, written as EWKT because that is what the
+-- geography column parses — the same as `trip_places`. It is what the map
+-- beside the days draws, numbered in the order the entries happen. Two entries
+-- deliberately carry none: an itinerary is written before anybody knows the
+-- exact spot, and the screen has to read honestly when only part of it is
+-- pinned.
 insert into public.itinerary_items (
   day_id, trip_id, user_id, kind, title, notes,
-  time_start, time_end, cost, currency, booking_ref, status, order_index
+  time_start, time_end, cost, currency, booking_ref, status, order_index, location
 )
 values
   ('1a000001-0000-4000-8000-000000000001', 'a0000001-0000-4000-8000-000000000012',
    '11111111-1111-1111-1111-111111111111', 'transport', 'Flight to Paro', '',
-   '09:20', '11:45', 42000, 'INR', 'KB-204-PBH', 'booked', 0),
+   '09:20', '11:45', 42000, 'INR', 'KB-204-PBH', 'booked', 0,
+   'SRID=4326;POINT(89.4246 27.4032)'),
   ('1a000001-0000-4000-8000-000000000001', 'a0000001-0000-4000-8000-000000000012',
    '11111111-1111-1111-1111-111111111111', 'hotel', 'Guesthouse near the bridge',
-   'Three nights, breakfast included.', '14:00', null, 18000, 'INR', 'GH-8891', 'booked', 1),
+   'Three nights, breakfast included.', '14:00', null, 18000, 'INR', 'GH-8891', 'booked', 1,
+   'SRID=4326;POINT(89.4139 27.4305)'),
   ('1a000001-0000-4000-8000-000000000002', 'a0000001-0000-4000-8000-000000000012',
    '11111111-1111-1111-1111-111111111111', 'transport', 'Road to Thimphu', 'Two hours, hired car.',
-   '10:00', '12:00', 3500, 'INR', '', 'planned', 0),
+   '10:00', '12:00', 3500, 'INR', '', 'planned', 0, null),
   ('1a000001-0000-4000-8000-000000000002', 'a0000001-0000-4000-8000-000000000012',
    '11111111-1111-1111-1111-111111111111', 'restaurant', 'Ema datshi, properly',
-   'Ask for it hot and regret it.', '13:30', null, null, 'INR', '', 'planned', 1),
+   'Ask for it hot and regret it.', '13:30', null, null, 'INR', '', 'planned', 1,
+   'SRID=4326;POINT(89.6390 27.4728)'),
   ('1a000001-0000-4000-8000-000000000003', 'a0000001-0000-4000-8000-000000000012',
    '11111111-1111-1111-1111-111111111111', 'activity', 'Buddha Dordenma at sunset', '',
-   '16:30', '18:00', null, 'INR', '', 'planned', 0),
+   '16:30', '18:00', null, 'INR', '', 'planned', 0,
+   'SRID=4326;POINT(89.6293 27.4429)'),
   ('1a000001-0000-4000-8000-000000000004', 'a0000001-0000-4000-8000-000000000012',
    '11111111-1111-1111-1111-111111111111', 'activity', 'Taktsang monastery hike', '',
-   null, null, 2000, 'INR', '', 'planned', 0);
+   null, null, 2000, 'INR', '', 'planned', 0,
+   'SRID=4326;POINT(89.3634 27.4917)');
 
 insert into public.expenses (
   trip_id, user_id, category, title, amount, currency, spent_at, paid_by, notes

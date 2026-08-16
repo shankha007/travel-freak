@@ -1,10 +1,12 @@
 'use client'
 
-import { useActionState, useEffect } from 'react'
+import { useActionState, useEffect, useState } from 'react'
 import { useFormStatus } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { AlertCircle, Loader2, Lock } from 'lucide-react'
+import { AlertCircle, Loader2, Lock, MapPin } from 'lucide-react'
+import { PlacePicker } from '@/client/components/trips/place-picker'
+import { formatLngLat, type LngLat } from '@/shared/geo/point'
 import { saveItineraryItem } from '@/server/actions/itinerary'
 import type { ItineraryEntry } from '@/server/queries/itinerary'
 import {
@@ -76,6 +78,12 @@ export function ItemDialog({
   }, [state, onOpenChange, router])
 
   const err = (field: string) => state.fieldErrors?.[field]
+
+  // The pin lives in state rather than in a field, because it is set by a map
+  // and a map is not a text input. It is submitted as two hidden fields, which
+  // is why `lng` and `lat` are always both written or both cleared.
+  const [pin, setPin] = useState<LngLat | null>(item?.point ?? null)
+  const [picking, setPicking] = useState(false)
 
   const rejected = state.values
   const initial = {
@@ -154,6 +162,36 @@ export function ItemDialog({
               rows={3}
               maxLength={2000}
             />
+          </div>
+
+          {/* Where it is. Optional like everything else — most of a plan is
+              written before anybody knows the exact spot — but what puts the
+              entry on the map beside the days. */}
+          <div className="space-y-2">
+            <Label>Where</Label>
+            <input type="hidden" name="lng" value={pin?.lng ?? ''} />
+            <input type="hidden" name="lat" value={pin?.lat ?? ''} />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setPicking(true)}>
+                <MapPin className="size-3.5" aria-hidden />
+                {pin ? 'Move the pin' : 'Drop a pin'}
+              </Button>
+              {pin && (
+                <>
+                  <span className="text-sm text-muted-foreground tabular-nums">
+                    {formatLngLat(pin)}
+                  </span>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setPin(null)}>
+                    Clear
+                  </Button>
+                </>
+              )}
+              {err('lng') && (
+                <p role="alert" className="w-full text-sm text-destructive">
+                  {err('lng')}
+                </p>
+              )}
+            </div>
           </div>
 
           {full ? (
@@ -268,8 +306,9 @@ export function ItemDialog({
             <p className="flex items-start gap-2 rounded-md border border-dashed p-3 text-sm text-muted-foreground">
               <Lock className="mt-0.5 size-4 shrink-0" aria-hidden />
               <span>
-                Times, costs, booking references and links come with the paid plans. Days,
-                activities and notes are yours on every plan —{' '}
+                Times, costs, booking references, links and dragging entries into order come with
+                the paid plans. Days, activities, notes and the pin that puts this on the map are
+                yours on every plan —{' '}
                 <Link href="/pricing" className="underline underline-offset-2">
                   see what else changes
                 </Link>
@@ -296,6 +335,19 @@ export function ItemDialog({
           </DialogFooter>
         </form>
       </DialogContent>
+
+      {/* The same picker the trip wizard uses: search where a MapTiler key
+          exists, click the shipped country polygons where it does not. Keyed on
+          the pin so reopening it starts from where the pin actually is. */}
+      <PlacePicker
+        key={pin ? `${pin.lng},${pin.lat}` : 'no-pin'}
+        open={picking}
+        onOpenChange={setPicking}
+        initial={pin}
+        label={initial.title || 'this entry'}
+        onPick={(place) => setPin({ lng: place.lng, lat: place.lat })}
+        onClear={() => setPin(null)}
+      />
     </Dialog>
   )
 }

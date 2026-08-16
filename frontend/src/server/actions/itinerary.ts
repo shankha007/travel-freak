@@ -4,13 +4,14 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/server/supabase/server'
 import { requireUser } from '@/server/auth'
 import { canUseFullItinerary } from '@/server/entitlements'
-import { MAX_GENERATED_DAYS, tripDateRange } from '@/shared/itinerary'
+import { MAX_GENERATED_DAYS, parseOrderedIds, tripDateRange } from '@/shared/itinerary'
 import {
   itineraryDaySchema,
   itineraryItemSchema,
   itineraryStatusSchema,
 } from '@/shared/validation/itinerary'
 import { fieldErrorsOf, textFields, type FormState } from '@/shared/validation/form-state'
+import { toPointEwkt } from '@/shared/geo/point'
 
 /**
  * Itinerary writes — screen 21.
@@ -214,7 +215,9 @@ export async function saveItineraryItem(_prev: FormState, formData: FormData): P
     'currency',
     'bookingRef',
     'url',
-    'status'
+    'status',
+    'lng',
+    'lat'
   )
 
   const cost = values.cost.trim() !== '' ? Number(values.cost) : null
@@ -229,11 +232,23 @@ export async function saveItineraryItem(_prev: FormState, formData: FormData): P
     }
   }
 
+  // A pin is two hidden fields written by the picker, so either both are
+  // numbers or neither is; the schema refuses the half-set case rather than
+  // writing a point off the coast of Africa.
+  const lng = values.lng.trim() !== '' ? Number(values.lng) : null
+  const lat = values.lat.trim() !== '' ? Number(values.lat) : null
+
+  if ((lng !== null && !Number.isFinite(lng)) || (lat !== null && !Number.isFinite(lat))) {
+    return { error: 'That pin did not come through. Try setting it again.', values }
+  }
+
   const rawId = formData.get('id')
   const parsed = itineraryItemSchema.safeParse({
     id: typeof rawId === 'string' && rawId !== '' ? rawId : null,
     ...values,
     cost,
+    lng,
+    lat,
     currency: values.currency || 'INR',
     kind: values.kind || 'activity',
     status: values.status || 'planned',
@@ -280,6 +295,10 @@ export async function saveItineraryItem(_prev: FormState, formData: FormData): P
     cost: full ? item.cost : null,
     booking_ref: full ? item.bookingRef : '',
     url: full ? item.url : '',
+    // EWKT, because that is what the geography column parses — the same way
+    // `trip_places` is written. Null clears the pin.
+    location:
+      item.lng === null || item.lat === null ? null : toPointEwkt({ lng: item.lng, lat: item.lat }),
   }
 
   const { error } = item.id
@@ -311,6 +330,46 @@ export async function deleteItineraryItem(
     .eq('user_id', user.id)
 
   if (error) return { error: 'Could not remove that. Please try again.' }
+
+  repaint(tripId)
+  return { error: null, saved: true }
+}
+
+/**
+ * Puts a day's entries in a new order, and moves one between days.
+ *
+ * One call for both, because dragging an entry from Tuesday to Wednesday *is*
+ * a reorder of Wednesday — the entry is simply named in its array. The client
+ * sends the day's ids in their new order and the database renumbers them in
+ * one statement, so a fourteen-item day costs one round trip rather than
+ * fourteen and cannot be left half-renumbered.
+ *
+ * `reorder_itinerary_items` is SECURITY INVOKER, so RLS decides which rows the
+ * update actually touches: an id belonging to somebody else silently matches
+ * nothing. The composite foreign key on `(day_id, trip_id)` is what stops an
+ * entry being dragged onto a day of a different trip.
+ *
+ * The ids arrive as a JSON array in one field rather than as repeated fields,
+ * because the order of `getAll()` is the order the browser serialised them in
+ * and that is precisely the fact being transmitted — it should not depend on it.
+ */
+export async function moveItineraryItem(_prev: FormState, formData: FormData): Promise<FormState> {
+  const { dayId, tripId, itemIds } = textFields(formData, 'dayId', 'tripId', 'itemIds')
+  if (!dayId || !tripId) return { error: 'Nothing to move.' }
+
+  const ids = parseOrderedIds(itemIds)
+  if (ids === null) return { error: 'Could not read the new order. Please try again.' }
+  if (ids.length === 0) return { error: null, saved: true }
+
+  const supabase = await createClient()
+  await requireUser()
+
+  const { error } = await supabase.rpc('reorder_itinerary_items', {
+    p_day_id: dayId,
+    p_item_ids: ids,
+  })
+
+  if (error) return { error: 'Could not save the new order. Please try again.' }
 
   repaint(tripId)
   return { error: null, saved: true }

@@ -74,8 +74,8 @@ export default async function ItineraryPage({ params }: PageProps<'/trips/[id]/i
         <p className="flex items-start gap-2 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
           <Lock className="mt-0.5 size-4 shrink-0" aria-hidden />
           <span>
-            Days, activities and notes are free on every plan. Times, costs, booking references and
-            links come with Voyager —{' '}
+            Days, activities, notes and the map are free on every plan. Times, costs, booking
+            references, links and dragging entries into order come with Voyager —{' '}
             <Link href="/pricing" className="underline underline-offset-2">
               what that changes
             </Link>
