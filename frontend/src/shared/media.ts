@@ -108,6 +108,51 @@ export function displayPath(originalPath: string): string {
 }
 
 /**
+ * The stable URL a post's stored HTML points an image at.
+ *
+ * Stable is the whole requirement. Whatever is written into `content_html` has
+ * to keep resolving for as long as the post exists, which is why this cannot be
+ * a signed URL — those expire within the hour — and why it names the media row
+ * rather than an object key: the bytes can move between buckets without every
+ * post that references them going stale.
+ *
+ * Relative on purpose. A post exported, re-imported, or read on a preview
+ * deployment resolves against whatever origin is serving it, and no absolute
+ * host gets baked into a database row.
+ */
+export function postImageUrl(mediaId: string): string {
+  return `/api/post-images/${mediaId}`
+}
+
+/**
+ * Whether a post's images may be served to this caller.
+ *
+ * Deliberately the same condition `resolve_post_share_link()` applies to the
+ * post itself: published, not deleted, and not private. An image is part of the
+ * post, so anything that can reach the post can reach its pictures and nothing
+ * else can.
+ *
+ * The owner is the exception, and has to be: the studio renders the document
+ * being written, and a draft whose pictures 404 for its own author is not a
+ * draft anybody can edit.
+ *
+ * Note what is *not* here — an unpublished post is not readable by anyone but
+ * its author, which is the whole point. Before this, the bytes sat in a
+ * world-readable bucket from the moment they were uploaded.
+ */
+export function mayServePostImage(post: {
+  isOwner: boolean
+  visibility: 'private' | 'unlisted' | 'public'
+  publishedAt: string | null
+  deletedAt: string | null
+}): boolean {
+  if (post.isOwner) return post.deletedAt === null
+  if (post.deletedAt !== null) return false
+  if (post.publishedAt === null) return false
+  return post.visibility !== 'private'
+}
+
+/**
  * Identifies an image from its leading bytes.
  *
  * A file's declared content type is a claim by whoever uploaded it — storage

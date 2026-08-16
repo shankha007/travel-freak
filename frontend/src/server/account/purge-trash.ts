@@ -59,10 +59,12 @@ export async function purgeExpiredTrash(now = Date.now()): Promise<PurgeResult> 
   }
 
   const originals = (media ?? []).map((m) => m.storage_path).filter(Boolean)
-  // The private display copy of a HEIC. Named from the original's key rather
-  // than stored, so it is listed unconditionally — `remove` is untroubled by a
-  // key that was never written, and the alternative is an orphan nothing can
-  // ever find again once the row naming it is gone.
+  // The private stripped copy: a HEIC's display copy in the vault, and now every
+  // image inside a post, which is served from this key rather than from the
+  // public bucket. Named from the original's key rather than stored, so it is
+  // listed unconditionally — `remove` is untroubled by a key that was never
+  // written, and the alternative is an orphan nothing can ever find again once
+  // the row naming it is gone.
   const displayCopies = originals.map(displayPath)
   const derivatives = (media ?? []).map((m) => m.public_path).filter((p): p is string => Boolean(p))
 

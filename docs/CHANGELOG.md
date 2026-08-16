@@ -51,6 +51,22 @@ their own line — nobody outside the repo ever saw them.
 
 ### Added
 
+- **Record what a plan actually cost.** An itinerary entry with a price on it
+  now has a button that files it on the budget, and the two stay joined. The
+  entry then shows what it came to next to what you expected — "INR 42,000
+  planned, INR 43,150 spent, +INR 1,150" — and the expense says which plan it
+  came from and by how much it moved. The amount starts at the planned figure
+  and is yours to correct: recording a plan is not the same as claiming it was
+  right, and the interesting number is the one that turned out different. Where
+  the two are in different currencies you get both figures and no comparison, as
+  everywhere else here, because there is no exchange rate in this app. Deleting a
+  plan leaves the money you spent on it alone.
+- **Filter your globe and your world map by trip type** as well as by year and
+  continent. Show only the places you have been to alone, or with family, or for
+  work. A place counts if any one trip there was of that kind — not if every trip
+  was — and places with no trip behind them, or none you gave a type, are left
+  out while a type is chosen. The screen says so under the count. Only the types
+  you actually have trips of are offered.
 - **Your route, drawn.** The trip page and the public trip page have always
   listed a trip's stops as a timeline. Now they draw them too: the pinned stops,
   numbered and joined in the order you visited them, above the list they
@@ -106,6 +122,18 @@ their own line — nobody outside the repo ever saw them.
 
 ### Security
 
+- **An image in an unpublished post was readable by anyone with its address.**
+  Pictures uploaded into a blog post were stored in public storage from the
+  moment they landed, so that the post's saved text could hold an address that
+  keeps working once published. The address was unguessable and never listed, but
+  it was not checked either — a photograph in a draft you never published was as
+  exposed as an unlisted link, which the editor said plainly rather than fixed.
+  Post images are now stored privately and served through an address that checks
+  the post it belongs to on every request, so they are readable by exactly the
+  people the post is. Unpublishing a post takes its pictures with it, with one
+  caveat now stated in the privacy policy: an address already handed out keeps
+  working for up to an hour. Pictures are still stripped of their location data
+  before anyone can see them, which has not changed.
 - **A collaborator could have made themselves an editor.** The rule that was
   supposed to let an invitee accept an invitation without changing its terms did
   not actually restrict the terms, so somebody invited to *view* a trip could
@@ -218,9 +246,15 @@ their own line — nobody outside the repo ever saw them.
 
 ### Infrastructure
 
+- **Reordering days is covered by the database tests.** Dragging entries had
+  pgTAP coverage from the day it shipped and dragging whole days did not, which
+  made it the one write on that screen nothing checked. It now has the same
+  assertions the entry version has, including the cross-account no-op, plus one
+  the entry version does not need: a day addressed through the wrong trip is not
+  renumbered even by the person who owns both.
 - **CI runs on every push and pull request.** Two jobs: the frontend one checks
-  formatting, lint, types, the 453 unit tests and a production build; the
-  database one boots the Supabase stack and runs the 200 pgTAP assertions that
+  formatting, lint, types, the 532 unit tests and a production build; the
+  database one boots the Supabase stack and runs the 219 pgTAP assertions that
   are the real guarantee one traveller cannot read another's trips. It also
   regenerates the database types and fails if they differ from what is
   committed — a migration that changes a table without them compiles fine and is

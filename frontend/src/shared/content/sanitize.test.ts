@@ -45,6 +45,19 @@ describe('sanitizePostHtml', () => {
     expect(out).toBe('<p>text</p>')
   })
 
+  it('keeps the relative src a post image is stored with', () => {
+    // Load-bearing. Post images are written into the document as
+    // `/api/post-images/<id>` so the route can check the post's visibility on
+    // every request; a sanitiser that required a scheme would strip the src off
+    // every picture in every post on read, which is a silent failure.
+    const out = sanitizePostHtml(
+      '<img src="/api/post-images/8b1d6a2c-0f4e-4a7b-9c3d-5e6f7a8b9c0d" alt="A road">'
+    )
+
+    expect(out).toContain('src="/api/post-images/8b1d6a2c-0f4e-4a7b-9c3d-5e6f7a8b9c0d"')
+    expect(out).toContain('alt="A road"')
+  })
+
   it('handles empty content', () => {
     expect(sanitizePostHtml('')).toBe('')
   })

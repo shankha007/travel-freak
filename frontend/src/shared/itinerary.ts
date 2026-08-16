@@ -8,6 +8,8 @@
  * be worked out inside a component.
  */
 
+import type { ExpenseCategory } from '@/shared/budget'
+
 export const ITINERARY_KINDS = [
   'activity',
   'hotel',
@@ -115,6 +117,85 @@ export function costByCurrency(items: readonly CostedItem[]): CurrencyTotal[] {
   return [...totals]
     .map(([currency, total]) => ({ currency, total }))
     .sort((a, b) => b.total - a.total || a.currency.localeCompare(b.currency))
+}
+
+// ---------------------------------------------------------------------------
+// Plan against actual
+// ---------------------------------------------------------------------------
+
+/**
+ * Which expense category a planned entry becomes when it is recorded as spent.
+ *
+ * `itinerary_kind` has six values and `expense_category` has six, but they are
+ * not the same six — the enums answer different questions, and the planner
+ * migration says why `transport` is missing from one: a train ticket is an
+ * expense under "getting there", which the category list calls `flights`.
+ *
+ * `note` maps to `misc` rather than being refused. A note with a price on it is
+ * unusual, but somebody who typed one meant it, and the alternative is a button
+ * that silently does nothing on one kind of row.
+ */
+export const EXPENSE_CATEGORY_FOR_KIND: Record<ItineraryKind, ExpenseCategory> = {
+  activity: 'activities',
+  hotel: 'hotels',
+  restaurant: 'food',
+  transport: 'flights',
+  booking: 'activities',
+  note: 'misc',
+}
+
+/** Just enough of an entry to decide. The query type carries the rest. */
+export interface RecordableEntry {
+  cost: number | null
+  /** Already settled — the control is a state then, not a repeat action. */
+  recorded: { id: string } | null
+}
+
+/**
+ * Whether "record what this cost" is offered for an entry.
+ *
+ * Requires a price. Without one there is nothing to prefill and the writer would
+ * be sent to a form with an empty amount, which is the form they already have —
+ * the point of this button is that it knows the number.
+ *
+ * A `null` cost and a cost of zero are different: an entry deliberately priced
+ * at nothing is a real plan (the free walking tour), and recording it keeps the
+ * day's actual spend honest about what was accounted for.
+ */
+export function canRecordExpense(entry: RecordableEntry): boolean {
+  return entry.recorded === null && entry.cost !== null && Number.isFinite(entry.cost)
+}
+
+/** How the recorded expense differs from what was planned, in its own currency. */
+export interface PlanVariance {
+  planned: number
+  actual: number
+  /** Actual minus planned: positive is an overspend. */
+  difference: number
+  currency: string
+}
+
+/**
+ * Plan against actual for one entry, or null when the two cannot be compared.
+ *
+ * Returns nothing when the currencies differ, for the reason every other total
+ * in this codebase gives: there is no exchange rate here, and "₹8,000 planned,
+ * $95 spent" is two facts rather than a variance. The screen shows both amounts
+ * and no difference in that case.
+ */
+export function planVariance(
+  planned: { cost: number | null; currency: string },
+  actual: { amount: number; currency: string }
+): PlanVariance | null {
+  if (planned.cost === null || !Number.isFinite(planned.cost)) return null
+  if (planned.currency.toUpperCase() !== actual.currency.toUpperCase()) return null
+
+  return {
+    planned: planned.cost,
+    actual: actual.amount,
+    difference: actual.amount - planned.cost,
+    currency: actual.currency.toUpperCase(),
+  }
 }
 
 /**

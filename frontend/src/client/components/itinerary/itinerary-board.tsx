@@ -18,6 +18,7 @@ import {
   TramFront,
   Trash2,
   Utensils,
+  Wallet,
 } from 'lucide-react'
 import {
   addTripDays,
@@ -25,14 +26,17 @@ import {
   deleteItineraryItem,
   setItineraryItemStatus,
 } from '@/server/actions/itinerary'
+import { recordItineraryExpense } from '@/server/actions/budget'
 import type { ItineraryData, ItineraryDay, ItineraryEntry } from '@/server/queries/itinerary'
 import { formatMoney } from '@/shared/budget'
 import {
   ITINERARY_KIND_LABEL,
   ITINERARY_STATUSES,
   ITINERARY_STATUS_LABEL,
+  canRecordExpense,
   dayLabel,
   formatTimeRange,
+  planVariance,
   type ItineraryKind,
 } from '@/shared/itinerary'
 import { EMPTY_FORM_STATE } from '@/shared/validation/form-state'
@@ -356,8 +360,12 @@ function ItemRow({
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
           <span>{ITINERARY_KIND_LABEL[item.kind]}</span>
           {item.cost !== null && (
-            <span className="tabular-nums">{formatMoney(item.cost, item.currency)}</span>
+            <span className="tabular-nums">
+              {formatMoney(item.cost, item.currency)}
+              {item.recorded && ' planned'}
+            </span>
           )}
+          {item.recorded && <RecordedCost item={item} />}
           {item.bookingRef && <span>Ref {item.bookingRef}</span>}
           {item.url && (
             <a
@@ -374,6 +382,7 @@ function ItemRow({
       </div>
 
       <div className="flex shrink-0 items-center gap-1">
+        {full && canRecordExpense(item) && <RecordExpenseButton item={item} tripId={tripId} />}
         {full ? (
           <StatusPicker item={item} tripId={tripId} />
         ) : (
@@ -394,6 +403,85 @@ function ItemRow({
         </Button>
       </div>
     </div>
+  )
+}
+
+/**
+ * What the plan actually came to, beside what it was planned at.
+ *
+ * The difference is only shown when the two are in the same currency, which is
+ * the same refusal every other total on these screens makes: there is no
+ * exchange rate here, so "₹8,000 planned, $95 spent" is two facts rather than an
+ * overspend. `planVariance()` decides, and returns null in that case.
+ */
+function RecordedCost({ item }: { item: ItineraryEntry }) {
+  if (!item.recorded) return null
+
+  const variance = planVariance(item, item.recorded)
+
+  return (
+    <span className="inline-flex items-center gap-1 tabular-nums">
+      <Wallet className="size-3" aria-hidden />
+      {formatMoney(item.recorded.amount, item.recorded.currency)} spent
+      {variance && variance.difference !== 0 && (
+        <span className={variance.difference > 0 ? 'text-destructive' : undefined}>
+          ({variance.difference > 0 ? '+' : '−'}
+          {formatMoney(Math.abs(variance.difference), variance.currency)})
+        </span>
+      )}
+    </span>
+  )
+}
+
+/**
+ * Turns a planned entry into an expense on the budget.
+ *
+ * The amount starts at the planned figure and is editable on the budget screen
+ * afterwards — recording a plan is not the same as claiming it was right, and
+ * the interesting number is the one that turned out different.
+ *
+ * Offered only on a plan that has a price. Without one there is nothing to
+ * prefill, and the writer would land on the same empty form the budget screen
+ * already gives them.
+ */
+function RecordExpenseButton({ item, tripId }: { item: ItineraryEntry; tripId: string }) {
+  const router = useRouter()
+  const [state, formAction] = useActionState(recordItineraryExpense, EMPTY_FORM_STATE)
+
+  useEffect(() => {
+    if (state.saved) router.refresh()
+  }, [state, router])
+
+  return (
+    <form action={formAction}>
+      <input type="hidden" name="itemId" value={item.id} />
+      <input type="hidden" name="tripId" value={tripId} />
+      {/* A child of the form, because that is the only place `useFormStatus`
+          can see it — called here it would report the enclosing form's state. */}
+      <RecordExpenseSubmit item={item} error={state.error} />
+    </form>
+  )
+}
+
+function RecordExpenseSubmit({ item, error }: { item: ItineraryEntry; error?: string | null }) {
+  const { pending } = useFormStatus()
+
+  return (
+    <Button
+      type="submit"
+      variant="ghost"
+      size="icon-sm"
+      disabled={pending}
+      // Names the amount, because the button records it without asking again.
+      aria-label={`Record ${formatMoney(item.cost ?? 0, item.currency)} spent on ${item.title}`}
+      title={error ?? 'Record this on the budget'}
+    >
+      {pending ? (
+        <Loader2 className="size-3.5 animate-spin" aria-hidden />
+      ) : (
+        <Wallet className="size-3.5" aria-hidden />
+      )}
+    </Button>
   )
 }
 

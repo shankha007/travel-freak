@@ -1,5 +1,6 @@
 import type { RegionDetail, VisitedRegion } from '@/shared/types/globe'
 import { countryName } from '@/shared/geo/countries'
+import type { TripType } from '@/shared/analytics'
 
 /**
  * Demo data for the marketing globe and for local development before the
@@ -20,8 +21,14 @@ function demoVisits(countryCode: string, count: number): string[] {
   return Array.from({ length: count }, (_, i) => `demo-${countryCode.toLowerCase()}-visit-${i + 1}`)
 }
 
-function demoRegion(region: Omit<VisitedRegion, 'visitCount'>): VisitedRegion {
-  return { ...region, visitCount: region.visitTripIds.length }
+/**
+ * `tripTypes` defaults to none. The marketing globe renders no filters, so the
+ * demo data has nothing to say about who these imaginary trips were taken with.
+ */
+function demoRegion(
+  region: Omit<VisitedRegion, 'visitCount' | 'tripTypes'> & { tripTypes?: TripType[] }
+): VisitedRegion {
+  return { ...region, tripTypes: region.tripTypes ?? [], visitCount: region.visitTripIds.length }
 }
 
 export const DEMO_REGIONS: VisitedRegion[] = [

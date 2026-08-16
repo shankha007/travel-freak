@@ -5,6 +5,7 @@ import { createClient } from '@/server/supabase/server'
 import { requireUser } from '@/server/auth'
 import { getMediaUrls } from '@/server/queries/vault'
 import { countryName } from '@/shared/geo/countries'
+import type { TripType } from '@/shared/analytics'
 import type {
   RegionDetail,
   RegionMemory,
@@ -16,9 +17,12 @@ import type { Database } from '@/shared/types/database'
 /**
  * Globe data.
  *
- * Reads `visited_regions` only — never `trips`. That aggregate is maintained by
- * `refresh_visited_regions()` triggers, so the globe gets one small result set
- * instead of joining across every trip a user has ever taken.
+ * Reads `visited_regions` for the map itself — never `trips`. That aggregate is
+ * maintained by `refresh_visited_regions()` triggers, so the globe gets one
+ * small result set instead of joining across every trip a user has ever taken.
+ * The single exception is `getTripTypes()` below, which reads one column of
+ * `trips` for the trip-type filter, and says there why the aggregate could not
+ * carry it instead.
  *
  * Every query filters on `user_id`. RLS is the ceiling, not the scope: the
  * aggregate also has a policy exposing the rows of anyone with a public
@@ -28,7 +32,13 @@ import type { Database } from '@/shared/types/database'
 
 type VisitedRegionRow = Database['public']['Tables']['visited_regions']['Row']
 
-function toVisitedRegion(row: VisitedRegionRow, urls?: Map<string, string>): VisitedRegion {
+function toVisitedRegion(
+  row: VisitedRegionRow,
+  urls?: Map<string, string>,
+  tripTypes?: Map<string, TripType>
+): VisitedRegion {
+  const ids = row.trip_ids ?? []
+
   return {
     countryCode: row.country_code,
     regionCode: row.region_code ?? '',
@@ -37,7 +47,12 @@ function toVisitedRegion(row: VisitedRegionRow, urls?: Map<string, string>): Vis
     visitTripIds: row.visit_trip_ids ?? [],
     firstVisit: row.first_visit,
     lastVisit: row.last_visit,
-    tripIds: row.trip_ids ?? [],
+    tripIds: ids,
+    // Deduplicated, and untyped trips contribute nothing rather than a sixth
+    // pseudo-type: `trip_type` is nullable and "no answer" is not a kind of trip.
+    tripTypes: tripTypes
+      ? [...new Set(ids.map((id) => tripTypes.get(id)).filter((t): t is TripType => Boolean(t)))]
+      : [],
     cityNames: row.city_names ?? [],
     featuredMediaId: row.featured_media_id,
     // The media bucket is private, so a URL means minting a signed link.
@@ -71,13 +86,47 @@ export const getVisitedRegions = cache(async function getVisitedRegions(): Promi
   }
 
   const rows = data ?? []
-  // One batched signing call for every hero photo, rather than one per region.
-  const urls = await getMediaUrls(
-    rows.map((r) => r.featured_media_id).filter((id): id is string => Boolean(id))
-  )
 
-  return rows.map((row) => toVisitedRegion(row, urls))
+  const [urls, tripTypes] = await Promise.all([
+    // One batched signing call for every hero photo, rather than one per region.
+    getMediaUrls(rows.map((r) => r.featured_media_id).filter((id): id is string => Boolean(id))),
+    getTripTypes(),
+  ])
+
+  return rows.map((row) => toVisitedRegion(row, urls, tripTypes))
 })
+
+/**
+ * Trip kind by trip id, for the trip-type filter on screens 14 and 16.
+ *
+ * The one place the globe reads `trips` — the comment at the top of this file
+ * says it never does, and this is the exception that proves why the rule was
+ * there. `visited_regions` cannot carry this: the aggregate is readable by
+ * anyone looking at a public profile, so a `trip_types` column would publish
+ * who somebody travels with along with where they went. Resolving it here keeps
+ * it on the owner's own read, where `user_id = auth.uid()` already applies.
+ *
+ * One query for the whole account rather than one per region — a plan allows
+ * fifteen trips, and the unlimited tiers are still tens, so this is a small read
+ * even for the heaviest globe.
+ */
+async function getTripTypes(): Promise<Map<string, TripType>> {
+  const supabase = await createClient()
+  const user = await requireUser()
+
+  const { data } = await supabase
+    .from('trips')
+    .select('id, trip_type')
+    .eq('user_id', user.id)
+    .is('deleted_at', null)
+    .not('trip_type', 'is', null)
+
+  return new Map(
+    (data ?? [])
+      .filter((t): t is { id: string; trip_type: TripType } => t.trip_type !== null)
+      .map((t) => [t.id, t.trip_type])
+  )
+}
 
 /**
  * Everything the region modal shows for one country.

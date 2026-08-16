@@ -32,6 +32,13 @@ export interface ExpenseRow {
   paidBy: string
   notes: string
   createdAt: string
+  /**
+   * What this expense settles, when it was recorded from the itinerary rather
+   * than typed in. Carries the planned figure so the row can show both numbers —
+   * the interesting one is the difference, and reading it back off the itinerary
+   * would mean a second query for a fact this join already has.
+   */
+  fromPlan: { itemId: string; title: string; cost: number | null; currency: string } | null
 }
 
 export interface BudgetData {
@@ -67,7 +74,10 @@ export async function getBudget(tripId: string): Promise<BudgetData | null> {
   const [expensesResult, itineraryResult, full] = await Promise.all([
     supabase
       .from('expenses')
-      .select('id, category, title, amount, currency, spent_at, paid_by, notes, created_at')
+      .select(
+        `id, category, title, amount, currency, spent_at, paid_by, notes, created_at,
+         itinerary_items ( id, title, cost, currency )`
+      )
       .eq('trip_id', tripId)
       // Newest spend first, and an undated one sorts by when it was recorded
       // rather than disappearing to the bottom of a list nobody scrolls.
@@ -89,6 +99,14 @@ export async function getBudget(tripId: string): Promise<BudgetData | null> {
     paidBy: row.paid_by,
     notes: row.notes,
     createdAt: row.created_at,
+    fromPlan: row.itinerary_items
+      ? {
+          itemId: row.itinerary_items.id,
+          title: row.itinerary_items.title,
+          cost: row.itinerary_items.cost === null ? null : Number(row.itinerary_items.cost),
+          currency: row.itinerary_items.currency,
+        }
+      : null,
   }))
 
   return {

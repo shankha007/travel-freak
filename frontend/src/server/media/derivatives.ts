@@ -13,6 +13,13 @@ import { toPublicDerivative } from '@/server/media/image-transform'
  * stripped of every metadata block — and the result is written to a separate
  * public bucket. The original never moves and never loses its metadata.
  *
+ * **Trip photos on a published trip only.** A post's images used to come through
+ * here too, and that was the mistake: they were written at upload rather than at
+ * publication, so the world-readable bucket held them before anyone had decided
+ * to publish. They are now a stripped copy in the *private* bucket served
+ * through `/api/post-images/[mediaId]`, which checks the post's visibility per
+ * request. This bucket is for things a public page is already showing.
+ *
  * The transform itself lives in image-transform.ts, where it can be tested
  * against a real file rather than described in a comment.
  *
@@ -33,24 +40,13 @@ export function derivativePath(userId: string, tripId: string, mediaId: string):
 }
 
 /**
- * Object key for an image placed inside a post.
- *
- * A separate shape because a post image belongs to no trip: its `media.trip_id`
- * is null, so there is no trip folder to put it in. The `posts/` segment keeps
- * the two kinds of derivative from ever colliding on a key.
- */
-export function postDerivativePath(userId: string, postId: string, mediaId: string): string {
-  return `${userId}/posts/${postId}/${mediaId}.webp`
-}
-
-/**
  * Ensures a public derivative exists, returning its object key.
  *
  * Uses the service role for both the read and the write, because the caller is
  * generating something on behalf of a visitor who has no rights to the
  * original. **Callers must have already established that the visitor may see
  * this image** — this function checks nothing, including where `target` points,
- * which is why the two path builders above are the only things that produce one.
+ * which is why `derivativePath` above is the only thing that produces one.
  */
 export async function ensurePublicDerivative(media: {
   id: string

@@ -35,7 +35,8 @@ export function CountryTapper({
   const [query, setQuery] = useState('')
 
   // What the map paints. Built from the selection so the fill follows the tap
-  // immediately; `visitCount: 0` is honest — a mark records no trips.
+  // immediately; `visitCount: 0` and no trip types are honest for the same
+  // reason — a mark records no trips, so there is no kind of trip to report.
   const regions: VisitedRegion[] = useMemo(
     () =>
       [...selected].map((code) => ({
@@ -47,6 +48,7 @@ export function CountryTapper({
         firstVisit: null,
         lastVisit: null,
         tripIds: [],
+        tripTypes: [],
         cityNames: [],
         featuredMediaId: null,
         featuredMediaUrl: null,

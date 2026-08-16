@@ -1,4 +1,5 @@
 import type { RegionState } from '@/shared/geo/region-state'
+import type { TripType } from '@/shared/analytics'
 
 /**
  * One row of the `visited_regions` aggregate — the only shape the globe, the
@@ -21,6 +22,17 @@ export interface VisitedRegion {
   firstVisit: string | null
   lastVisit: string | null
   tripIds: string[]
+  /**
+   * The kinds of trip behind `tripIds` — solo, family and so on, deduplicated.
+   *
+   * Not a column on `visited_regions`, and deliberately so. That table has a
+   * policy exposing every row of anyone with a public profile, which is what
+   * makes a shared globe possible; a `trip_types` column would have published
+   * "she went to Japan with a partner" alongside it. So the owner's own query
+   * resolves this by reading `trips`, and the public reads leave it empty —
+   * which is also why nothing may treat an empty array as "no trips here".
+   */
+  tripTypes: TripType[]
   cityNames: string[]
   featuredMediaId: string | null
   /** Resolved signed/public URL for the hero photo, when one exists. */
@@ -108,6 +120,7 @@ export function rollUpToCountries(regions: VisitedRegion[]): VisitedRegion[] {
       firstVisit: minDate(existing.firstVisit, region.firstVisit),
       lastVisit: maxDate(existing.lastVisit, region.lastVisit),
       tripIds: [...new Set([...existing.tripIds, ...region.tripIds])],
+      tripTypes: [...new Set([...existing.tripTypes, ...region.tripTypes])],
       cityNames: [...new Set([...existing.cityNames, ...region.cityNames])],
       featuredMediaUrl: existing.featuredMediaUrl ?? region.featuredMediaUrl,
     })

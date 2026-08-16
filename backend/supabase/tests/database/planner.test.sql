@@ -458,6 +458,180 @@ select is(
 );
 
 -- ---------------------------------------------------------------------------
+-- Reordering days — the other half of screen 21's drag and drop
+--
+-- `reorder_itinerary_days()` shipped without coverage while
+-- `reorder_itinerary_items()` had it, which made the day handles the one write
+-- on this screen nothing checked. It is SECURITY INVOKER for the same reason and
+-- carries one extra guard the item version does not need: the update is scoped
+-- to `p_trip_id`, so naming a day of another trip in the array cannot renumber
+-- it even when the caller owns both.
+-- ---------------------------------------------------------------------------
+
+reset role;
+
+-- Two undated days, which are the only ones a handle is offered on: a dated day
+-- is sorted by its date and an order_index on it would lose every time.
+insert into public.itinerary_days (id, trip_id, user_id, day_date, title, order_index)
+values
+  ('13000000-0000-4000-8000-00000000000a', 'a1000000-0000-4000-8000-000000000001',
+   'a0000000-0000-4000-8000-00000000000a', null, 'Somewhere north', 0),
+  ('13000000-0000-4000-8000-00000000000b', 'a1000000-0000-4000-8000-000000000001',
+   'a0000000-0000-4000-8000-00000000000a', null, 'Somewhere south', 1);
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"a0000000-0000-4000-8000-00000000000a","role":"authenticated"}',
+  true
+);
+set local role authenticated;
+
+select is(
+  public.reorder_itinerary_days(
+    'a1000000-0000-4000-8000-000000000001',
+    array['13000000-0000-4000-8000-00000000000b',
+          '13000000-0000-4000-8000-00000000000a']::uuid[]
+  ),
+  2,
+  'reordering days renumbers every day named, in one statement'
+);
+
+select is(
+  (select order_index from public.itinerary_days
+   where id = '13000000-0000-4000-8000-00000000000b'),
+  0,
+  'the day dragged to the front is now first'
+);
+
+select is(
+  (select order_index from public.itinerary_days
+   where id = '13000000-0000-4000-8000-00000000000a'),
+  1,
+  'and the one it passed is second'
+);
+
+-- Alice owns both trips, so RLS would happily let her write this row. The
+-- `d.trip_id = p_trip_id` clause is the only thing that refuses it, which is why
+-- the assertion names a day the caller certainly *can* write: her own, addressed
+-- through the wrong trip.
+select is(
+  public.reorder_itinerary_days(
+    'a1000000-0000-4000-8000-000000000002',
+    array['13000000-0000-4000-8000-00000000000a']::uuid[]
+  ),
+  0,
+  'a day addressed through the wrong trip is not renumbered, even by its owner'
+);
+
+reset role;
+
+select is(
+  (select order_index from public.itinerary_days
+   where id = '13000000-0000-4000-8000-00000000000a'),
+  1,
+  'and keeps the position its own trip put it in'
+);
+
+-- The cross-user no-op, matching the one the item reorder has. Carol names days
+-- she cannot see; SECURITY INVOKER means RLS filters them and nothing is written.
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"c0000000-0000-4000-8000-00000000000c","role":"authenticated"}',
+  true
+);
+set local role authenticated;
+
+select is(
+  public.reorder_itinerary_days(
+    'a1000000-0000-4000-8000-000000000001',
+    array['13000000-0000-4000-8000-00000000000a',
+          '13000000-0000-4000-8000-00000000000b']::uuid[]
+  ),
+  0,
+  'a stranger reordering days they cannot see writes nothing'
+);
+
+reset role;
+
+select is(
+  (select order_index from public.itinerary_days
+   where id = '13000000-0000-4000-8000-00000000000b'),
+  0,
+  'and the days are exactly where their owner left them'
+);
+
+-- ---------------------------------------------------------------------------
+-- Plan against actual — expenses.itinerary_item_id
+--
+-- The link that lets one screen say "this hotel is that expense". Three things
+-- have to hold: one expense per entry, the two agree about their trip, and
+-- deleting the plan leaves the money alone.
+-- ---------------------------------------------------------------------------
+
+reset role;
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"a0000000-0000-4000-8000-00000000000a","role":"authenticated"}',
+  true
+);
+set local role authenticated;
+
+insert into public.expenses (id, trip_id, user_id, itinerary_item_id, category, title, amount, currency)
+values ('14000000-0000-4000-8000-00000000000a', 'a1000000-0000-4000-8000-000000000001',
+        'a0000000-0000-4000-8000-00000000000a', '12000000-0000-4000-8000-00000000000b',
+        'hotels', 'The hotel', 9240, 'INR');
+
+select is(
+  (select itinerary_item_id from public.expenses
+   where id = '14000000-0000-4000-8000-00000000000a'),
+  '12000000-0000-4000-8000-00000000000b'::uuid,
+  'an expense can be recorded against the plan it settles'
+);
+
+-- Pressing the button twice would otherwise file the same hotel bill twice, and
+-- the day's actual spend would be wrong in the direction nobody checks.
+select throws_ok(
+  $$insert into public.expenses (trip_id, user_id, itinerary_item_id, category, amount, currency)
+    values ('a1000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-00000000000a',
+            '12000000-0000-4000-8000-00000000000b', 'hotels', 9240, 'INR')$$,
+  '23505',
+  null,
+  'a second expense against the same plan is refused'
+);
+
+-- The trigger, not a foreign key: `on delete set null` cannot coexist with a
+-- composite key here, because expenses.trip_id is not null.
+select throws_ok(
+  $$insert into public.expenses (trip_id, user_id, itinerary_item_id, category, amount, currency)
+    values ('a1000000-0000-4000-8000-000000000002', 'a0000000-0000-4000-8000-00000000000a',
+            '12000000-0000-4000-8000-00000000000a', 'hotels', 500, 'INR')$$,
+  '23514',
+  null,
+  'an expense cannot settle a plan belonging to another trip'
+);
+
+reset role;
+
+-- The whole reason the column is `on delete set null`. The entry was a guess and
+-- the expense is a fact; dropping the fact because the guess went away would
+-- quietly change what the trip cost.
+delete from public.itinerary_items where id = '12000000-0000-4000-8000-00000000000b';
+
+select is(
+  (select amount from public.expenses where id = '14000000-0000-4000-8000-00000000000a'),
+  9240::numeric,
+  'deleting the plan leaves the money that was spent on it'
+);
+
+select is(
+  (select itinerary_item_id from public.expenses
+   where id = '14000000-0000-4000-8000-00000000000a'),
+  null,
+  'and simply releases the link'
+);
+
+-- ---------------------------------------------------------------------------
 -- Nothing the two of them tried actually landed
 --
 -- Read with RLS bypassed, because the whole question is what the rows say now
