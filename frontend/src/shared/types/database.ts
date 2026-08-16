@@ -413,6 +413,9 @@ export type Database = {
           day_id: string
           id: string
           kind: Database["public"]["Enums"]["itinerary_kind"]
+          latitude: number | null
+          location: unknown
+          longitude: number | null
           notes: string
           order_index: number
           status: Database["public"]["Enums"]["itinerary_status"]
@@ -432,6 +435,9 @@ export type Database = {
           day_id: string
           id?: string
           kind?: Database["public"]["Enums"]["itinerary_kind"]
+          latitude?: number | null
+          location?: unknown
+          longitude?: number | null
           notes?: string
           order_index?: number
           status?: Database["public"]["Enums"]["itinerary_status"]
@@ -451,6 +457,9 @@ export type Database = {
           day_id?: string
           id?: string
           kind?: Database["public"]["Enums"]["itinerary_kind"]
+          latitude?: number | null
+          location?: unknown
+          longitude?: number | null
           notes?: string
           order_index?: number
           status?: Database["public"]["Enums"]["itinerary_status"]
@@ -1668,6 +1677,14 @@ export type Database = {
       refresh_visited_regions: {
         Args: { p_user_id: string }
         Returns: undefined
+      }
+      reorder_itinerary_days: {
+        Args: { p_day_ids: string[]; p_trip_id: string }
+        Returns: number
+      }
+      reorder_itinerary_items: {
+        Args: { p_day_id: string; p_item_ids: string[] }
+        Returns: number
       }
       resolve_post_share_link: { Args: { p_token: string }; Returns: string }
       resolve_share_link: { Args: { p_token: string }; Returns: string }

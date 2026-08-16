@@ -352,6 +352,112 @@ select lives_ok(
 );
 
 -- ---------------------------------------------------------------------------
+-- Reordering — screen 21's drag and drop
+--
+-- `reorder_itinerary_items` is SECURITY INVOKER, which is the whole security
+-- story: RLS decides which rows the update touches, so an id somebody else owns
+-- in the array is silently skipped rather than reordered. Dan is still acting
+-- here — an editor on Alice's private trip, which is exactly who should be
+-- allowed to rearrange it.
+-- ---------------------------------------------------------------------------
+
+reset role;
+
+insert into public.itinerary_items (id, day_id, trip_id, user_id, kind, title, order_index)
+values
+  ('12000000-0000-4000-8000-00000000000a', '11000000-0000-4000-8000-000000000001',
+   'a1000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-00000000000a',
+   'activity', 'First', 0),
+  ('12000000-0000-4000-8000-00000000000b', '11000000-0000-4000-8000-000000000001',
+   'a1000000-0000-4000-8000-000000000001', 'a0000000-0000-4000-8000-00000000000a',
+   'activity', 'Second', 1);
+
+-- A second day on the same trip, to move an entry onto.
+insert into public.itinerary_days (id, trip_id, user_id, day_date, order_index)
+values ('11000000-0000-4000-8000-00000000000f', 'a1000000-0000-4000-8000-000000000001',
+        'a0000000-0000-4000-8000-00000000000a', '2026-03-02', 5);
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"a0000000-0000-4000-8000-00000000000a","role":"authenticated"}',
+  true
+);
+set local role authenticated;
+
+select is(
+  public.reorder_itinerary_items(
+    '11000000-0000-4000-8000-000000000001',
+    array['12000000-0000-4000-8000-00000000000b',
+          '12000000-0000-4000-8000-00000000000a']::uuid[]
+  ),
+  2,
+  'reordering renumbers every entry named, in one statement'
+);
+
+select is(
+  (select order_index from public.itinerary_items
+   where id = '12000000-0000-4000-8000-00000000000b'),
+  0,
+  'the entry moved to the front is now first'
+);
+
+-- Moving between days is the same call: the entry is simply named in the other
+-- day's array, and day_id is rewritten with the position.
+select is(
+  public.reorder_itinerary_items(
+    '11000000-0000-4000-8000-00000000000f',
+    array['12000000-0000-4000-8000-00000000000a']::uuid[]
+  ),
+  1,
+  'an entry can be moved onto another day of the same trip'
+);
+
+select is(
+  (select day_id from public.itinerary_items
+   where id = '12000000-0000-4000-8000-00000000000a'),
+  '11000000-0000-4000-8000-00000000000f'::uuid,
+  'and lands on the day it was dropped on'
+);
+
+-- trip_id is untouched by the function, and itinerary_items_day_trip_fk is what
+-- guarantees the two still agree.
+select is(
+  (select trip_id from public.itinerary_items
+   where id = '12000000-0000-4000-8000-00000000000a'),
+  'a1000000-0000-4000-8000-000000000001'::uuid,
+  'while its trip stays what the day says it is'
+);
+
+-- Carol names Alice's entries in a reorder of her own. SECURITY INVOKER means
+-- RLS filters them out, so the call is a no-op rather than a rearrangement.
+reset role;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"c0000000-0000-4000-8000-00000000000c","role":"authenticated"}',
+  true
+);
+set local role authenticated;
+
+select is(
+  public.reorder_itinerary_items(
+    '11000000-0000-4000-8000-000000000001',
+    array['12000000-0000-4000-8000-00000000000a',
+          '12000000-0000-4000-8000-00000000000b']::uuid[]
+  ),
+  0,
+  'a stranger reordering entries they cannot see writes nothing'
+);
+
+reset role;
+
+select is(
+  (select day_id from public.itinerary_items
+   where id = '12000000-0000-4000-8000-00000000000a'),
+  '11000000-0000-4000-8000-00000000000f'::uuid,
+  'and the entry is exactly where its owner left it'
+);
+
+-- ---------------------------------------------------------------------------
 -- Nothing the two of them tried actually landed
 --
 -- Read with RLS bypassed, because the whole question is what the rows say now

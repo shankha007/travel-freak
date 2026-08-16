@@ -15,7 +15,13 @@ including sign-in, the globe and both maps on a free and a paid plan, the trip
 and blog screens, delete → trash → restore, and a share link through create,
 open, revoke and pull-back. The three planner screens were checked the same way
 on 2026-08-15, including a list ticked off and a fortnight of itinerary days
-laid out in one click, both confirmed in the database afterwards. Collaborators
+laid out in one click, both confirmed in the database afterwards. **The
+itinerary's drag-and-drop is the one thing here not verified by hand**: the
+harness browser does not composite, so every element measures zero and neither
+dnd-kit's sensors nor MapLibre can initialise. The markup, the handles and
+their labels were checked in the DOM, the reorder function has pgTAP coverage
+including the cross-user no-op, and `parseOrderedIds` is unit-tested — but the
+drag gesture itself wants a human. Collaborators
 was checked the same day from both sides — an invitation accepted by email match
 and confirmed in the database, and the owner's trip opened as a collaborator to
 verify the Budget screen is absent and 404s.
@@ -39,12 +45,12 @@ verify the Budget screen is absent and 404s.
 | Public / marketing | 8 | 0 | 0 | 2 |
 | Auth | 6 | 0 | 0 | 1 |
 | Dashboard & globe | 5 | 2 | 0 | 0 |
-| Trips & planner | 8 | 2 | 0 | 0 |
+| Trips & planner | 9 | 1 | 0 | 0 |
 | Memory & content | 7 | 0 | 0 | 0 |
 | Analytics & resume | 2 | 0 | 0 | 2 |
 | Public sharing | 5 | 0 | 0 | 0 |
 | Account | 3 | 1 | 0 | 3 |
-| **Total** | **64** | **5** | **0** | **9** |
+| **Total** | **65** | **4** | **0** | **9** |
 
 ---
 
@@ -123,7 +129,7 @@ verify the Budget screen is absent and 404s.
 | — | **Edit trip** `/trips/[id]/edit` | ✅ Done | Same wizard as create (`TripForm`), saveable from any step. Slug and `published_at` are deliberately stable; places are matched by id so memories stay pinned |
 | — | **Delete trip** | ✅ Done | Confirm dialog → `soft_delete_trip()`; sets `deleted_at`, repaints the globe, frees quota, destroys nothing. Restorable from `/trash` for 30 days |
 | — | **Trash** `/trash` | ✅ Done | Trips and posts deleted in the last 30 days, with restore, a countdown and a count of what comes back. Reads deleted trips through `list_deleted_trips()`, because `trips_select_own` hides them from their own owner. Restoring is refused when it would breach the plan's trip limit |
-| 21 | **Itinerary builder** `/trips/[id]/itinerary` | 🟡 Partial | Days and entries over `itinerary_days` / `itinerary_items`. A day needs neither date nor title, so a trip in planning can be laid out before it has dates; a trip that has them offers to create every missing day in one click, capped at 60 so a mistyped year cannot write 370 rows. Six kinds, four statuses, per-day and per-trip cost roll-ups grouped by currency and never summed across. Times, costs, booking refs and links are gated on `itinerary_full` and **dropped rather than refused** on a free plan, which is what the pricing table sells. **No drag-and-drop and no map alongside** — `order_index` exists and nothing reorders it yet |
+| 21 | **Itinerary builder** `/trips/[id]/itinerary` | ✅ Done | Days and entries over `itinerary_days` / `itinerary_items`. A day needs neither date nor title, so a trip in planning can be laid out before it has dates; a trip that has them offers to create every missing day in one click, capped at 60 so a mistyped year cannot write 370 rows. Six kinds, four statuses, per-day and per-trip cost roll-ups grouped by currency and never summed across. Times, costs, booking refs and links are gated on `itinerary_full` and **dropped rather than refused** on a free plan, which is what the pricing table sells. **Drag and drop** reorders entries within a day and moves them between days, by pointer, touch and keyboard — `@dnd-kit`, chosen over native HTML5 drag events because those do nothing at all on a phone; the write is one `reorder_itinerary_items()` call that renumbers from array position rather than one update per row. Also gated on `itinerary_full`, which is how the pricing table sells it. **The map alongside** draws entries that carry a pin, numbered across the whole trip and joined in order, from the same `PlacePicker` the trip wizard uses; free on every plan, and lazy-loaded like every other map here |
 | 22 | **Budget planner** `/trips/[id]/budget` | ✅ Done | `expenses` against `trips.budget_planned`, which is the same field the trip form and analytics read, so a budget set here is set everywhere. One panel per currency: the plan only applies to the currency it was written in, and spend in any other gets a total and no comparison, because there is no exchange rate here. Category breakdown and its chart are gated on `budget_full`; recording an expense and seeing the totals are free, since a budget you cannot write to is not a budget. Also totals what the itinerary expects to cost. `shared/budget.ts` is pure and holds all of it, with 20 assertions |
 | 23 | **Packing / checklists** `/trips/[id]/packing` | ✅ Done | `checklists` / `checklist_items`, packing and to-do, grouped by a free-text category in the order they were built. Adding a line and ticking one off are each one gesture and no dialog; the tick sends the value it means rather than a toggle, so two taps cannot race. `limits.checklists` is read **per trip** — three on the free plan — and templates are the unlimited plans' feature: six of them in `shared/packing.ts`, copied in as ordinary rows so a list can be gutted without breaking anything |
 | 24 | **Collaborators** `/trips/[id]/people` | ✅ Done | Invite by email as `editor` or `viewer`, change a role, remove somebody, and the other side — accept, decline, leave — on `/trips`. The screen states what each role can **and cannot** do, in two lists under two headings rather than one list with two icons, because the tick and the cross are `aria-hidden` and a flat list reads every line as a permission. `collaborators_per_trip` gates it: 0 on Explorer reads as "not available", not as a limit of none. **No email is sent** — an invitation is delivered by the app, which the invite form says plainly |
@@ -248,13 +254,14 @@ verify the Budget screen is absent and 404s.
    user from the proxy to the render — a request header, or a short-lived per-request cache — is
    the fix, and it is the largest latency left on an authenticated page now that the screens
    paint immediately.
-12. **The itinerary cannot be reordered, and has no map.** `itinerary_days.order_index` and
-   `itinerary_items.order_index` are written on insert and never changed after it, so an entry
-   added late sits at the bottom of its day whatever time it carries — the sort puts timed
-   entries in time order first, which hides it for a full plan and not for a sparse one. The
-   plan asks for drag-and-drop and for a map beside the days; the second also wants a `location`
-   column on `itinerary_items`, which was deliberately left out rather than shipped as a column
-   nothing writes.
+12. **Only itinerary *entries* can be dragged, not days.** `getItinerary()` sorts dated days by
+   their date, so dragging one would either do nothing visible or have to override the date —
+   and a plan for the 3rd sitting after the plan for the 4th is worse than not being able to
+   move it. `reorder_itinerary_days()` exists and is granted, for the undated days that have
+   nothing but `order_index`; no screen calls it yet. The other edge: on a day where every entry
+   is timed, dragging changes nothing visible either, because `time_start` sorts ahead of
+   `order_index`. That is deliberate — a plan with times on it is ordered by the clock — but it
+   is not signposted, and somebody dragging a fully-timed day will wonder why it sprang back.
 13. **A collaborator can plan a trip but not see what it costs.** `expenses` has one policy,
    `user_id = auth.uid()`, and no collaborator clause at all, which is the right default for
    money and the wrong answer for four friends splitting a trip. `paid_by` is free text for that

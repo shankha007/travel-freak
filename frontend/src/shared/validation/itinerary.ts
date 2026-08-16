@@ -92,6 +92,29 @@ export const itineraryItemSchema = z
         error: 'Links must start with http:// or https://',
       }),
     status: itineraryStatusSchema.default('planned'),
+    /**
+     * Where the entry is, when a pin has been dropped on it.
+     *
+     * Both or neither: half a coordinate is not a location, and a longitude
+     * with no latitude would write a point in the Gulf of Guinea rather than
+     * fail. The refinement below is what makes that impossible.
+     */
+    lng: z
+      .number()
+      .min(-180, { error: 'That longitude is off the map' })
+      .max(180, { error: 'That longitude is off the map' })
+      .nullable()
+      .default(null),
+    lat: z
+      .number()
+      .min(-90, { error: 'That latitude is off the map' })
+      .max(90, { error: 'That latitude is off the map' })
+      .nullable()
+      .default(null),
+  })
+  .refine((v) => (v.lng === null) === (v.lat === null), {
+    error: 'A pin needs both a longitude and a latitude',
+    path: ['lng'],
   })
   .refine((v) => v.timeStart === null || v.timeEnd === null || v.timeEnd >= v.timeStart, {
     error: 'The end time is before the start',

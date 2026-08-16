@@ -51,6 +51,19 @@ their own line — nobody outside the repo ever saw them.
 
 ### Added
 
+- **Drag an itinerary entry where it belongs.** Plans are not written in order —
+  you remember the restaurant after you have booked the hotel. Entries can now
+  be dragged into place within a day, or onto a different day entirely. It works
+  by touch, and by keyboard: focus the handle, press space, use the arrow keys,
+  press space again. A screen reader is told what has been picked up and which
+  day it is over, in those words. Reordering comes with the paid plans, alongside
+  times, costs and bookings.
+- **A map beside the days.** Give an entry a pin — the same map picker the trip
+  wizard uses — and it appears on a map next to the plan, numbered in the order
+  it happens and joined in that order. That line is what a list cannot show you:
+  that Tuesday afternoon doubles back an hour the way you came. Entries without
+  a pin are not a problem and the map says how many are on it, because most of a
+  plan is written before anybody knows the exact spot. Free on every plan.
 - **Collaborators** at `/trips/[id]/people`. Invite the people you are
   travelling with by email, as an **editor** who can change the trip and build
   its plan, or a **viewer** who can read it. The screen spells out what each

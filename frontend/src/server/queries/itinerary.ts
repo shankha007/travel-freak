@@ -4,6 +4,7 @@ import { createClient } from '@/server/supabase/server'
 import { canUseFullItinerary } from '@/server/entitlements'
 import { getPlannerTrip } from '@/server/queries/planner'
 import { costByCurrency, tripDateRange, type CurrencyTotal } from '@/shared/itinerary'
+import { pointFrom, type LngLat } from '@/shared/geo/point'
 import type { Database } from '@/shared/types/database'
 
 /**
@@ -34,6 +35,8 @@ export interface ItineraryEntry {
   url: string
   status: ItineraryStatus
   orderIndex: number
+  /** The pin, when one was dropped. Null for an entry recorded by name alone. */
+  point: LngLat | null
 }
 
 export interface ItineraryDay {
@@ -86,7 +89,7 @@ export async function getItinerary(tripId: string): Promise<ItineraryData | null
       .from('itinerary_items')
       .select(
         `id, day_id, kind, title, notes, time_start, time_end, cost, currency,
-         booking_ref, url, status, order_index`
+         booking_ref, url, status, order_index, latitude, longitude`
       )
       .eq('trip_id', tripId)
       .order('time_start', { ascending: true, nullsFirst: false })
@@ -112,6 +115,7 @@ export async function getItinerary(tripId: string): Promise<ItineraryData | null
       url: row.url,
       status: row.status,
       orderIndex: row.order_index,
+      point: pointFrom(row.latitude, row.longitude),
     }
     const existing = itemsByDay.get(row.day_id)
     if (existing) existing.push(entry)

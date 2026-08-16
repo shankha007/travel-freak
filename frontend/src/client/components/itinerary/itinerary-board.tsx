@@ -37,6 +37,8 @@ import {
 import { EMPTY_FORM_STATE } from '@/shared/validation/form-state'
 import { DayDialog } from '@/client/components/itinerary/day-dialog'
 import { ItemDialog } from '@/client/components/itinerary/item-dialog'
+import { ItineraryMap } from '@/client/components/itinerary/itinerary-map'
+import { SortableDays, SortableItem } from '@/client/components/itinerary/sortable-items'
 import { Badge } from '@/client/components/ui/badge'
 import { Button } from '@/client/components/ui/button'
 import { Card, CardContent } from '@/client/components/ui/card'
@@ -130,85 +132,112 @@ export function ItineraryBoard({ itinerary }: { itinerary: ItineraryData }) {
           </div>
         </div>
       ) : (
-        <ol className="space-y-4">
-          {itinerary.days.map((day, index) => (
-            <li key={day.id}>
-              <Card>
-                <CardContent className="space-y-4 p-5">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0 space-y-0.5">
-                      <h2 className="font-medium">{dayLabel(day.title, index)}</h2>
-                      <p className="text-sm text-muted-foreground">
-                        {day.dayDate ? (
-                          <time dateTime={day.dayDate}>
-                            {new Date(`${day.dayDate}T00:00:00`).toLocaleDateString('en-IN', {
-                              weekday: 'short',
-                              day: 'numeric',
-                              month: 'short',
-                              year: 'numeric',
-                            })}
-                          </time>
-                        ) : (
-                          'No date yet'
-                        )}
-                        {day.costs.length > 0 && (
-                          <>
-                            {' · '}
-                            <span className="tabular-nums">
-                              {day.costs.map((c) => formatMoney(c.total, c.currency)).join(' + ')}
-                            </span>
-                          </>
-                        )}
-                      </p>
-                    </div>
+        // The map alongside, once there is a plan to draw. Sticky on a wide
+        // screen so it stays put while a long itinerary scrolls past it, and
+        // below the days on a phone, where a map above the list would push the
+        // thing you came to read off the screen.
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+          <div>
+            <SortableDays days={itinerary.days} tripId={itinerary.tripId}>
+              {(day, items) => {
+                const index = itinerary.days.findIndex((d) => d.id === day.id)
+                return (
+                  <Card className="mb-4">
+                    <CardContent className="space-y-4 p-5">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 space-y-0.5">
+                          <h2 className="font-medium">{dayLabel(day.title, index)}</h2>
+                          <p className="text-sm text-muted-foreground">
+                            {day.dayDate ? (
+                              <time dateTime={day.dayDate}>
+                                {new Date(`${day.dayDate}T00:00:00`).toLocaleDateString('en-IN', {
+                                  weekday: 'short',
+                                  day: 'numeric',
+                                  month: 'short',
+                                  year: 'numeric',
+                                })}
+                              </time>
+                            ) : (
+                              'No date yet'
+                            )}
+                            {day.costs.length > 0 && (
+                              <>
+                                {' · '}
+                                <span className="tabular-nums">
+                                  {day.costs
+                                    .map((c) => formatMoney(c.total, c.currency))
+                                    .join(' + ')}
+                                </span>
+                              </>
+                            )}
+                          </p>
+                        </div>
 
-                    <div className="flex shrink-0 gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Edit ${dayLabel(day.title, index)}`}
-                        onClick={() => setEditingDay(day)}
-                      >
-                        <Pencil className="size-3.5" aria-hidden />
+                        <div className="flex shrink-0 gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={`Edit ${dayLabel(day.title, index)}`}
+                            onClick={() => setEditingDay(day)}
+                          >
+                            <Pencil className="size-3.5" aria-hidden />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={`Remove ${dayLabel(day.title, index)}`}
+                            onClick={() => setRemovingDay(day)}
+                          >
+                            <Trash2 className="size-3.5" aria-hidden />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {day.notes && <p className="text-sm text-muted-foreground">{day.notes}</p>}
+
+                      {items.length > 0 && (
+                        <ul className="space-y-3 border-l pl-4">
+                          {items.map((item) => (
+                            <li key={item.id}>
+                              {itinerary.full ? (
+                                <SortableItem id={item.id} label={item.title}>
+                                  <ItemRow
+                                    item={item}
+                                    tripId={itinerary.tripId}
+                                    full={itinerary.full}
+                                    onEdit={() => setEditingItem(item)}
+                                    onRemove={() => setRemovingItem(item)}
+                                  />
+                                </SortableItem>
+                              ) : (
+                                <ItemRow
+                                  item={item}
+                                  tripId={itinerary.tripId}
+                                  full={itinerary.full}
+                                  onEdit={() => setEditingItem(item)}
+                                  onRemove={() => setRemovingItem(item)}
+                                />
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+
+                      <Button variant="outline" size="sm" onClick={() => setAddingTo(day)}>
+                        <Plus className="size-3.5" aria-hidden />
+                        Add to this day
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Remove ${dayLabel(day.title, index)}`}
-                        onClick={() => setRemovingDay(day)}
-                      >
-                        <Trash2 className="size-3.5" aria-hidden />
-                      </Button>
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
+                )
+              }}
+            </SortableDays>
+          </div>
 
-                  {day.notes && <p className="text-sm text-muted-foreground">{day.notes}</p>}
-
-                  {day.items.length > 0 && (
-                    <ul className="space-y-3 border-l pl-4">
-                      {day.items.map((item) => (
-                        <li key={item.id}>
-                          <ItemRow
-                            item={item}
-                            tripId={itinerary.tripId}
-                            full={itinerary.full}
-                            onEdit={() => setEditingItem(item)}
-                            onRemove={() => setRemovingItem(item)}
-                          />
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-
-                  <Button variant="outline" size="sm" onClick={() => setAddingTo(day)}>
-                    <Plus className="size-3.5" aria-hidden />
-                    Add to this day
-                  </Button>
-                </CardContent>
-              </Card>
-            </li>
-          ))}
-        </ol>
+          <aside className="lg:sticky lg:top-6">
+            <ItineraryMap days={itinerary.days} />
+          </aside>
+        </div>
       )}
 
       {/* Keyed by the row so the uncontrolled inputs remount with its values

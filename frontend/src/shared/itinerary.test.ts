@@ -5,6 +5,7 @@ import {
   dayLabel,
   formatTime,
   formatTimeRange,
+  parseOrderedIds,
   tripDateRange,
 } from '@/shared/itinerary'
 
@@ -81,6 +82,47 @@ describe('costByCurrency', () => {
       { cost: 900, currency: 'INR' },
     ])
     expect(totals[0]?.currency).toBe('INR')
+  })
+})
+
+describe('parseOrderedIds', () => {
+  const a = '11111111-1111-4111-8111-111111111111'
+  const b = '22222222-2222-4222-8222-222222222222'
+
+  it('reads the order a drag produced', () => {
+    expect(parseOrderedIds(JSON.stringify([b, a]))).toEqual([b, a])
+  })
+
+  it('accepts an empty day', () => {
+    // A day emptied by dragging its last entry away is a real state, not a
+    // malformed payload.
+    expect(parseOrderedIds('[]')).toEqual([])
+  })
+
+  it('refuses anything that is not JSON', () => {
+    expect(parseOrderedIds('not json')).toBeNull()
+    expect(parseOrderedIds('')).toBeNull()
+  })
+
+  it('refuses a payload that is not an array', () => {
+    expect(parseOrderedIds(JSON.stringify({ 0: a }))).toBeNull()
+    expect(parseOrderedIds(JSON.stringify(a))).toBeNull()
+  })
+
+  it('refuses the whole list if any id is malformed, rather than part-applying', () => {
+    expect(parseOrderedIds(JSON.stringify([a, 'nonsense']))).toBeNull()
+    expect(parseOrderedIds(JSON.stringify([a, 42]))).toBeNull()
+    expect(parseOrderedIds(JSON.stringify([a, null]))).toBeNull()
+  })
+
+  it('refuses duplicates, which would silently drop an entry', () => {
+    // The database sets order_index from array position, so a repeated id would
+    // leave one entry unnumbered and another numbered twice.
+    expect(parseOrderedIds(JSON.stringify([a, b, a]))).toBeNull()
+  })
+
+  it('catches a duplicate that differs only in case', () => {
+    expect(parseOrderedIds(JSON.stringify([a, a.toUpperCase()]))).toBeNull()
   })
 })
 

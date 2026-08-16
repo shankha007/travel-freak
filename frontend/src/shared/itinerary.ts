@@ -118,6 +118,39 @@ export function costByCurrency(items: readonly CostedItem[]): CurrencyTotal[] {
 }
 
 /**
+ * Reads the new order a drag produced, off the wire.
+ *
+ * The client sends the day's entry ids as a JSON array in one field, because
+ * the order *is* the message and `FormData.getAll()` ordering is not something
+ * to stake a feature on. That makes this the one place a reorder can be
+ * malformed, so it is pulled out here and tested rather than left inline in the
+ * action: anything that is not an array of well-formed uuids is rejected whole
+ * rather than partially applied, and duplicates are refused because a repeated
+ * id would silently drop an entry from the day.
+ *
+ * Returns null when the payload cannot be trusted. An empty array is valid and
+ * means "nothing to do" — a day emptied by a drag is a real state.
+ */
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export function parseOrderedIds(raw: string): string[] | null {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return null
+  }
+
+  if (!Array.isArray(parsed)) return null
+  if (!parsed.every((id) => typeof id === 'string' && UUID_PATTERN.test(id))) return null
+
+  const ids = parsed as string[]
+  if (new Set(ids.map((id) => id.toLowerCase())).size !== ids.length) return null
+
+  return ids
+}
+
+/**
  * What a day is called when nobody has named it.
  *
  * A plan is navigated by position — "day three" — long before it is navigated by
