@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { BRAND } from '@/shared/brand'
 import { LEGAL_DOCS } from '@/shared/content/legal'
 import { ThemeToggle } from '@/client/components/theme-toggle'
+import { MarketingMobileNav } from '@/client/components/marketing/mobile-nav'
 import { Button } from '@/client/components/ui/button'
 import { cn } from '@/shared/utils'
 
@@ -33,11 +34,13 @@ const LINKS: MarketingLink[] = [
 ]
 
 /**
- * The legal documents, footer only.
+ * The legal documents — the footer, and the phone menu.
  *
- * Not in the header: nobody arrives looking for the refund policy, and five
- * nav items is already more than the phone breakpoint can hold. The footer is
- * where a reader expects to find them, and where a reviewer expects them to be.
+ * Not in the header's own row: nobody arrives looking for the refund policy,
+ * and five nav items is already all that row can hold. The footer is where a
+ * reader expects to find them, and where a reviewer expects them to be; the
+ * phone menu carries them as well, because a reader who has opened the menu
+ * should not have to close it again to reach them.
  */
 const LEGAL_LINKS: MarketingLink[] = LEGAL_DOCS.map((doc) => ({
   href: doc.path,
@@ -71,12 +74,21 @@ export function MarketingHeader({ current }: { current?: string }) {
 
         <ThemeToggle />
 
-        <Button variant="ghost" nativeButton={false} render={<Link href="/login" />}>
+        {/* Sign in folds into the menu on a phone; Get started does not, because
+            it is the one thing this header is for. */}
+        <Button
+          variant="ghost"
+          nativeButton={false}
+          render={<Link href="/login" />}
+          className="hidden sm:inline-flex"
+        >
           Sign in
         </Button>
         <Button nativeButton={false} render={<Link href="/register" />}>
           Get started
         </Button>
+
+        <MarketingMobileNav links={LINKS} legalLinks={LEGAL_LINKS} current={current} />
       </div>
     </header>
   )

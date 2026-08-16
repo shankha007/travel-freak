@@ -8,6 +8,8 @@ import type { RegionDetail, VisitedRegion } from '@/shared/types/globe'
 import { rollUpToCountries } from '@/shared/types/globe'
 import { REGION_STATES, REGION_STATE_META, type RegionState } from '@/shared/geo/region-state'
 import { FREE_ADMIN1_COUNTRY } from '@/shared/geo/admin1'
+import { NO_REGION_FILTER, filterRegions, type RegionFilter } from '@/shared/geo/region-filter'
+import { RegionFilterNote, RegionFilters } from '@/client/components/globe/region-filters'
 import { RegionList } from '@/client/components/globe/region-list'
 import { RegionModal } from '@/client/components/globe/region-modal'
 import { Button } from '@/client/components/ui/button'
@@ -45,6 +47,7 @@ export function MapExplorer({
   )
 
   const [visibleStates, setVisibleStates] = useState<RegionState[]>([...TOGGLEABLE, 'unvisited'])
+  const [filter, setFilter] = useState<RegionFilter>(NO_REGION_FILTER)
   const [detail, setDetail] = useState<{ forCountry: string; data: RegionDetail | null } | null>(
     null
   )
@@ -56,9 +59,19 @@ export function MapExplorer({
   const [panelPreference, setPanelPreference] = useState<boolean | null>(null)
   const panelOpen = panelPreference ?? wideEnough
 
+  // Everything below paints from the filtered rows; the controls themselves read
+  // the unfiltered ones, because a filter that removed its own options could
+  // never be undone. A row that is filtered out is simply absent, which the map
+  // already draws as unvisited — no separate "dimmed" state to keep in step.
+  const visibleRegions = useMemo(() => filterRegions(regions, filter), [regions, filter])
+
   // Country mode shows one country's subdivisions; world mode shows them for
   // every country the user has actually been to, which is what keeps the
   // downloads small.
+  //
+  // Read from the *unfiltered* rows on purpose: which polygons to download is a
+  // question about the account, and re-fetching a country's subdivisions every
+  // time somebody changes the year would be a download per keystroke.
   const admin1Countries = useMemo(() => {
     if (focusCountry) return [focusCountry]
     if (!showRegionDetail) return []
@@ -69,25 +82,26 @@ export function MapExplorer({
   // drawn; everywhere else they roll up so a country still gets its colour.
   const displayRegions = useMemo(() => {
     if (focusCountry) {
-      const forCountry = regions.filter((r) => r.countryCode === focusCountry)
+      const forCountry = visibleRegions.filter((r) => r.countryCode === focusCountry)
       // Keep the country-level row too, so a trip logged without a state still
       // paints the country outline on the country map.
       return forCountry
     }
-    if (!showRegionDetail) return rollUpToCountries(regions)
+    if (!showRegionDetail) return rollUpToCountries(visibleRegions)
 
     const detailed = admin1Countries
     return [
-      ...rollUpToCountries(regions),
-      ...regions.filter((r) => r.regionCode !== '' && detailed.includes(r.countryCode)),
+      ...rollUpToCountries(visibleRegions),
+      ...visibleRegions.filter((r) => r.regionCode !== '' && detailed.includes(r.countryCode)),
     ]
-  }, [admin1Countries, focusCountry, regions, showRegionDetail])
+  }, [admin1Countries, focusCountry, visibleRegions, showRegionDetail])
 
   // The list is the keyboard-navigable equivalent of the map and always shows
-  // the same rows the map is painting.
+  // the same rows the map is painting — filter included, or the two would
+  // disagree about where somebody has been.
   const listRegions = useMemo(
-    () => (focusCountry ? displayRegions : rollUpToCountries(regions)),
-    [displayRegions, focusCountry, regions]
+    () => (focusCountry ? displayRegions : rollUpToCountries(visibleRegions)),
+    [displayRegions, focusCountry, visibleRegions]
   )
 
   useEffect(() => {
@@ -219,6 +233,22 @@ export function MapExplorer({
             <X className="size-4" aria-hidden />
             <span className="sr-only">Hide the places panel</span>
           </Button>
+        </div>
+
+        {/* In the panel rather than floating over the map on their own: the
+            filter narrows the list and the polygons together, and this is where
+            a reader can see both the controls and what they did. */}
+        <div className="space-y-1.5">
+          <RegionFilters regions={regions} filter={filter} onChange={setFilter} />
+          <RegionFilterNote
+            filter={filter}
+            shown={listRegions.length}
+            total={
+              focusCountry
+                ? regions.filter((r) => r.countryCode === focusCountry).length
+                : rollUpToCountries(regions).length
+            }
+          />
         </div>
 
         {/* The upgrade path, stated where the missing feature would appear rather

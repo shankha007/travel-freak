@@ -6,7 +6,14 @@ import { getEntitlements } from '@/server/entitlements'
 import { pointFrom } from '@/shared/geo/point'
 import { TOTAL_COUNTRIES } from '@/shared/geo/countries'
 import { rollUpToCountries, type VisitedRegion } from '@/shared/types/globe'
-import { countByKind, totalDistanceKm, yearsTravelling, type ResumePlace } from '@/shared/resume'
+import {
+  countByKind,
+  distanceCoverage,
+  totalDistanceKm,
+  yearsTravelling,
+  type DistanceCoverage,
+  type ResumePlace,
+} from '@/shared/resume'
 import {
   budgetByCurrency,
   byTripType,
@@ -14,6 +21,7 @@ import {
   perYear,
   tripLengths,
   yearsWithTravel,
+  type AnalyticsExpense,
   type AnalyticsTrip,
   type BudgetByCurrency,
   type FavouriteDestinations,
@@ -46,8 +54,8 @@ export interface AnalyticsHeadline {
   yearsTravelling: number
   /** Approximate: straight lines between recorded stops. Null when nothing is pinned. */
   distanceKm: number | null
-  /** Trips with at least one pinned place, over trips with any place at all. */
-  pinned: { measured: number; total: number }
+  /** How many trips the distance figure could actually measure. */
+  pinned: DistanceCoverage
 }
 
 export interface AnalyticsData {
@@ -71,7 +79,7 @@ export async function getAnalytics(): Promise<AnalyticsData> {
   const supabase = await createClient()
   const user = await requireUser()
 
-  const [tripRows, placeRows, regionRows, entitlements] = await Promise.all([
+  const [tripRows, placeRows, regionRows, expenseRows, entitlements] = await Promise.all([
     supabase
       .from('trips')
       .select(
@@ -87,6 +95,11 @@ export async function getAnalytics(): Promise<AnalyticsData> {
       )
       .eq('user_id', user.id),
     supabase.from('visited_regions').select('*').eq('user_id', user.id),
+    // What was actually spent, which until now this screen has never read. The
+    // `expenses` policy is `user_id = auth.uid()` and nothing else, so this is
+    // the caller's own spend and no collaborator's — the same line the budget
+    // screen is drawn on, and the reason a collaborator sees plans only.
+    supabase.from('expenses').select('trip_id, amount, currency').eq('user_id', user.id),
     getEntitlements(),
   ])
 
@@ -119,6 +132,13 @@ export async function getAnalytics(): Promise<AnalyticsData> {
     }
   })
 
+  const expenses: AnalyticsExpense[] = (expenseRows.data ?? []).map((e) => ({
+    tripId: e.trip_id,
+    // `numeric` arrives as a string from PostgREST once it is large enough.
+    amount: Number(e.amount),
+    currency: e.currency,
+  }))
+
   const regions: VisitedRegion[] = (regionRows.data ?? []).map((r) => ({
     countryCode: r.country_code,
     regionCode: r.region_code ?? '',
@@ -150,38 +170,16 @@ export async function getAnalytics(): Promise<AnalyticsData> {
       travelDays: years.reduce((sum, y) => sum + y.days, 0),
       yearsTravelling: yearsTravelling(trips.map((t) => t.startDate)),
       distanceKm: totalDistanceKm(places),
-      pinned: pinnedCoverage(places),
+      pinned: distanceCoverage(places),
     },
     years,
     lengths: tripLengths(trips),
-    budgets: budgetByCurrency(trips),
+    budgets: budgetByCurrency(trips, expenses),
     types: byTripType(trips),
     destinations: favouriteDestinations(regions, 6),
     trips,
     heatmapYears: yearsWithTravel(trips),
     undatedTrips: trips.filter((t) => !t.startDate).length,
     showsAdvanced: entitlements.limits.analytics_advanced === true,
-  }
-}
-
-/**
- * How much of the distance figure is actually measured.
- *
- * `totalDistanceKm` skips the legs it cannot see, which is the honest answer but
- * an unexplained one — a trip with three stops and one pin measures nothing. The
- * screen shows this ratio next to the number so a small total reads as "not
- * pinned yet" rather than "you have not been far".
- */
-function pinnedCoverage(places: ResumePlace[]): { measured: number; total: number } {
-  const trips = new Map<string, boolean>()
-
-  for (const place of places) {
-    const pinned = place.lat !== null && place.lng !== null
-    trips.set(place.tripId, (trips.get(place.tripId) ?? false) || pinned)
-  }
-
-  return {
-    measured: [...trips.values()].filter(Boolean).length,
-    total: trips.size,
   }
 }

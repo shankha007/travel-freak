@@ -73,6 +73,41 @@ export function postImagePath(
 }
 
 /**
+ * Formats no browser can be relied on to decode.
+ *
+ * HEIC is what an iPhone writes by default, and outside Safari almost nothing
+ * renders it. A public page never has the problem — publication re-encodes to
+ * WebP — but the owner's own vault points at the original, so the person who
+ * took the photograph is the one most likely to see an empty frame.
+ */
+const UNDISPLAYABLE_MIME = ['image/heic', 'image/heif']
+
+export function needsDisplayCopy(mime: string): boolean {
+  return UNDISPLAYABLE_MIME.includes(mime)
+}
+
+/**
+ * Object key for a private, browser-readable copy of an original.
+ *
+ * The same folder as the original with a `display/` segment inserted, so the
+ * first path segment is still the owner's id and the storage policies covering
+ * the bucket cover this too, unchanged. The subfolder is not decoration:
+ * `confirmUpload` finds a freshly uploaded object with a non-recursive
+ * `list(folder, { search: '<id>.' })`, and a sibling `<id>.webp` would be a
+ * second match for it.
+ *
+ * Derived from the original's key rather than stored on the row, so nothing has
+ * to be migrated and every deletion path can compute what to remove.
+ */
+export function displayPath(originalPath: string): string {
+  const cut = originalPath.lastIndexOf('/')
+  const folder = originalPath.slice(0, cut)
+  const file = originalPath.slice(cut + 1)
+  const base = file.includes('.') ? file.slice(0, file.lastIndexOf('.')) : file
+  return `${folder}/display/${base}.webp`
+}
+
+/**
  * Identifies an image from its leading bytes.
  *
  * A file's declared content type is a claim by whoever uploaded it — storage

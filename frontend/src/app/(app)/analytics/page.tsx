@@ -16,6 +16,7 @@ import { getAnalytics } from '@/server/queries/analytics'
 import { TRIP_TYPE_LABELS, type TripLength } from '@/shared/analytics'
 import { countryFlag, countryName } from '@/shared/geo/countries'
 import { formatDistance } from '@/shared/resume'
+import { formatMoney } from '@/shared/budget'
 import { YearChart } from '@/client/components/analytics/year-chart'
 import { TravelHeatmap } from '@/client/components/analytics/travel-heatmap'
 import { Badge } from '@/client/components/ui/badge'
@@ -158,9 +159,11 @@ export default async function AnalyticsPage() {
               <p className="text-sm text-muted-foreground">
                 {headline.pinned.total === 0
                   ? 'No places recorded yet.'
-                  : headline.pinned.measured === 0
-                    ? 'Nothing is pinned yet, so there is nothing to measure. Add a pin to a place and the legs between stops start counting.'
-                    : `Straight lines between the stops that carry a pin — ${headline.pinned.measured} of your ${headline.pinned.total} trips with places. The legs it cannot see are real distance it is not claiming.`}
+                  : headline.pinned.measurable === 0
+                    ? 'Distance is the leg between two stops, and no trip of yours has a second one recorded yet.'
+                    : headline.pinned.measured === 0
+                      ? 'No trip has two pinned stops yet, so there is nothing to measure. Pin a second place and the legs between stops start counting.'
+                      : `Straight lines between the stops that carry a pin — ${headline.pinned.measured} of your ${headline.pinned.measurable} multi-stop trips. The legs it cannot see are real distance it is not claiming.`}
               </p>
             </CardContent>
           </Card>
@@ -272,31 +275,91 @@ export default async function AnalyticsPage() {
               <CardContent className="space-y-4 p-5">
                 <h2 className="flex items-center gap-2 font-medium">
                   <Wallet className="size-4 text-muted-foreground" aria-hidden />
-                  Planned budgets
+                  Money
                 </h2>
                 {budgets.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    No trip carries a budget yet. It is an optional field on the trip form.
+                    No trip carries a budget or an expense yet. A budget is an optional field on the
+                    trip form; expenses are recorded on a trip’s Budget screen.
                   </p>
                 ) : (
-                  <ul className="space-y-3">
+                  <ul className="space-y-4">
                     {budgets.map((budget) => (
-                      <li key={budget.currency} className="space-y-0.5">
-                        <p className="text-lg font-semibold tabular-nums">
-                          {budget.currency} {budget.average.toLocaleString('en-IN')}
+                      <li key={budget.currency} className="space-y-1">
+                        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                          {budget.currency}
                         </p>
-                        <p className="text-xs text-muted-foreground">
-                          average over {budget.trips} {budget.trips === 1 ? 'trip' : 'trips'} ·{' '}
-                          {budget.currency} {budget.total.toLocaleString('en-IN')} planned in total
-                        </p>
+
+                        <dl className="flex flex-wrap gap-x-6 gap-y-1">
+                          {budget.plannedTrips > 0 && (
+                            <div>
+                              <dt className="text-xs text-muted-foreground">Planned</dt>
+                              <dd className="text-lg leading-tight font-semibold tabular-nums">
+                                {formatMoney(budget.plannedTotal, budget.currency)}
+                              </dd>
+                              <dd className="text-xs text-muted-foreground">
+                                over {budget.plannedTrips}{' '}
+                                {budget.plannedTrips === 1 ? 'trip' : 'trips'} ·{' '}
+                                {formatMoney(budget.plannedAverage, budget.currency)} each
+                              </dd>
+                            </div>
+                          )}
+
+                          {budget.spentTrips > 0 && (
+                            <div>
+                              <dt className="text-xs text-muted-foreground">Spent</dt>
+                              <dd className="text-lg leading-tight font-semibold tabular-nums">
+                                {formatMoney(budget.spentTotal, budget.currency)}
+                              </dd>
+                              <dd className="text-xs text-muted-foreground">
+                                across {budget.spentTrips}{' '}
+                                {budget.spentTrips === 1 ? 'trip' : 'trips'}
+                              </dd>
+                            </div>
+                          )}
+                        </dl>
+
+                        {/* The only place the two are set against each other, and
+                            only over the trips that carry both. */}
+                        {budget.comparable && (
+                          <p className="text-xs text-muted-foreground">
+                            On the {budget.comparable.trips}{' '}
+                            {budget.comparable.trips === 1 ? 'trip' : 'trips'} with both,{' '}
+                            {formatMoney(budget.comparable.spent, budget.currency)} spent against{' '}
+                            {formatMoney(budget.comparable.planned, budget.currency)} planned —{' '}
+                            <span className="font-medium text-foreground">
+                              {budget.comparable.spent > budget.comparable.planned
+                                ? `${formatMoney(
+                                    Math.round(
+                                      (budget.comparable.spent - budget.comparable.planned) * 100
+                                    ) / 100,
+                                    budget.currency
+                                  )} over`
+                                : `${formatMoney(
+                                    Math.round(
+                                      (budget.comparable.planned - budget.comparable.spent) * 100
+                                    ) / 100,
+                                    budget.currency
+                                  )} under`}
+                            </span>
+                            .
+                          </p>
+                        )}
+
+                        {budget.plannedTrips > 0 && budget.spentTrips > 0 && !budget.comparable && (
+                          <p className="text-xs text-muted-foreground">
+                            No trip has both a plan and spend in {budget.currency}, so there is
+                            nothing here to compare.
+                          </p>
+                        )}
                       </li>
                     ))}
                   </ul>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  What you planned to spend, not what you did — expenses are not tracked yet.
                   Currencies are never added together, because there is no exchange rate here to do
-                  it with.
+                  it with — and a budgeted trip with no expenses recorded is left out of the
+                  comparison rather than counted as an underspend.
                 </p>
               </CardContent>
             </Card>

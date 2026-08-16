@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createProxyClient } from '@/server/supabase/proxy'
+import { signHandoff } from '@/shared/auth-handoff'
 
 /**
  * Refreshes the Supabase session on every request and guards the app shell.
@@ -13,6 +14,10 @@ import { createProxyClient } from '@/server/supabase/proxy'
  *     silently expires and users get logged out mid-session.
  *  2. Redirect unauthenticated visitors away from the authenticated shell, and
  *     signed-in users away from the auth pages.
+ *  3. Pass the user it just verified to the render, as a signed request header,
+ *     so `getSessionUser()` does not have to ask the auth server the same
+ *     question a second time. See `shared/auth-handoff.ts` for why that header
+ *     is signed and what happens when it is not there.
  *
  * This is a convenience redirect, never the security boundary — Row Level
  * Security is. A request that slips past this still cannot read another user's
@@ -43,7 +48,7 @@ const PROTECTED = [
 const AUTH_ROUTES = ['/login', '/register']
 
 export async function proxy(request: NextRequest) {
-  const { supabase, getResponse } = createProxyClient(request)
+  const { supabase, getResponse, setVerifiedUser } = createProxyClient(request)
 
   // Must be getUser(), not getSession(): only getUser() revalidates the token
   // against the auth server. getSession() trusts whatever the cookie claims.
@@ -67,6 +72,18 @@ export async function proxy(request: NextRequest) {
     url.pathname = '/dashboard'
     url.search = ''
     return NextResponse.redirect(url)
+  }
+
+  // Only on the way to a render. A redirect above returns before this, which is
+  // correct — the response it returns is not the one being rendered, and a
+  // token on it would go nowhere.
+  //
+  // Skipped silently when the secret is unavailable: the render then falls back
+  // to `getUser()`, which is exactly what it did before this existed. An
+  // unsigned token is never sent.
+  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (user && secret) {
+    setVerifiedUser(await signHandoff({ sub: user.id, email: user.email ?? '' }, secret))
   }
 
   // Carries the refreshed auth cookies. Returning anything else drops them.

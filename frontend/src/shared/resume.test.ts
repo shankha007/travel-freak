@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   countByKind,
+  distanceCoverage,
+  distanceCoverageNote,
   formatDistance,
   haversineKm,
   placeKindLabel,
@@ -137,6 +139,75 @@ describe('totalDistanceKm', () => {
 
     expect(km).not.toBeNull()
     expect(Math.abs((km as number) - 403)).toBeLessThan(4)
+  })
+})
+
+describe('distanceCoverage', () => {
+  it('does not count a trip with a single pin as measured', () => {
+    // The case gap 10 was about: three stops, one pin, nothing measurable —
+    // and the earlier version of this counted the trip as measured anyway.
+    const coverage = distanceCoverage([
+      place({ tripId: 't1', orderIndex: 0, lat: 28.61, lng: 77.21 }),
+      place({ tripId: 't1', orderIndex: 1 }),
+      place({ tripId: 't1', orderIndex: 2 }),
+    ])
+
+    expect(coverage).toEqual({ measured: 0, measurable: 1, total: 1 })
+  })
+
+  it('counts a trip once two of its stops are pinned', () => {
+    const coverage = distanceCoverage([
+      place({ tripId: 't1', orderIndex: 0, lat: 28.61, lng: 77.21 }),
+      place({ tripId: 't1', orderIndex: 1, lat: 19.08, lng: 72.88 }),
+      place({ tripId: 't1', orderIndex: 2 }),
+    ])
+
+    expect(coverage.measured).toBe(1)
+  })
+
+  it('leaves a one-stop trip out of the denominator', () => {
+    // A trip with one place has no leg to measure however well it is pinned, so
+    // counting it as measurable would make the ratio unreachable.
+    const coverage = distanceCoverage([
+      place({ tripId: 't1', orderIndex: 0, lat: 28.61, lng: 77.21 }),
+      place({ tripId: 't2', orderIndex: 0, lat: 19.08, lng: 72.88 }),
+      place({ tripId: 't2', orderIndex: 1, lat: 12.97, lng: 77.59 }),
+    ])
+
+    expect(coverage).toEqual({ measured: 1, measurable: 1, total: 2 })
+  })
+
+  it('is all zeroes when there are no places', () => {
+    expect(distanceCoverage([])).toEqual({ measured: 0, measurable: 0, total: 0 })
+  })
+})
+
+describe('distanceCoverageNote', () => {
+  it('tells a visitor the figure is withheld, not missing', () => {
+    expect(distanceCoverageNote(null)).toBe('Not shown publicly')
+  })
+
+  it('names the ratio while any measurable trip is unpinned', () => {
+    expect(distanceCoverageNote({ measured: 2, measurable: 5, total: 7 })).toBe(
+      'Approximate · 2 of 5 trips'
+    )
+  })
+
+  it('drops the ratio once every measurable trip is in the total', () => {
+    expect(distanceCoverageNote({ measured: 5, measurable: 5, total: 9 })).toBe('Approximate')
+  })
+
+  it('separates nothing recorded from nothing pinned from nothing to pin', () => {
+    expect(distanceCoverageNote({ measured: 0, measurable: 0, total: 0 })).toBe(
+      'Needs pinned places'
+    )
+    // Places exist but every trip is a single stop: pinning more will not help.
+    expect(distanceCoverageNote({ measured: 0, measurable: 0, total: 3 })).toBe(
+      'Needs a second stop'
+    )
+    expect(distanceCoverageNote({ measured: 0, measurable: 3, total: 3 })).toBe(
+      '0 of 3 trips pinned'
+    )
   })
 })
 

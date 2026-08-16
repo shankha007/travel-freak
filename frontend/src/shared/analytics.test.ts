@@ -124,10 +124,12 @@ describe('budgetByCurrency', () => {
       trip({ budgetPlanned: 400, currency: 'USD' }),
     ])
 
-    expect(rows).toEqual([
-      { currency: 'INR', trips: 2, total: 100000, average: 50000 },
-      { currency: 'USD', trips: 1, total: 400, average: 400 },
-    ])
+    expect(rows.map((r) => [r.currency, r.plannedTrips, r.plannedTotal, r.plannedAverage])).toEqual(
+      [
+        ['INR', 2, 100000, 50000],
+        ['USD', 1, 400, 400],
+      ]
+    )
   })
 
   it('leaves a trip with no budget out rather than averaging in a zero', () => {
@@ -137,7 +139,7 @@ describe('budgetByCurrency', () => {
     ])
 
     // Not having thought about the money is not a budget of nothing.
-    expect(rows[0]).toEqual({ currency: 'INR', trips: 1, total: 50000, average: 50000 })
+    expect(rows[0]).toMatchObject({ plannedTrips: 1, plannedTotal: 50000, plannedAverage: 50000 })
   })
 
   it('folds the currency code, so inr and INR are one row', () => {
@@ -146,7 +148,85 @@ describe('budgetByCurrency', () => {
       trip({ budgetPlanned: 100, currency: 'INR' }),
     ])
     expect(rows).toHaveLength(1)
-    expect(rows[0].trips).toBe(2)
+    expect(rows[0].plannedTrips).toBe(2)
+  })
+
+  it('reports no spend when no expenses are passed', () => {
+    const rows = budgetByCurrency([trip({ budgetPlanned: 100, currency: 'INR' })])
+
+    expect(rows[0]).toMatchObject({ spentTotal: 0, spentTrips: 0, comparable: null })
+  })
+
+  it('totals spend per currency, whatever the trip was planned in', () => {
+    const rows = budgetByCurrency(
+      [trip({ id: 'a', budgetPlanned: 40000, currency: 'INR' })],
+      [
+        { tripId: 'a', amount: 12000, currency: 'INR' },
+        { tripId: 'a', amount: 8000, currency: 'inr' },
+        // Spent abroad on a trip budgeted in rupees: its own row, no comparison.
+        { tripId: 'a', amount: 120, currency: 'USD' },
+      ]
+    )
+
+    const inr = rows.find((r) => r.currency === 'INR')
+    const usd = rows.find((r) => r.currency === 'USD')
+
+    expect(inr).toMatchObject({ spentTotal: 20000, spentTrips: 1 })
+    expect(usd).toMatchObject({ spentTotal: 120, spentTrips: 1, plannedTotal: 0, comparable: null })
+  })
+
+  it('gives a currency spent in but never planned in its own row', () => {
+    const rows = budgetByCurrency(
+      [trip({ id: 'a', budgetPlanned: null, currency: 'INR' })],
+      [{ tripId: 'a', amount: 500, currency: 'THB' }]
+    )
+
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      currency: 'THB',
+      plannedTrips: 0,
+      plannedTotal: 0,
+      plannedAverage: 0,
+      spentTotal: 500,
+      comparable: null,
+    })
+  })
+
+  it('compares only the trips that have both a plan and spend in that currency', () => {
+    const rows = budgetByCurrency(
+      [
+        trip({ id: 'a', budgetPlanned: 40000, currency: 'INR' }),
+        // Budgeted, nothing recorded against it: almost always receipts nobody
+        // typed in, so counting it as 40000 planned and 0 spent would invent an
+        // underspend.
+        trip({ id: 'b', budgetPlanned: 60000, currency: 'INR' }),
+        // Spent on, never budgeted: real spend, but nothing to compare it to.
+        trip({ id: 'c', budgetPlanned: null, currency: 'INR' }),
+      ],
+      [
+        { tripId: 'a', amount: 45000, currency: 'INR' },
+        { tripId: 'c', amount: 9000, currency: 'INR' },
+      ]
+    )
+
+    expect(rows[0]).toMatchObject({
+      currency: 'INR',
+      plannedTotal: 100000,
+      spentTotal: 54000,
+      comparable: { trips: 1, planned: 40000, spent: 45000 },
+    })
+  })
+
+  it('ignores an amount that is not a number', () => {
+    const rows = budgetByCurrency(
+      [trip({ id: 'a', budgetPlanned: 100, currency: 'INR' })],
+      [
+        { tripId: 'a', amount: Number.NaN, currency: 'INR' },
+        { tripId: 'a', amount: 25, currency: 'INR' },
+      ]
+    )
+
+    expect(rows[0].spentTotal).toBe(25)
   })
 })
 

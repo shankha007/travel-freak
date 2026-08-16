@@ -7,6 +7,7 @@ import {
   AlertCircle,
   BedDouble,
   CalendarPlus,
+  Clock3,
   FileText,
   Link2,
   Loader2,
@@ -139,38 +140,49 @@ export function ItineraryBoard({ itinerary }: { itinerary: ItineraryData }) {
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
           <div>
             <SortableDays days={itinerary.days} tripId={itinerary.tripId}>
-              {(day, items) => {
+              {(day, items, dragHandle) => {
                 const index = itinerary.days.findIndex((d) => d.id === day.id)
+                // Every entry timed means the clock decides the order and a
+                // drag springs back. True by design — but only if it is said.
+                const clockOrdered =
+                  itinerary.full && items.length > 1 && items.every((i) => i.timeStart !== null)
+
                 return (
                   <Card className="mb-4">
                     <CardContent className="space-y-4 p-5">
                       <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0 space-y-0.5">
-                          <h2 className="font-medium">{dayLabel(day.title, index)}</h2>
-                          <p className="text-sm text-muted-foreground">
-                            {day.dayDate ? (
-                              <time dateTime={day.dayDate}>
-                                {new Date(`${day.dayDate}T00:00:00`).toLocaleDateString('en-IN', {
-                                  weekday: 'short',
-                                  day: 'numeric',
-                                  month: 'short',
-                                  year: 'numeric',
-                                })}
-                              </time>
-                            ) : (
-                              'No date yet'
-                            )}
-                            {day.costs.length > 0 && (
-                              <>
-                                {' · '}
-                                <span className="tabular-nums">
-                                  {day.costs
-                                    .map((c) => formatMoney(c.total, c.currency))
-                                    .join(' + ')}
-                                </span>
-                              </>
-                            )}
-                          </p>
+                        {/* The handle sits beside the heading rather than in it:
+                            inside, its label would be read as part of the
+                            heading text on every day of the plan. */}
+                        <div className="flex min-w-0 items-start gap-1">
+                          {dragHandle}
+                          <div className="min-w-0 space-y-0.5">
+                            <h2 className="font-medium">{dayLabel(day.title, index)}</h2>
+                            <p className="text-sm text-muted-foreground">
+                              {day.dayDate ? (
+                                <time dateTime={day.dayDate}>
+                                  {new Date(`${day.dayDate}T00:00:00`).toLocaleDateString('en-IN', {
+                                    weekday: 'short',
+                                    day: 'numeric',
+                                    month: 'short',
+                                    year: 'numeric',
+                                  })}
+                                </time>
+                              ) : (
+                                'No date yet'
+                              )}
+                              {day.costs.length > 0 && (
+                                <>
+                                  {' · '}
+                                  <span className="tabular-nums">
+                                    {day.costs
+                                      .map((c) => formatMoney(c.total, c.currency))
+                                      .join(' + ')}
+                                  </span>
+                                </>
+                              )}
+                            </p>
+                          </div>
                         </div>
 
                         <div className="flex shrink-0 gap-1">
@@ -221,6 +233,19 @@ export function ItineraryBoard({ itinerary }: { itinerary: ItineraryData }) {
                             </li>
                           ))}
                         </ul>
+                      )}
+
+                      {/* Gap 12's other edge: on a day where every entry is
+                          timed, `time_start` sorts ahead of `order_index`, so a
+                          drag lands the entry back where it was. That is right —
+                          a plan with times on it is ordered by the clock — but
+                          an unexplained spring-back reads as a bug. */}
+                      {clockOrdered && (
+                        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Clock3 className="size-3.5 shrink-0" aria-hidden />
+                          Everything here has a time, so this day is ordered by the clock. Clear an
+                          entry’s time to put it where you like.
+                        </p>
                       )}
 
                       <Button variant="outline" size="sm" onClick={() => setAddingTo(day)}>

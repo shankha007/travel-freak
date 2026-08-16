@@ -198,6 +198,44 @@ export async function addTripDays(_prev: FormState, formData: FormData): Promise
   return { error: null, saved: true }
 }
 
+/**
+ * Puts the trip's days in a new order.
+ *
+ * Only ever called for a drag between **undated** days. `getItinerary()` sorts
+ * on `day_date` before `order_index`, so a dated day's position is decided by
+ * its date and this column never gets a say — which is why moving one is not
+ * offered rather than offered and ignored.
+ *
+ * The client still sends every day, in the order the screen is showing. The
+ * dated ones land back on the numbers they already had, and the column is left
+ * describing the whole list rather than a suffix of it.
+ *
+ * `reorder_itinerary_days` is SECURITY INVOKER and scoped to `p_trip_id`, so
+ * RLS decides which rows the update touches and a day id from another trip
+ * matches nothing.
+ */
+export async function moveItineraryDay(_prev: FormState, formData: FormData): Promise<FormState> {
+  const { tripId, dayIds } = textFields(formData, 'tripId', 'dayIds')
+  if (!tripId) return { error: 'Nothing to move.' }
+
+  const ids = parseOrderedIds(dayIds)
+  if (ids === null) return { error: 'Could not read the new order. Please try again.' }
+  if (ids.length === 0) return { error: null, saved: true }
+
+  const supabase = await createClient()
+  await requireUser()
+
+  const { error } = await supabase.rpc('reorder_itinerary_days', {
+    p_trip_id: tripId,
+    p_day_ids: ids,
+  })
+
+  if (error) return { error: 'Could not save the new order. Please try again.' }
+
+  repaint(tripId)
+  return { error: null, saved: true }
+}
+
 // ---------------------------------------------------------------------------
 // Items
 // ---------------------------------------------------------------------------

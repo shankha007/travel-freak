@@ -25,6 +25,7 @@ import { getPlannerSummary } from '@/server/queries/planner'
 import { formatMoney } from '@/shared/budget'
 import { SITE_URL } from '@/shared/brand'
 import { ShareTripCard } from '@/client/components/trips/share-trip-card'
+import { TripRouteMap } from '@/client/components/trips/route-map'
 import { countryFlag, countryName } from '@/shared/geo/countries'
 import { formatDateRange } from '@/shared/format'
 import { Badge } from '@/client/components/ui/badge'
@@ -257,6 +258,11 @@ export default async function TripDetailPage({ params }: PageProps<'/trips/[id]'
               <CardTitle className="text-base">Route</CardTitle>
             </CardHeader>
             <CardContent>
+              {/* The map first, the timeline under it: the shape of the trip is
+                  the thing a reader takes in at a glance, and the list is what
+                  they read afterwards. Renders nothing when no stop is pinned. */}
+              <TripRouteMap stops={trip.places} className="mb-5" />
+
               {trip.places.length ? (
                 <ol className="relative space-y-4 border-l pl-6">
                   {trip.places.map((place) => (
@@ -294,27 +300,16 @@ export default async function TripDetailPage({ params }: PageProps<'/trips/[id]'
                 </p>
               )}
 
-              {trip.places.length > 0 && (
+              {/* Only the unpinned case is left here. `TripRouteMap` states its
+                  own coverage above the list, so repeating the ratio underneath
+                  it would be the same sentence twice on one card. */}
+              {trip.places.length > 0 && pinnedPlaces === 0 && (
                 <p className="mt-4 text-xs text-muted-foreground">
-                  {pinnedPlaces === 0 ? (
-                    'No stop here carries a pin yet, so there is nothing to draw on a map. Add one from Edit.'
-                  ) : (
-                    <>
-                      {pinnedPlaces === trip.places.length
-                        ? 'Every stop carries a pin'
-                        : `${pinnedPlaces} of ${trip.places.length} stops ${
-                            pinnedPlaces === 1 ? 'carries' : 'carry'
-                          } a pin`}
-                      {' — the '}
-                      <Link
-                        href={`/trips/${trip.id}/vault`}
-                        className="underline underline-offset-2"
-                      >
-                        vault&rsquo;s map
-                      </Link>
-                      {' draws them in visit order.'}
-                    </>
-                  )}
+                  No stop here carries a pin yet, so there is nothing to draw on a map. Add one from{' '}
+                  <Link href={`/trips/${trip.id}/edit`} className="underline underline-offset-2">
+                    Edit
+                  </Link>
+                  .
                 </p>
               )}
             </CardContent>

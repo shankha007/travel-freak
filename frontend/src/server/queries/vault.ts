@@ -3,6 +3,7 @@ import 'server-only'
 import { createClient } from '@/server/supabase/server'
 import { requireUser } from '@/server/auth'
 import { getMediaQuota, type MediaQuota } from '@/server/entitlements'
+import { displayKeysFor } from '@/server/media/display'
 import { countryName } from '@/shared/geo/countries'
 import { pointFrom, type LngLat } from '@/shared/geo/point'
 import type { Database } from '@/shared/types/database'
@@ -97,7 +98,7 @@ export async function getVaultData(tripId: string): Promise<VaultData | null> {
     supabase
       .from('media')
       .select(
-        'id, storage_path, caption, alt_text, bytes, width, height, taken_at, created_at, is_featured, exif_lat, exif_lng'
+        'id, storage_path, mime, caption, alt_text, bytes, width, height, taken_at, created_at, is_featured, exif_lat, exif_lng'
       )
       .eq('user_id', user.id)
       .eq('trip_id', tripId)
@@ -123,9 +124,18 @@ export async function getVaultData(tripId: string): Promise<VaultData | null> {
   ])
 
   const rows = photoRows.data ?? []
+
+  // What to sign, which is the original for everything but a HEIC — those get a
+  // private WebP copy so the owner's own gallery is not a wall of empty frames
+  // in every browser but Safari. Nothing else about the row changes: the bytes,
+  // the dimensions and the EXIF all still describe the original.
+  const displayKeys = await displayKeysFor(
+    rows.map((r) => ({ storagePath: r.storage_path, mime: r.mime }))
+  )
+
   const signed = rows.length
     ? await supabase.storage.from('media').createSignedUrls(
-        rows.map((r) => r.storage_path),
+        rows.map((r) => displayKeys.get(r.storage_path) ?? r.storage_path),
         SIGNED_URL_TTL_S
       )
     : { data: [] }
@@ -141,7 +151,7 @@ export async function getVaultData(tripId: string): Promise<VaultData | null> {
     tripTitle: trip.title,
     photos: rows.map((r) => ({
       id: r.id,
-      url: urlByPath.get(r.storage_path) ?? null,
+      url: urlByPath.get(displayKeys.get(r.storage_path) ?? r.storage_path) ?? null,
       caption: r.caption,
       altText: r.alt_text,
       bytes: r.bytes,
@@ -186,16 +196,18 @@ export async function getMediaUrl(mediaId: string | null): Promise<string | null
 
   const { data } = await supabase
     .from('media')
-    .select('storage_path')
+    .select('storage_path, mime')
     .eq('id', mediaId)
     .is('deleted_at', null)
     .maybeSingle()
 
   if (!data) return null
 
+  const keys = await displayKeysFor([{ storagePath: data.storage_path, mime: data.mime }])
+
   const { data: signed } = await supabase.storage
     .from('media')
-    .createSignedUrl(data.storage_path, SIGNED_URL_TTL_S)
+    .createSignedUrl(keys.get(data.storage_path) ?? data.storage_path, SIGNED_URL_TTL_S)
 
   return signed?.signedUrl ?? null
 }
@@ -209,14 +221,19 @@ export async function getMediaUrls(mediaIds: string[]): Promise<Map<string, stri
 
   const { data: rows } = await supabase
     .from('media')
-    .select('id, storage_path')
+    .select('id, storage_path, mime')
     .in('id', ids)
     .is('deleted_at', null)
 
   if (!rows?.length) return new Map()
 
+  const keys = await displayKeysFor(
+    rows.map((r) => ({ storagePath: r.storage_path, mime: r.mime }))
+  )
+  const keyOf = (path: string) => keys.get(path) ?? path
+
   const { data: signed } = await supabase.storage.from('media').createSignedUrls(
-    rows.map((r) => r.storage_path),
+    rows.map((r) => keyOf(r.storage_path)),
     SIGNED_URL_TTL_S
   )
 
@@ -224,7 +241,7 @@ export async function getMediaUrls(mediaIds: string[]): Promise<Map<string, stri
 
   return new Map(
     rows
-      .map((r) => [r.id, urlByPath.get(r.storage_path)] as const)
+      .map((r) => [r.id, urlByPath.get(keyOf(r.storage_path))] as const)
       .filter((entry): entry is [string, string] => Boolean(entry[1]))
   )
 }

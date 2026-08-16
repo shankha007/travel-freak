@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   MAX_UPLOAD_BYTES,
+  displayPath,
   extensionFor,
   isAllowedImageMime,
+  needsDisplayCopy,
+  postImagePath,
   rejectionFor,
   sniffImageMime,
   storagePath,
@@ -51,6 +54,42 @@ describe('storagePath', () => {
 
     expect(path).toBe('user-1/trip-2/media-3.jpg')
     expect(path.split('/')[0]).toBe('user-1')
+  })
+})
+
+describe('needsDisplayCopy', () => {
+  it('is true only for the formats a browser cannot be relied on to draw', () => {
+    expect(needsDisplayCopy('image/heic')).toBe(true)
+    expect(needsDisplayCopy('image/heif')).toBe(true)
+    expect(needsDisplayCopy('image/jpeg')).toBe(false)
+    expect(needsDisplayCopy('image/webp')).toBe(false)
+    expect(needsDisplayCopy('image/avif')).toBe(false)
+  })
+})
+
+describe('displayPath', () => {
+  it('keeps the owner id first, so the same storage policy covers it', () => {
+    const path = displayPath(storagePath('user-1', 'trip-2', 'media-3', 'image/heic'))
+
+    expect(path).toBe('user-1/trip-2/display/media-3.webp')
+    expect(path.split('/')[0]).toBe('user-1')
+  })
+
+  it('does not sit beside the original, which confirmUpload searches for', () => {
+    // `confirmUpload` finds a new object with a non-recursive
+    // list(folder, { search: '<id>.' }); a sibling would be a second match.
+    const original = storagePath('u', 't', 'm', 'image/heic')
+    const copy = displayPath(original)
+
+    expect(copy.slice(0, copy.lastIndexOf('/'))).not.toBe(
+      original.slice(0, original.lastIndexOf('/'))
+    )
+  })
+
+  it('handles a post image, which lives in no trip folder', () => {
+    expect(displayPath(postImagePath('user-1', 'post-2', 'media-3', 'image/heif'))).toBe(
+      'user-1/posts/post-2/display/media-3.webp'
+    )
   })
 })
 

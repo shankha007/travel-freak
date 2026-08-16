@@ -186,44 +186,127 @@ export function tripLengths(trips: AnalyticsTrip[]): TripLengthSummary | null {
 // Budgets
 // ---------------------------------------------------------------------------
 
+/** One expense, reduced to what this file needs of it. */
+export interface AnalyticsExpense {
+  tripId: string
+  amount: number
+  currency: string
+}
+
 export interface BudgetByCurrency {
   currency: string
-  trips: number
-  total: number
-  average: number
+  /** Trips whose plan is written in this currency. */
+  plannedTrips: number
+  plannedTotal: number
+  /** Mean plan across those trips. */
+  plannedAverage: number
+  /** Everything recorded as spent in this currency, across every trip. */
+  spentTotal: number
+  /** Trips carrying at least one expense in this currency. */
+  spentTrips: number
+  /**
+   * Plan against spend, over the trips that have both *in this currency*.
+   *
+   * Not `plannedTotal` against `spentTotal`: those two are drawn from different
+   * sets of trips, so the difference between them would fold a budget nobody
+   * has spent against together with spend on a trip nobody budgeted, and call
+   * the result an overrun. Null when no trip qualifies.
+   */
+  comparable: { trips: number; planned: number; spent: number } | null
 }
 
 /**
- * Planned budgets, grouped by the currency they were written in.
+ * Planned budgets and actual spend, grouped by the currency each was written in.
  *
  * Grouped rather than summed, because there is no exchange rate in this
  * codebase and inventing one would turn ₹40,000 and $400 into a single number
- * that is wrong in both currencies. Trips with no budget are left out entirely
- * rather than averaged in as zero — not having thought about the money is a
- * different statement from having planned to spend none.
+ * that is wrong in both currencies. The budget screen refuses to convert for
+ * the same reason, so the two screens cannot disagree.
  *
- * Largest total first, so the currency someone actually travels in leads.
+ * Trips with no budget are left out of the planned half entirely rather than
+ * averaged in as zero — not having thought about the money is a different
+ * statement from having planned to spend none. Spend is counted wherever it was
+ * recorded, including on a trip that was never budgeted, because it happened.
+ *
+ * Largest planned total first, then largest spend, so the currency someone
+ * actually travels in leads whichever half of the pair they use.
  */
-export function budgetByCurrency(trips: AnalyticsTrip[]): BudgetByCurrency[] {
-  const groups = new Map<string, number[]>()
+export function budgetByCurrency(
+  trips: AnalyticsTrip[],
+  expenses: readonly AnalyticsExpense[] = []
+): BudgetByCurrency[] {
+  const currencyOf = (raw: string | null | undefined) => raw?.trim().toUpperCase() || 'INR'
+
+  const planned = new Map<string, number[]>()
+  /** trip id → its plan currency, for the paired comparison below. */
+  const planOf = new Map<string, { currency: string; amount: number }>()
 
   for (const trip of trips) {
     if (trip.budgetPlanned === null || !Number.isFinite(trip.budgetPlanned)) continue
-    const currency = trip.currency?.trim().toUpperCase() || 'INR'
-    groups.set(currency, [...(groups.get(currency) ?? []), trip.budgetPlanned])
+    const currency = currencyOf(trip.currency)
+    planned.set(currency, [...(planned.get(currency) ?? []), trip.budgetPlanned])
+    planOf.set(trip.id, { currency, amount: trip.budgetPlanned })
   }
 
-  return [...groups.entries()]
-    .map(([currency, amounts]) => {
-      const total = amounts.reduce((sum, n) => sum + n, 0)
+  const spent = new Map<string, { total: number; trips: Set<string> }>()
+  /** `${tripId}:${currency}` → spend, so a plan meets the spend it belongs to. */
+  const spentPerTrip = new Map<string, number>()
+
+  for (const expense of expenses) {
+    if (!Number.isFinite(expense.amount)) continue
+    const currency = currencyOf(expense.currency)
+    const bucket = spent.get(currency) ?? { total: 0, trips: new Set<string>() }
+    bucket.total += expense.amount
+    bucket.trips.add(expense.tripId)
+    spent.set(currency, bucket)
+
+    const key = `${expense.tripId}:${currency}`
+    spentPerTrip.set(key, (spentPerTrip.get(key) ?? 0) + expense.amount)
+  }
+
+  const currencies = new Set([...planned.keys(), ...spent.keys()])
+
+  return [...currencies]
+    .map((currency) => {
+      const amounts = planned.get(currency) ?? []
+      const plannedTotal = amounts.reduce((sum, n) => sum + n, 0)
+      const spendHere = spent.get(currency) ?? { total: 0, trips: new Set<string>() }
+
+      // A trip qualifies for the comparison only when it was planned in this
+      // currency *and* something was recorded against it in the same one. A
+      // budgeted trip with no expenses on it is far more often one nobody has
+      // typed the receipts into than one that cost nothing.
+      let comparableTrips = 0
+      let comparablePlanned = 0
+      let comparableSpent = 0
+
+      for (const [tripId, plan] of planOf) {
+        if (plan.currency !== currency) continue
+        const tripSpend = spentPerTrip.get(`${tripId}:${currency}`)
+        if (tripSpend === undefined) continue
+        comparableTrips += 1
+        comparablePlanned += plan.amount
+        comparableSpent += tripSpend
+      }
+
       return {
         currency,
-        trips: amounts.length,
-        total,
-        average: Math.round(total / amounts.length),
+        plannedTrips: amounts.length,
+        plannedTotal,
+        plannedAverage: amounts.length === 0 ? 0 : Math.round(plannedTotal / amounts.length),
+        spentTotal: Math.round(spendHere.total * 100) / 100,
+        spentTrips: spendHere.trips.size,
+        comparable:
+          comparableTrips === 0
+            ? null
+            : {
+                trips: comparableTrips,
+                planned: comparablePlanned,
+                spent: Math.round(comparableSpent * 100) / 100,
+              },
       }
     })
-    .sort((a, b) => b.total - a.total)
+    .sort((a, b) => b.plannedTotal - a.plannedTotal || b.spentTotal - a.spentTotal)
 }
 
 // ---------------------------------------------------------------------------
