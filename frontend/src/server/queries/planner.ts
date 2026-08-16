@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { createClient } from '@/server/supabase/server'
+import { requireUser } from '@/server/auth'
 import { checklistProgress, type ChecklistProgress } from '@/shared/packing'
 import { costByCurrency, type CurrencyTotal } from '@/shared/itinerary'
 
@@ -28,6 +29,16 @@ export interface PlannerTrip {
   tripType: string | null
   currency: string
   budgetPlanned: number | null
+  /**
+   * Whether the caller owns this trip, as opposed to collaborating on it.
+   *
+   * Load-bearing for the budget: `expenses` is owner-only by policy, but
+   * `trips.budget_planned` is a column on the trip itself and RLS hands it to
+   * any collaborator. Without this, `/budget` opened for a collaborator and
+   * showed them the planned figure under a sentence promising only the owner
+   * could see it. The screens use it to close that gap.
+   */
+  isOwner: boolean
 }
 
 export async function getPlannerTrip(id: string): Promise<PlannerTrip | null> {
@@ -36,10 +47,11 @@ export async function getPlannerTrip(id: string): Promise<PlannerTrip | null> {
   if (!UUID.test(id)) return null
 
   const supabase = await createClient()
+  const user = await requireUser()
 
   const { data } = await supabase
     .from('trips')
-    .select('id, title, start_date, end_date, trip_type, currency, budget_planned')
+    .select('id, user_id, title, start_date, end_date, trip_type, currency, budget_planned')
     .eq('id', id)
     .is('deleted_at', null)
     .maybeSingle()
@@ -48,6 +60,7 @@ export async function getPlannerTrip(id: string): Promise<PlannerTrip | null> {
 
   return {
     id: data.id,
+    isOwner: data.user_id === user.id,
     title: data.title,
     startDate: data.start_date,
     endDate: data.end_date,
@@ -73,12 +86,14 @@ export interface PlannerSummary {
   spent: CurrencyTotal[]
   listCount: number
   packing: ChecklistProgress
+  /** People on the trip besides the owner — accepted and still pending. */
+  collaboratorCount: number
 }
 
 export async function getPlannerSummary(tripId: string): Promise<PlannerSummary> {
   const supabase = await createClient()
 
-  const [days, items, expenses, lists, checklistItems] = await Promise.all([
+  const [days, items, expenses, lists, checklistItems, collaborators] = await Promise.all([
     supabase
       .from('itinerary_days')
       .select('*', { count: 'exact', head: true })
@@ -90,6 +105,12 @@ export async function getPlannerSummary(tripId: string): Promise<PlannerSummary>
     supabase.from('expenses').select('amount, currency').eq('trip_id', tripId),
     supabase.from('checklists').select('*', { count: 'exact', head: true }).eq('trip_id', tripId),
     supabase.from('checklist_items').select('is_done, quantity').eq('trip_id', tripId),
+    // A declined invitation is not a person on the trip, so it is not counted.
+    supabase
+      .from('trip_collaborators')
+      .select('*', { count: 'exact', head: true })
+      .eq('trip_id', tripId)
+      .is('declined_at', null),
   ])
 
   return {
@@ -104,5 +125,6 @@ export async function getPlannerSummary(tripId: string): Promise<PlannerSummary>
     packing: checklistProgress(
       (checklistItems.data ?? []).map((row) => ({ isDone: row.is_done, quantity: row.quantity }))
     ),
+    collaboratorCount: collaborators.count ?? 0,
   }
 }

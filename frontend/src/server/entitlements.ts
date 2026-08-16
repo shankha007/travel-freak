@@ -304,6 +304,66 @@ export async function canUseFullBudget(): Promise<boolean> {
 }
 
 /**
+ * Whether another person may be invited to this trip — screen 24.
+ *
+ * `collaborators_per_trip` is 0 on the free plan, which the convention at the
+ * top of this file reads as "not available" rather than as a limit of none —
+ * and the pricing table already sells it that way, as a ✗ against Explorer.
+ *
+ * Counts pending and accepted rows together. An invitation that has been sent
+ * and not yet answered is a seat taken: counting only acceptances would let
+ * somebody on a three-seat plan send thirty invitations and find out which
+ * limit was real when the fourth person clicked.
+ *
+ * A declined row costs nothing — it is kept only so the address cannot be
+ * re-invited in a loop, and so the owner can see the answer.
+ */
+export async function checkCollaboratorQuota(tripId: string): Promise<QuotaCheck> {
+  const supabase = await createClient()
+  // Not for the id — the count below is scoped by trip — but because a quota
+  // check reached without a session should redirect rather than answer.
+  await requireUser()
+  const { limits, planName } = await getEntitlements()
+
+  const limit = limits.collaborators_per_trip ?? null
+
+  // Scoped by trip alone, and correct because of who asks: only an owner
+  // invites, and `collaborators_select` shows an owner every row on their own
+  // trip. Filtering by `user_id` here would count the wrong thing — an
+  // invitation by email has no user_id at all until it is accepted.
+  const { count } = await supabase
+    .from('trip_collaborators')
+    .select('*', { count: 'exact', head: true })
+    .eq('trip_id', tripId)
+    .is('declined_at', null)
+
+  const used = count ?? 0
+
+  if (limit === null) return { allowed: true, used, limit }
+
+  if (limit === 0) {
+    return {
+      allowed: false,
+      used,
+      limit,
+      reason: `Planning together comes with the paid plans. On ${planName} a trip is yours alone — everything you have recorded stays exactly as it is.`,
+    }
+  }
+
+  return {
+    allowed: used < limit,
+    used,
+    limit,
+    reason:
+      used < limit
+        ? undefined
+        : `${planName} includes ${limit} ${
+            limit === 1 ? 'collaborator' : 'collaborators'
+          } per trip and this trip has ${used}. Upgrade to add more — nobody already on it is affected.`,
+  }
+}
+
+/**
  * Whether another checklist may be added to this trip — screen 23.
  *
  * `limits.checklists` is read as **per trip**, which is the reading the screen

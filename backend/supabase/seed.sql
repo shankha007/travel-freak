@@ -435,6 +435,125 @@ values
    '11111111-1111-1111-1111-111111111111', 'Download offline maps', 'Phone', 1, false, 2);
 
 -- ---------------------------------------------------------------------------
+-- A second traveller, and collaboration — screen 24
+--
+-- Sign in with friend@travelfreak.app / password123
+--
+-- Collaboration cannot be demonstrated with one account, and every collaborator
+-- policy in the schema was unreachable until screen 24 shipped. So the seed now
+-- has two people and covers all three states a collaborator row can be in:
+--
+--   accepted   the friend is an editor on Ladakh, so signing in as them shows
+--              somebody else's trip in their list and the planner open to them
+--   pending    an invitation addressed to somebody who has not signed up at
+--              all, which is the case the invite-by-email path exists for
+--   declined   answered and kept, so the owner's screen has all three to draw
+--
+-- The friend also owns one trip and has invited the demo account to it, which
+-- is what puts a live invitation on the demo user's own Trips screen.
+-- ---------------------------------------------------------------------------
+
+delete from auth.users where email = 'friend@travelfreak.app';
+
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password,
+  email_confirmed_at, last_sign_in_at,
+  raw_app_meta_data, raw_user_meta_data,
+  created_at, updated_at,
+  confirmation_token, email_change, email_change_token_new, recovery_token
+)
+values (
+  '00000000-0000-0000-0000-000000000000',
+  '22222222-2222-2222-2222-222222222222',
+  'authenticated',
+  'authenticated',
+  'friend@travelfreak.app',
+  extensions.crypt('password123', extensions.gen_salt('bf')),
+  now(), now(),
+  '{"provider":"email","providers":["email"]}'::jsonb,
+  '{"full_name":"Riya Sharma"}'::jsonb,
+  now() - interval '1 year', now(),
+  '', '', '', ''
+);
+
+insert into auth.identities (
+  id, user_id, provider_id, identity_data, provider,
+  last_sign_in_at, created_at, updated_at
+)
+values (
+  gen_random_uuid(),
+  '22222222-2222-2222-2222-222222222222',
+  '22222222-2222-2222-2222-222222222222',
+  '{"sub":"22222222-2222-2222-2222-222222222222","email":"friend@travelfreak.app","email_verified":true}'::jsonb,
+  'email',
+  now(), now(), now()
+);
+
+update public.profiles
+set
+  username = 'riya',
+  display_name = 'Riya Sharma',
+  bio = 'Rides pillion, takes the better photographs.',
+  country_code = 'IND',
+  city = 'Pune',
+  onboarded_at = now() - interval '1 year'
+where id = '22222222-2222-2222-2222-222222222222';
+
+-- The friend's own trip, so the demo account has something to be invited to.
+insert into public.trips (
+  id, user_id, title, slug, summary, start_date, end_date,
+  status, visibility, trip_type, traveler_count, budget_planned, currency
+)
+values (
+  'b0000002-0000-4000-8000-000000000001', '22222222-2222-2222-2222-222222222222',
+  'Spiti in the shoulder season', 'spiti-shoulder-season',
+  'Kaza, Key monastery, and whichever passes are still open.',
+  '2027-06-05', '2027-06-18', 'planning', 'private', 'friends', 4, 70000, 'INR'
+);
+
+insert into public.trip_places (
+  trip_id, user_id, country_code, region_code, city_name, place_kind, order_index
+)
+values (
+  'b0000002-0000-4000-8000-000000000001', '22222222-2222-2222-2222-222222222222',
+  'IND', 'IN-HP', 'Kaza', 'mountain', 0
+);
+
+-- Accepted: the friend edits the demo account's Ladakh trip. The row keeps the
+-- address it was sent to, because accept_trip_invitation() sets `user_id` and
+-- `accepted_at` and leaves `invited_email` alone — a seeded row that dropped it
+-- would not look like one the app produces.
+insert into public.trip_collaborators (trip_id, user_id, invited_email, role, invited_by, accepted_at)
+values (
+  'a0000001-0000-4000-8000-000000000001', '22222222-2222-2222-2222-222222222222',
+  'friend@travelfreak.app', 'editor', '11111111-1111-1111-1111-111111111111',
+  now() - interval '3 months'
+);
+
+-- Pending, addressed to somebody with no account: the invite-by-email case.
+insert into public.trip_collaborators (trip_id, invited_email, role, invited_by)
+values (
+  'a0000001-0000-4000-8000-000000000001', 'arjun@example.com',
+  'viewer', '11111111-1111-1111-1111-111111111111'
+);
+
+-- Declined, and kept, so the owner can see the answer.
+insert into public.trip_collaborators (trip_id, invited_email, role, invited_by, declined_at)
+values (
+  'a0000001-0000-4000-8000-000000000001', 'nikhil@example.com',
+  'viewer', '11111111-1111-1111-1111-111111111111', now() - interval '2 months'
+);
+
+-- Waiting for the demo account on its own Trips screen.
+insert into public.trip_collaborators (trip_id, invited_email, role, invited_by)
+values (
+  'b0000002-0000-4000-8000-000000000001', 'demo@travelfreak.app',
+  'editor', '22222222-2222-2222-2222-222222222222'
+);
+
+select public.refresh_visited_regions('22222222-2222-2222-2222-222222222222');
+
+-- ---------------------------------------------------------------------------
 -- Safety net
 --
 -- The triggers above rebuild visited_regions row by row. Running the refresh

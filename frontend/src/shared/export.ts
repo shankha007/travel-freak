@@ -46,6 +46,8 @@ export interface ExportContents {
   expenses: unknown[]
   checklists: unknown[]
   checklistItems: unknown[]
+  /** Trips shared with this account, and invitations sent to its address. */
+  collaborations: unknown[]
   visitedCountries: unknown[]
   visitedRegions: unknown[]
 }
@@ -74,6 +76,7 @@ export const EXPORT_SECTIONS: (keyof ExportContents)[] = [
   'expenses',
   'checklists',
   'checklistItems',
+  'collaborations',
   'visitedCountries',
   'visitedRegions',
 ]
