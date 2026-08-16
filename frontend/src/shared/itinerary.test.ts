@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import {
+  EXPENSE_CATEGORY_FOR_KIND,
+  ITINERARY_KINDS,
   MAX_GENERATED_DAYS,
+  canRecordExpense,
   costByCurrency,
   dayLabel,
   formatTime,
   formatTimeRange,
   parseOrderedIds,
+  planVariance,
   tripDateRange,
 } from '@/shared/itinerary'
+import { EXPENSE_CATEGORIES } from '@/shared/budget'
 
 describe('formatTime', () => {
   it('drops the seconds Postgres sends', () => {
@@ -177,5 +182,81 @@ describe('tripDateRange', () => {
     const end = new Date(Date.UTC(2026, 0, MAX_GENERATED_DAYS))
     const range = tripDateRange('2026-01-01', end.toISOString().slice(0, 10))
     expect(range).toHaveLength(MAX_GENERATED_DAYS)
+  })
+})
+
+describe('EXPENSE_CATEGORY_FOR_KIND', () => {
+  it('maps every itinerary kind to a real expense category', () => {
+    // Two enums of six that are not the same six. A kind with no mapping would
+    // be a button that silently does nothing on one sort of row.
+    for (const kind of ITINERARY_KINDS) {
+      expect(EXPENSE_CATEGORIES).toContain(EXPENSE_CATEGORY_FOR_KIND[kind])
+    }
+  })
+
+  it('files transport under flights, because there is no transport category', () => {
+    // The planner migration's own reasoning: a train ticket is an expense under
+    // "getting there", and inventing a seventh category would put this list out
+    // of step with the pricing page.
+    expect(EXPENSE_CATEGORY_FOR_KIND.transport).toBe('flights')
+  })
+})
+
+describe('canRecordExpense', () => {
+  it('offers the control on a priced entry that is not yet recorded', () => {
+    expect(canRecordExpense({ cost: 8000, recorded: null })).toBe(true)
+  })
+
+  it('offers it on an entry deliberately priced at nothing', () => {
+    // A free walking tour is a real plan, and recording it keeps the day's
+    // actual spend honest about what has been accounted for.
+    expect(canRecordExpense({ cost: 0, recorded: null })).toBe(true)
+  })
+
+  it('withholds it from an unpriced entry', () => {
+    // Nothing to prefill: the writer would land on the empty form they already
+    // have on the budget screen.
+    expect(canRecordExpense({ cost: null, recorded: null })).toBe(false)
+  })
+
+  it('withholds it once the entry has been recorded', () => {
+    expect(canRecordExpense({ cost: 8000, recorded: { id: 'e1' } })).toBe(false)
+  })
+})
+
+describe('planVariance', () => {
+  it('reports an overspend as a positive difference', () => {
+    const variance = planVariance(
+      { cost: 8000, currency: 'INR' },
+      { amount: 9240, currency: 'INR' }
+    )
+
+    expect(variance).toEqual({ planned: 8000, actual: 9240, difference: 1240, currency: 'INR' })
+  })
+
+  it('reports an underspend as a negative one', () => {
+    expect(
+      planVariance({ cost: 8000, currency: 'INR' }, { amount: 7500, currency: 'INR' })?.difference
+    ).toBe(-500)
+  })
+
+  it('refuses to compare across currencies', () => {
+    // The same refusal every total in this codebase makes. "₹8,000 planned, $95
+    // spent" is two facts, and there is no exchange rate here to make it one.
+    expect(
+      planVariance({ cost: 8000, currency: 'INR' }, { amount: 95, currency: 'USD' })
+    ).toBeNull()
+  })
+
+  it('matches currencies case-insensitively', () => {
+    expect(
+      planVariance({ cost: 100, currency: 'inr' }, { amount: 120, currency: 'INR' })?.currency
+    ).toBe('INR')
+  })
+
+  it('has nothing to compare when the plan carried no price', () => {
+    expect(
+      planVariance({ cost: null, currency: 'INR' }, { amount: 500, currency: 'INR' })
+    ).toBeNull()
   })
 })

@@ -37,6 +37,18 @@ export interface ItineraryEntry {
   orderIndex: number
   /** The pin, when one was dropped. Null for an entry recorded by name alone. */
   point: LngLat | null
+  /**
+   * The expense this plan turned into, once somebody recorded what it came to.
+   * Null while the entry is still only a plan, which is most of them.
+   */
+  recorded: RecordedExpense | null
+}
+
+/** What a planned entry actually cost, read back from the budget. */
+export interface RecordedExpense {
+  id: string
+  amount: number
+  currency: string
 }
 
 export interface ItineraryDay {
@@ -76,7 +88,7 @@ export async function getItinerary(tripId: string): Promise<ItineraryData | null
 
   const supabase = await createClient()
 
-  const [daysResult, itemsResult, full] = await Promise.all([
+  const [daysResult, itemsResult, expensesResult, full] = await Promise.all([
     supabase
       .from('itinerary_days')
       .select('id, day_date, title, notes, order_index')
@@ -94,11 +106,30 @@ export async function getItinerary(tripId: string): Promise<ItineraryData | null
       .eq('trip_id', tripId)
       .order('time_start', { ascending: true, nullsFirst: false })
       .order('order_index', { ascending: true }),
+    // What any of these plans actually came to. A third read rather than an
+    // embedded join: `expenses` is the caller's own by policy and an itinerary a
+    // collaborator is allowed to see carries none of theirs, so the two have to
+    // be able to come back independently — an empty result here is a normal
+    // answer, not a failure.
+    supabase
+      .from('expenses')
+      .select('id, amount, currency, itinerary_item_id')
+      .eq('trip_id', tripId)
+      .not('itinerary_item_id', 'is', null),
     canUseFullItinerary(),
   ])
 
   const rows = itemsResult.data ?? []
   const itemsByDay = new Map<string, ItineraryEntry[]>()
+
+  const recordedByItem = new Map<string, RecordedExpense>(
+    (expensesResult.data ?? [])
+      .filter((e): e is typeof e & { itinerary_item_id: string } => e.itinerary_item_id !== null)
+      .map((e) => [
+        e.itinerary_item_id,
+        { id: e.id, amount: Number(e.amount), currency: e.currency },
+      ])
+  )
 
   for (const row of rows) {
     const entry: ItineraryEntry = {
@@ -116,6 +147,7 @@ export async function getItinerary(tripId: string): Promise<ItineraryData | null
       status: row.status,
       orderIndex: row.order_index,
       point: pointFrom(row.latitude, row.longitude),
+      recorded: recordedByItem.get(row.id) ?? null,
     }
     const existing = itemsByDay.get(row.day_id)
     if (existing) existing.push(entry)

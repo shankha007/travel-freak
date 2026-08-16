@@ -143,7 +143,7 @@ const privacy: LegalDoc = {
         },
         {
           kind: 'note',
-          text: 'An image attached to a blog post is served from public storage under an unguessable address from the moment it is uploaded, so that the post can keep working once published. Before the post is published, that image is as exposed as an unlisted link. The editor says so next to the upload button.',
+          text: 'An image attached to a blog post is stored privately and served through an address that checks the post it belongs to on every request, so it is readable by exactly the people the post is. Unpublishing a post takes its images with it, with one caveat: an address already handed out stays good for up to an hour.',
         },
       ],
     },

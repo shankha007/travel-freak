@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/server/supabase/server'
 import { requireUser } from '@/server/auth'
 import { expenseSchema } from '@/shared/validation/expense'
+import { EXPENSE_CATEGORY_FOR_KIND } from '@/shared/itinerary'
 import { fieldErrorsOf, textFields, type FormState } from '@/shared/validation/form-state'
 
 /**
@@ -103,6 +104,96 @@ export async function saveExpense(_prev: FormState, formData: FormData): Promise
   if (error) return { error: 'Could not save that. Please try again.', values }
 
   repaint(trip.id)
+  return { error: null, saved: true }
+}
+
+/**
+ * Records a planned itinerary entry as money actually spent.
+ *
+ * The gap this closes: the budget screen totalled the itinerary's costs beside
+ * the expenses and analytics set plan against spend, but the two were separate
+ * rows and nobody could say "this hotel is that expense". Now an entry with a
+ * price on it becomes an expense carrying its id, and both screens can show the
+ * pair.
+ *
+ * The amount starts at the planned figure and is editable afterwards on the
+ * budget screen, which is the point — the interesting number is the one that
+ * differs from the plan. Recording it is not the same as claiming it was right.
+ *
+ * Refuses a second attempt rather than filing a duplicate. The unique index does
+ * the same thing underneath, and this turns its error into a sentence.
+ */
+export async function recordItineraryExpense(
+  _prev: FormState,
+  formData: FormData
+): Promise<FormState> {
+  const { itemId, tripId } = textFields(formData, 'itemId', 'tripId')
+  if (!itemId || !tripId) return { error: 'Nothing to record.' }
+
+  const supabase = await createClient()
+  const user = await requireUser()
+
+  // The entry, its day's date, and the trip it belongs to, in one read. RLS
+  // restricts this to the caller's own rows; the explicit `user_id` turns
+  // somebody else's id into a sentence rather than a silent no-op.
+  //
+  // The embed is hinted by constraint name because `itinerary_items` reaches
+  // `itinerary_days` twice — once on `day_id` and once on the composite key that
+  // makes the two agree about their trip — and PostgREST will not guess. A
+  // rename would fail this file's typecheck rather than only its next request.
+  const { data: item } = await supabase
+    .from('itinerary_items')
+    .select(
+      'id, trip_id, kind, title, cost, currency, itinerary_days!itinerary_items_day_id_fkey ( day_date )'
+    )
+    .eq('id', itemId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (!item || item.trip_id !== tripId) {
+    return { error: 'That plan is not here any more.' }
+  }
+
+  if (item.cost === null) {
+    // The button is not offered for an unpriced entry, so this is a stale form
+    // rather than a mis-click — the entry's price was cleared in another tab.
+    return { error: 'Put a cost on that plan first, then record what it came to.' }
+  }
+
+  const { data: existing } = await supabase
+    .from('expenses')
+    .select('id')
+    .eq('itinerary_item_id', itemId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (existing) {
+    return { error: 'That plan is already recorded on the budget.' }
+  }
+
+  const day = item.itinerary_days as { day_date: string | null } | null
+
+  const { error } = await supabase.from('expenses').insert({
+    trip_id: item.trip_id,
+    user_id: user.id,
+    itinerary_item_id: item.id,
+    category: EXPENSE_CATEGORY_FOR_KIND[item.kind],
+    title: item.title,
+    amount: Number(item.cost),
+    currency: item.currency,
+    // The day's own date, and null on an undated day rather than today's date.
+    // A plan laid out before the trip has dates would otherwise file every
+    // expense on the afternoon somebody happened to press the button.
+    spent_at: day?.day_date ?? null,
+    notes: '',
+    paid_by: '',
+  })
+
+  if (error) return { error: 'Could not record that. Please try again.' }
+
+  repaint(tripId)
+  // The entry now shows what it came to, so the itinerary repaints too.
+  revalidatePath(`/trips/${tripId}/itinerary`)
   return { error: null, saved: true }
 }
 

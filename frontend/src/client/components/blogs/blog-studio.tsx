@@ -403,7 +403,8 @@ export function BlogStudio({
             {id && (
               <span className="flex items-center gap-1.5">
                 <ImageOff className="size-3" aria-hidden />
-                Images are published as copies with their location data removed.
+                Images are stored as copies with their location data removed, and stay private until
+                the post is.
               </span>
             )}
           </p>

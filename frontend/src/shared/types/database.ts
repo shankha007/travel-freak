@@ -314,6 +314,7 @@ export type Database = {
           created_at: string
           currency: string
           id: string
+          itinerary_item_id: string | null
           notes: string
           paid_by: string
           spent_at: string | null
@@ -328,6 +329,7 @@ export type Database = {
           created_at?: string
           currency?: string
           id?: string
+          itinerary_item_id?: string | null
           notes?: string
           paid_by?: string
           spent_at?: string | null
@@ -342,6 +344,7 @@ export type Database = {
           created_at?: string
           currency?: string
           id?: string
+          itinerary_item_id?: string | null
           notes?: string
           paid_by?: string
           spent_at?: string | null
@@ -351,6 +354,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "expenses_itinerary_item_id_fkey"
+            columns: ["itinerary_item_id"]
+            isOneToOne: false
+            referencedRelation: "itinerary_items"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "expenses_trip_id_fkey"
             columns: ["trip_id"]

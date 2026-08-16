@@ -8,6 +8,7 @@ import { AlertCircle, Loader2, Lock, Pencil, Plus, Trash2, Wallet } from 'lucide
 import { deleteExpense, setPlannedBudget } from '@/server/actions/budget'
 import type { BudgetData, ExpenseRow } from '@/server/queries/budget'
 import { budgetVerdict, categoryLabel, formatMoney, type CurrencyBudget } from '@/shared/budget'
+import { planVariance } from '@/shared/itinerary'
 import { EMPTY_FORM_STATE } from '@/shared/validation/form-state'
 import { CategoryChart } from '@/client/components/budget/category-chart'
 import { ExpenseDialog } from '@/client/components/budget/expense-dialog'
@@ -174,6 +175,7 @@ export function BudgetView({ budget }: { budget: BudgetData }) {
                     {expense.notes && (
                       <p className="text-sm text-muted-foreground">{expense.notes}</p>
                     )}
+                    <FromPlanLine expense={expense} tripId={budget.tripId} />
                   </div>
 
                   <span className="shrink-0 font-medium tabular-nums">
@@ -438,6 +440,48 @@ function PlanDialog({
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/**
+ * "This came from the itinerary", and what the plan had said it would cost.
+ *
+ * The pair is the whole point of the link — a hotel planned at ₹8,000 and paid
+ * at ₹9,240 is the sentence neither screen could say before. The difference is
+ * omitted when the two are in different currencies, for the reason every total
+ * here gives: there is no exchange rate, so the two amounts are two facts.
+ *
+ * Links to the itinerary rather than naming the day, because the entry may have
+ * been dragged to another one since — the link stays right and a remembered day
+ * number would not.
+ */
+function FromPlanLine({ expense, tripId }: { expense: ExpenseRow; tripId: string }) {
+  if (!expense.fromPlan) return null
+
+  const variance = planVariance(expense.fromPlan, expense)
+
+  return (
+    <p className="text-xs text-muted-foreground">
+      <Link href={`/trips/${tripId}/itinerary`} className="underline underline-offset-2">
+        From the itinerary
+      </Link>
+      {expense.fromPlan.cost !== null && (
+        <>
+          {' · planned at '}
+          <span className="tabular-nums">
+            {formatMoney(expense.fromPlan.cost, expense.fromPlan.currency)}
+          </span>
+          {variance && variance.difference !== 0 && (
+            <span className={variance.difference > 0 ? 'text-destructive' : undefined}>
+              {variance.difference > 0 ? ' · over by ' : ' · under by '}
+              <span className="tabular-nums">
+                {formatMoney(Math.abs(variance.difference), variance.currency)}
+              </span>
+            </span>
+          )}
+        </>
+      )}
+    </p>
   )
 }
 

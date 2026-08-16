@@ -338,6 +338,9 @@ values
 --     them in USD — so the multi-currency case, which is the one the arithmetic
 --     refuses to collapse, is on screen rather than only in a unit test.
 --
+-- Bhutan additionally carries one expense recorded from its own itinerary, which
+-- is the only way to see a planned cost and an actual one side by side.
+--
 -- Deliberately partial: Bhutan's later days are left empty and its list is only
 -- half ticked, because a screen that is complete on first sight never shows its
 -- empty states.
@@ -410,6 +413,25 @@ values
   -- against the plan, because there is no exchange rate in this codebase.
   ('a0000001-0000-4000-8000-000000000001', '11111111-1111-1111-1111-111111111111',
    'misc', 'Spare GoPro battery, bought online', 39, 'USD', '2026-05-05', 'me', '');
+
+-- One expense recorded *from* the itinerary, so the plan-against-actual pair is
+-- on screen rather than only in a unit test. The Paro flight is planned at
+-- ₹42,000 and was paid at ₹43,150, which is the interesting case: the itinerary
+-- shows what it came to and by how much it moved, and the budget row says where
+-- it came from. A pair that matched exactly would demonstrate nothing.
+--
+-- Selected by title rather than by a literal id because the entries above are
+-- inserted without one; the link is the point, not the key.
+insert into public.expenses (
+  trip_id, user_id, itinerary_item_id, category, title, amount, currency, spent_at, paid_by, notes
+)
+select
+  'a0000001-0000-4000-8000-000000000012', '11111111-1111-1111-1111-111111111111',
+  i.id, 'flights', 'Flight to Paro', 43150, 'INR', '2026-11-02', 'me',
+  'Fare moved between booking and paying.'
+from public.itinerary_items i
+where i.trip_id = 'a0000001-0000-4000-8000-000000000012'
+  and i.title = 'Flight to Paro';
 
 insert into public.checklists (id, trip_id, user_id, kind, title, order_index)
 values

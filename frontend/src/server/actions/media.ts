@@ -5,19 +5,15 @@ import { z } from 'zod'
 import { createAdminClient, createClient } from '@/server/supabase/server'
 import { requireUser } from '@/server/auth'
 import { checkPhotoQuota, checkStorageQuota } from '@/server/entitlements'
-import {
-  ensurePublicDerivative,
-  postDerivativePath,
-  publicMediaUrl,
-} from '@/server/media/derivatives'
+import { toPublicDerivative } from '@/server/media/image-transform'
 import {
   displayPath,
   isAllowedImageMime,
   postImagePath,
+  postImageUrl,
   sniffImageMime,
   storagePath,
 } from '@/shared/media'
-import { publicEnv } from '@/shared/env'
 
 /**
  * Media Server Actions.
@@ -216,10 +212,12 @@ export interface PostImageResult {
  *    included — and the document references the stripped copy. The original stays
  *    private and is never what a reader sees.
  *
- * That means the bytes are readable by anyone holding the derivative's URL before
- * the post is published. The key contains a random uuid and is never listed, so
- * it is exactly as exposed as an unlisted link — which is what the studio tells
- * the writer next to the button.
+ * The stripped copy goes into the **private** bucket, beside the original under
+ * the owner's own prefix, and the document points at `/api/post-images/<id>`,
+ * which checks the post's visibility on every request. It used to go into the
+ * world-readable bucket instead, which made the picture fetchable from the
+ * moment it was uploaded — unguessable, but unguarded, and readable before
+ * anybody had decided to publish anything.
  */
 export async function confirmPostImage(
   input: z.input<typeof postImageInput>
@@ -299,30 +297,51 @@ export async function confirmPostImage(
     return { ok: false, error: `Could not save that image: ${error.message}` }
   }
 
-  const { path: publicPath, error: derivativeError } = await ensurePublicDerivative({
-    id: mediaId,
-    userId: user.id,
-    storagePath: path,
-    publicPath: null,
-    target: postDerivativePath(user.id, postId, mediaId),
-  })
+  const stripped = await writeStrippedCopy(path)
 
-  if (!publicPath) {
-    // Nothing readable came out of the transform, so there is no URL to insert.
-    // The row and the original are removed rather than left as a file the writer
-    // can neither see nor account for.
+  if (!stripped) {
+    // Nothing readable came out of the transform, so there is no image to point
+    // the document at. The row and the original are removed rather than left as
+    // a file the writer can neither see nor account for — and this is also what
+    // lets the serving route treat "the row exists" as "the copy exists".
     await supabase.from('media').delete().eq('id', mediaId).eq('user_id', user.id)
     await removeObject(path)
-    return {
-      ok: false,
-      error: derivativeError
-        ? `Could not prepare that image: ${derivativeError}`
-        : 'Could not prepare that image.',
-    }
+    return { ok: false, error: 'Could not prepare that image.' }
   }
 
   revalidatePath(`/blogs/${postId}/edit`)
-  return { ok: true, url: publicMediaUrl(publicEnv().NEXT_PUBLIC_SUPABASE_URL, publicPath) }
+  return { ok: true, url: postImageUrl(mediaId) }
+}
+
+/**
+ * Re-encodes an upload into a stripped WebP beside it in the private bucket.
+ *
+ * The same transform, the same key and the same bucket the vault's HEIC display
+ * copies use — `displayPath()` says why the shape is what it is, and both
+ * deletion paths already sweep it, so a post image needs no cleanup of its own.
+ *
+ * Through the owner's own client, never the service role: the storage policies
+ * key on the first path segment being the caller's id, so the person whose
+ * upload this is can read it and write beside it, and nobody else can do either.
+ */
+async function writeStrippedCopy(originalPath: string): Promise<boolean> {
+  const supabase = await createClient()
+  const bucket = supabase.storage.from('media')
+
+  const { data: original } = await bucket.download(originalPath)
+  if (!original) return false
+
+  try {
+    const converted = await toPublicDerivative(Buffer.from(await original.arrayBuffer()))
+    const { error } = await bucket.upload(displayPath(originalPath), converted, {
+      contentType: 'image/webp',
+      upsert: true,
+    })
+    return !error
+  } catch {
+    // sharp refuses what it cannot decode — a HEIC variant, a truncated upload.
+    return false
+  }
 }
 
 const detailsInput = z.object({

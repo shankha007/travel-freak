@@ -148,6 +148,9 @@ export async function getAnalytics(): Promise<AnalyticsData> {
     firstVisit: r.first_visit,
     lastVisit: r.last_visit,
     tripIds: r.trip_ids ?? [],
+    // Nothing on this screen filters regions by trip type — the trip-type
+    // breakdown here counts trips directly, from rows that carry the column.
+    tripTypes: [],
     cityNames: r.city_names ?? [],
     featuredMediaId: r.featured_media_id,
     featuredMediaUrl: null,

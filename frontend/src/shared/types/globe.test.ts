@@ -15,6 +15,7 @@ function region(
     firstVisit: null,
     lastVisit: null,
     tripIds: [],
+    tripTypes: [],
     cityNames: [],
     featuredMediaId: null,
     featuredMediaUrl: null,
@@ -103,6 +104,17 @@ describe('rollUpToCountries', () => {
     expect(rolled.lastVisit).toBe('2026-02-02')
     expect(rolled.tripIds.sort()).toEqual(['t1', 't2', 't3'])
     expect(rolled.cityNames.sort()).toEqual(['Bengaluru', 'Mysuru', 'Panaji'])
+  })
+
+  it('unions the trip types across subdivisions', () => {
+    // A country reached on a solo trip to one state and a family trip to another
+    // has been reached both ways, and the filter has to keep it under either.
+    const [rolled] = rollUpToCountries([
+      region({ countryCode: 'IND', regionCode: 'IN-KA', tripTypes: ['solo', 'family'] }),
+      region({ countryCode: 'IND', regionCode: 'IN-GA', tripTypes: ['family', 'business'] }),
+    ])
+
+    expect([...rolled.tripTypes].sort()).toEqual(['business', 'family', 'solo'])
   })
 
   it('counts distinct trips across subdivisions, not the largest single count', () => {

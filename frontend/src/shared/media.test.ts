@@ -4,8 +4,10 @@ import {
   displayPath,
   extensionFor,
   isAllowedImageMime,
+  mayServePostImage,
   needsDisplayCopy,
   postImagePath,
+  postImageUrl,
   rejectionFor,
   sniffImageMime,
   storagePath,
@@ -149,5 +151,75 @@ describe('rejectionFor', () => {
 
   it('rejects an empty file', () => {
     expect(rejectionFor({ ...ok, size: 0 })).toMatch(/empty/)
+  })
+})
+
+describe('postImageUrl', () => {
+  it('names the media row, not an object key', () => {
+    // The bytes have to be free to move between buckets without every post that
+    // references them going stale, and the URL lives in stored HTML for ever.
+    expect(postImageUrl('8b1d6a2c-0f4e-4a7b-9c3d-5e6f7a8b9c0d')).toBe(
+      '/api/post-images/8b1d6a2c-0f4e-4a7b-9c3d-5e6f7a8b9c0d'
+    )
+  })
+
+  it('stays relative, so no host is baked into a database row', () => {
+    expect(postImageUrl('x')).not.toMatch(/^https?:/)
+  })
+})
+
+describe('mayServePostImage', () => {
+  const published = {
+    isOwner: false,
+    visibility: 'public' as const,
+    publishedAt: '2026-08-01T00:00:00Z',
+    deletedAt: null,
+  }
+
+  it('serves a published public post to anyone', () => {
+    expect(mayServePostImage(published)).toBe(true)
+  })
+
+  it('serves a published unlisted post, the same as its share link does', () => {
+    // `resolve_post_share_link()` resolves while the post is unlisted-or-public
+    // and published. An image is part of the post, so the conditions match: a
+    // stricter rule here would break every picture in a shared draft-turned-link.
+    expect(mayServePostImage({ ...published, visibility: 'unlisted' })).toBe(true)
+  })
+
+  it('refuses an unpublished post — the gap this closes', () => {
+    expect(mayServePostImage({ ...published, publishedAt: null })).toBe(false)
+  })
+
+  it('refuses a private post even once published', () => {
+    expect(mayServePostImage({ ...published, visibility: 'private' })).toBe(false)
+  })
+
+  it('refuses a deleted post', () => {
+    expect(mayServePostImage({ ...published, deletedAt: '2026-08-02T00:00:00Z' })).toBe(false)
+  })
+
+  it('serves the author their own draft', () => {
+    // The studio renders the document being written. A draft whose pictures 404
+    // for its own author is not a draft anybody can edit.
+    expect(
+      mayServePostImage({
+        isOwner: true,
+        visibility: 'private',
+        publishedAt: null,
+        deletedAt: null,
+      })
+    ).toBe(true)
+  })
+
+  it('refuses even the author once the post is in the trash', () => {
+    expect(
+      mayServePostImage({
+        isOwner: true,
+        visibility: 'public',
+        publishedAt: '2026-08-01T00:00:00Z',
+        deletedAt: '2026-08-02T00:00:00Z',
+      })
+    ).toBe(false)
   })
 })

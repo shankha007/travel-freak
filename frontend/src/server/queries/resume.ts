@@ -360,6 +360,11 @@ function toVisitedRegion(row: VisitedRegionRow): VisitedRegion {
     firstVisit: row.first_visit,
     lastVisit: row.last_visit,
     tripIds: row.trip_ids ?? [],
+    // Left empty on purpose. This read serves the public profile, and the kind
+    // of trip behind a region is exactly the fact that must not travel with it —
+    // where somebody went is the shared claim, who they went with is not. The
+    // filter that consumes this offers no options when it comes back empty.
+    tripTypes: [],
     cityNames: row.city_names ?? [],
     featuredMediaId: row.featured_media_id,
     // The resume shows counts and a globe, not photos; leaving this null keeps
