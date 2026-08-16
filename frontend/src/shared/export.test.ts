@@ -22,6 +22,7 @@ const empty: ExportContents = {
   expenses: [],
   checklists: [],
   checklistItems: [],
+  collaborations: [],
   visitedCountries: [],
   visitedRegions: [],
 }

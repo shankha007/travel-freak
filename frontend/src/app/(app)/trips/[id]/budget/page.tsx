@@ -20,8 +20,10 @@ export default async function BudgetPage({ params }: PageProps<'/trips/[id]/budg
   const { id } = await params
   const budget = await getBudget(id)
 
-  // `expenses` is owner-only by policy — no collaborator clause at all — so this
-  // 404s for anybody but the person whose money it is.
+  // Owner only. `expenses` is owner-only by policy — no collaborator clause at
+  // all — and `getBudget()` turns that into a 404 for everybody else, because
+  // the planned figure this screen also shows rides on the trip row and RLS
+  // hands that to collaborators.
   if (!budget) notFound()
 
   return (
@@ -41,8 +43,9 @@ export default async function BudgetPage({ params }: PageProps<'/trips/[id]/budg
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Budget</h1>
         <p className="text-sm text-muted-foreground">
-          What this trip was meant to cost, and what it actually did. Only you can see it — not
-          collaborators, and never a public trip page.
+          What this trip was meant to cost, and what it actually did. This screen is yours alone —
+          collaborators see the budget you set, because it is part of the plan, but never what you
+          spent against it, and no trip page publishes either.
         </p>
       </header>
 

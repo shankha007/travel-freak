@@ -2,6 +2,7 @@ import 'server-only'
 
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 import { createClient } from '@/server/supabase/server'
+import { getSessionUser } from '@/server/auth'
 import { getMediaUrl } from '@/server/queries/vault'
 import { pointFrom } from '@/shared/geo/point'
 import type { Database } from '@/shared/types/database'
@@ -60,6 +61,15 @@ export interface TripPhoto {
 
 export interface TripDetail {
   id: string
+  /**
+   * Whether the caller owns this trip, as opposed to collaborating on it.
+   *
+   * The page uses it to decide whether to offer the Budget screen, which is
+   * owner-only: `expenses` has no collaborator policy, and the card's own
+   * subtitle carried the planned figure, so leaving it up for a collaborator
+   * would have shown exactly what the screen behind it hides.
+   */
+  isOwner: boolean
   title: string
   slug: string
   summary: string
@@ -92,6 +102,7 @@ export interface TripDetail {
 
 export async function getTripDetail(id: string): Promise<TripDetail | null> {
   const supabase = await createClient()
+  const sessionUser = await getSessionUser()
 
   // Guard before querying: Postgres rejects a malformed uuid with a 400 rather
   // than an empty result, which would surface as a server error instead of a
@@ -103,7 +114,7 @@ export async function getTripDetail(id: string): Promise<TripDetail | null> {
   const { data: trip } = await supabase
     .from('trips')
     .select(
-      `id, title, slug, summary, start_date, end_date, status, visibility,
+      `id, user_id, title, slug, summary, start_date, end_date, status, visibility,
        trip_type, traveler_count, budget_planned, currency, cover_media_id,
        photo_count, video_count, audio_count, media_bytes, created_at`
     )
@@ -193,6 +204,10 @@ export async function getTripDetail(id: string): Promise<TripDetail | null> {
 
   return {
     id: trip.id,
+    // Read through `getSessionUser()` rather than `requireUser()`: this query
+    // also serves paths that tolerate a signed-out visitor, and there the
+    // answer is simply that they do not own it.
+    isOwner: sessionUser !== null && trip.user_id === sessionUser.id,
     title: trip.title,
     slug: trip.slug,
     summary: trip.summary,

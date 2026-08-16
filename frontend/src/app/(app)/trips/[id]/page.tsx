@@ -90,17 +90,25 @@ export default async function TripDetailPage({ params }: PageProps<'/trips/[id]'
               planner.itemCount
             } ${planner.itemCount === 1 ? 'entry' : 'entries'}`,
     },
-    {
-      href: `/trips/${trip.id}/budget`,
-      icon: Wallet,
-      label: 'Budget',
-      detail:
-        planner.spent.length > 0
-          ? `${planner.spent.map((s) => formatMoney(s.total, s.currency)).join(' + ')} spent`
-          : trip.budgetPlanned !== null
-            ? `${formatMoney(trip.budgetPlanned, trip.currency)} planned, nothing spent yet`
-            : 'Set what it should cost',
-    },
+    // Owners only, and omitted rather than disabled: `/budget` 404s for a
+    // collaborator, and a card that leads to a 404 is worse than no card. It
+    // also carried the planned figure in its own subtitle, so hiding the screen
+    // while leaving the card would have leaked exactly what the screen hides.
+    ...(trip.isOwner
+      ? [
+          {
+            href: `/trips/${trip.id}/budget`,
+            icon: Wallet,
+            label: 'Budget',
+            detail:
+              planner.spent.length > 0
+                ? `${planner.spent.map((s) => formatMoney(s.total, s.currency)).join(' + ')} spent`
+                : trip.budgetPlanned !== null
+                  ? `${formatMoney(trip.budgetPlanned, trip.currency)} planned, nothing spent yet`
+                  : 'Set what it should cost',
+          },
+        ]
+      : []),
     {
       href: `/trips/${trip.id}/packing`,
       icon: ListChecks,
@@ -111,6 +119,17 @@ export default async function TripDetailPage({ params }: PageProps<'/trips/[id]'
           : `${planner.packing.done} of ${planner.packing.total} done across ${
               planner.listCount
             } ${planner.listCount === 1 ? 'list' : 'lists'}`,
+    },
+    {
+      href: `/trips/${trip.id}/people`,
+      icon: Users,
+      label: 'People',
+      detail:
+        planner.collaboratorCount === 0
+          ? 'Plan it together'
+          : `${planner.collaboratorCount} ${
+              planner.collaboratorCount === 1 ? 'person' : 'people'
+            } on this trip`,
     },
   ]
 
@@ -211,7 +230,7 @@ export default async function TripDetailPage({ params }: PageProps<'/trips/[id]'
           reachable from it — a bin of sub-routes in the sidebar would be
           meaningless without a trip in hand. */}
       <section aria-label="Planner">
-        <ul className="grid gap-3 sm:grid-cols-3">
+        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {plannerLinks.map(({ href, icon: Icon, label, detail }) => (
             <li key={href}>
               <Link

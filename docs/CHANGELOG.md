@@ -51,6 +51,36 @@ their own line — nobody outside the repo ever saw them.
 
 ### Added
 
+- **Collaborators** at `/trips/[id]/people`. Invite the people you are
+  travelling with by email, as an **editor** who can change the trip and build
+  its plan, or a **viewer** who can read it. The screen spells out what each
+  role can and — just as plainly — cannot do before you choose. Invitations
+  appear on the invitee's own Trips screen, where they can accept or decline;
+  once accepted the trip joins their list and they can leave it again whenever
+  they like, without taking anything they added with them. The owner sees who
+  has accepted, who has not answered and who said no, and can change a role or
+  take somebody off at any time. Three collaborators per trip on Voyager,
+  unlimited on Nomad; a free trip is yours alone.
+- **What you actually spent is never shared.** Collaborators see the budget you
+  set, because a budget is part of a plan — but the expenses you record against
+  it, and the whole Budget screen, stay with you.
+- **You can see who you are travelling with.** Sharing a trip now lets the
+  people on it see each other's name and username, which a private profile
+  previously hid — the owner's own People screen used to list an invited friend
+  as "Someone".
+
+### Security
+
+- **A collaborator could have made themselves an editor.** The rule that was
+  supposed to let an invitee accept an invitation without changing its terms did
+  not actually restrict the terms, so somebody invited to *view* a trip could
+  have granted themselves permission to *change* it — and through that, its
+  places, its photographs, its notes and its plan. Nobody could have used it:
+  there has never been a way to add a collaborator to a trip until this release,
+  so no such invitation has ever existed. It is fixed in the same change that
+  makes invitations possible, accepting and declining now go through a path that
+  cannot touch a role, and a test asserts a viewer stays a viewer.
+
 - **Itinerary builder** at `/trips/[id]/itinerary`. A trip is planned day by
   day: each day holds activities, stays, food, travel, bookings and notes, and
   a day needs neither a date nor a name to hold a plan — an idea gets written
@@ -120,8 +150,8 @@ their own line — nobody outside the repo ever saw them.
 ### Infrastructure
 
 - **CI runs on every push and pull request.** Two jobs: the frontend one checks
-  formatting, lint, types, the 436 unit tests and a production build; the
-  database one boots the Supabase stack and runs the 158 pgTAP assertions that
+  formatting, lint, types, the 453 unit tests and a production build; the
+  database one boots the Supabase stack and runs the 200 pgTAP assertions that
   are the real guarantee one traveller cannot read another's trips. It also
   regenerates the database types and fails if they differ from what is
   committed — a migration that changes a table without them compiles fine and is

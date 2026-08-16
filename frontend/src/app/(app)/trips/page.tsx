@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { Camera, MapPin, Plus, Trash2, Users } from 'lucide-react'
 import { Button } from '@/client/components/ui/button'
 import { getTrips, groupTrips, type TripListItem } from '@/server/queries/trips'
+import { getMyInvitations } from '@/server/queries/collaborators'
+import { InvitationsCard } from '@/client/components/collaborators/invitations-card'
 import { countryFlag } from '@/shared/geo/countries'
 import { formatDateRange } from '@/shared/format'
 import { Card, CardContent } from '@/client/components/ui/card'
@@ -91,7 +93,9 @@ function TripGrid({ trips }: { trips: TripListItem[] }) {
 }
 
 export default async function TripsPage() {
-  const trips = await getTrips()
+  // An invitation is a trip that is not in the list yet, so it belongs above
+  // the list rather than on a screen of its own nobody would think to open.
+  const [trips, invitations] = await Promise.all([getTrips(), getMyInvitations()])
   const grouped = groupTrips(trips)
 
   const tabs = [
@@ -124,6 +128,8 @@ export default async function TripsPage() {
           </Button>
         </div>
       </header>
+
+      <InvitationsCard invitations={invitations} />
 
       <Tabs defaultValue="all">
         <TabsList>

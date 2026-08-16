@@ -51,6 +51,17 @@ export async function getBudget(tripId: string): Promise<BudgetData | null> {
   const trip = await getPlannerTrip(tripId)
   if (!trip) return null
 
+  // Owner only, and this line is the whole enforcement on the read side.
+  //
+  // `expenses` has one policy — `user_id = auth.uid()` — so a collaborator
+  // opening this screen saw an empty expense list, which is correct. What they
+  // also saw was `trips.budget_planned`: a column on the trip row, which RLS
+  // hands to any collaborator, rendered under a sentence promising that only
+  // the owner could see it. The list was private and the plan was not, and the
+  // page said both were. It 404s for anyone but the owner now, which is the
+  // same answer the policy already gave for the half that mattered.
+  if (!trip.isOwner) return null
+
   const supabase = await createClient()
 
   const [expensesResult, itineraryResult, full] = await Promise.all([

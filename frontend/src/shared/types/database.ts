@@ -884,6 +884,7 @@ export type Database = {
         Row: {
           accepted_at: string | null
           created_at: string
+          declined_at: string | null
           id: string
           invited_by: string | null
           invited_email: string | null
@@ -895,6 +896,7 @@ export type Database = {
         Insert: {
           accepted_at?: string | null
           created_at?: string
+          declined_at?: string | null
           id?: string
           invited_by?: string | null
           invited_email?: string | null
@@ -906,6 +908,7 @@ export type Database = {
         Update: {
           accepted_at?: string | null
           created_at?: string
+          declined_at?: string | null
           id?: string
           invited_by?: string | null
           invited_email?: string | null
@@ -1383,6 +1386,7 @@ export type Database = {
         Returns: unknown
       }
       _st_within: { Args: { geom1: unknown; geom2: unknown }; Returns: boolean }
+      accept_trip_invitation: { Args: { p_trip_id: string }; Returns: boolean }
       addauth: { Args: { "": string }; Returns: boolean }
       addgeometrycolumn:
         | {
@@ -1423,6 +1427,7 @@ export type Database = {
           }
       can_edit_trip: { Args: { p_trip_id: string }; Returns: boolean }
       can_read_trip: { Args: { p_trip_id: string }; Returns: boolean }
+      decline_trip_invitation: { Args: { p_trip_id: string }; Returns: boolean }
       disablelongtransactions: { Args: never; Returns: string }
       dropgeometrycolumn:
         | {
@@ -1563,6 +1568,7 @@ export type Database = {
       geomfromewkt: { Args: { "": string }; Returns: unknown }
       gettransactionid: { Args: never; Returns: unknown }
       is_trip_collaborator: { Args: { p_trip_id: string }; Returns: boolean }
+      leave_trip: { Args: { p_trip_id: string }; Returns: boolean }
       list_deleted_trips: {
         Args: never
         Returns: {
@@ -1577,6 +1583,17 @@ export type Database = {
           summary: string
           title: string
           visibility: Database["public"]["Enums"]["visibility"]
+        }[]
+      }
+      list_my_invitations: {
+        Args: never
+        Returns: {
+          invited_at: string
+          inviter_name: string
+          inviter_username: string
+          role: Database["public"]["Enums"]["collaborator_role"]
+          trip_id: string
+          trip_title: string
         }[]
       }
       longtransactionsenabled: { Args: never; Returns: boolean }
@@ -1655,6 +1672,7 @@ export type Database = {
       resolve_post_share_link: { Args: { p_token: string }; Returns: string }
       resolve_share_link: { Args: { p_token: string }; Returns: string }
       restore_trip: { Args: { p_trip_id: string }; Returns: boolean }
+      shares_a_trip_with: { Args: { p_user_id: string }; Returns: boolean }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       shows_branding_badge: { Args: { p_user_id: string }; Returns: boolean }

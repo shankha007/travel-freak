@@ -38,6 +38,7 @@ export async function getAccountExport(): Promise<ExportDocument> {
     expenses,
     checklists,
     checklistItems,
+    collaborations,
     countries,
     regions,
   ] = await Promise.all([
@@ -54,6 +55,11 @@ export async function getAccountExport(): Promise<ExportDocument> {
     supabase.from('expenses').select('*').eq('user_id', user.id),
     supabase.from('checklists').select('*').eq('user_id', user.id),
     supabase.from('checklist_items').select('*').eq('user_id', user.id),
+    // No user_id filter: RLS returns the rows naming this account *and* the
+    // invitations sent to its address, which have no user_id until they are
+    // accepted. Filtering here would drop exactly the ones somebody exporting
+    // their data would be looking for.
+    supabase.from('trip_collaborators').select('*'),
     supabase.from('visited_countries').select('*').eq('user_id', user.id),
     supabase.from('visited_regions').select('*').eq('user_id', user.id),
   ])
@@ -72,6 +78,7 @@ export async function getAccountExport(): Promise<ExportDocument> {
     expenses: expenses.data ?? [],
     checklists: checklists.data ?? [],
     checklistItems: checklistItems.data ?? [],
+    collaborations: collaborations.data ?? [],
     visitedCountries: countries.data ?? [],
     visitedRegions: regions.data ?? [],
   }
