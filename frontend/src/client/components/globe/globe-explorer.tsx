@@ -7,7 +7,9 @@ import { Globe2 } from 'lucide-react'
 import type { RegionDetail, VisitedRegion } from '@/shared/types/globe'
 import { rollUpToCountries } from '@/shared/types/globe'
 import { TOTAL_COUNTRIES } from '@/shared/geo/countries'
+import { NO_REGION_FILTER, filterRegions, type RegionFilter } from '@/shared/geo/region-filter'
 import { useLazyComponent } from '@/client/hooks/use-lazy-component'
+import { RegionFilterNote, RegionFilters } from './region-filters'
 import { RegionLegend } from './region-legend'
 import { RegionList } from './region-list'
 import { RegionModal } from './region-modal'
@@ -45,25 +47,34 @@ export function GlobeExplorer({
     data: RegionDetail | null
   } | null>(null)
 
+  const [filter, setFilter] = useState<RegionFilter>(NO_REGION_FILTER)
+
+  // The filter is applied before the paywall roll-up, so both the globe and the
+  // list beside it are narrowed by exactly the same rows.
+  const visibleRegions = useMemo(() => filterRegions(regions, filter), [regions, filter])
+
   // Free plans render country fills only, even when the stored data carries
   // subdivision rows. The paywall changes the view, never the underlying data.
   const displayRegions = useMemo(
-    () => (showRegionDetail ? regions : rollUpToCountries(regions)),
-    [regions, showRegionDetail]
+    () => (showRegionDetail ? visibleRegions : rollUpToCountries(visibleRegions)),
+    [visibleRegions, showRegionDetail]
   )
 
   // Counted from the country roll-up, never from `displayRegions`. On a plan
   // with subdivision detail the display rows are states, so counting those
   // would report "13 countries" for someone who has visited six.
+  //
+  // Counted from the *filtered* rows, because these three numbers sit on the
+  // globe itself and would otherwise describe a globe nobody is looking at.
   const stats = useMemo(() => {
-    const countryLevel = rollUpToCountries(regions)
+    const countryLevel = rollUpToCountries(visibleRegions)
     const visited = countryLevel.filter((r) => r.state === 'visited' || r.state === 'current')
     return {
       countries: visited.length,
-      cities: new Set(regions.flatMap((r) => r.cityNames)).size,
+      cities: new Set(visibleRegions.flatMap((r) => r.cityNames)).size,
       percentOfWorld: Math.round((visited.length / TOTAL_COUNTRIES) * 100),
     }
-  }, [regions])
+  }, [visibleRegions])
 
   useEffect(() => {
     if (!selected) return
@@ -153,6 +164,16 @@ export function GlobeExplorer({
           <Globe2 className="size-4" aria-hidden />
           Your places
         </h2>
+
+        {/* Above the list, not over the globe: the globe is a canvas with no
+            room for chrome, and the filter narrows both halves at once. */}
+        <RegionFilters regions={regions} filter={filter} onChange={setFilter} />
+        <RegionFilterNote
+          filter={filter}
+          shown={rollUpToCountries(visibleRegions).length}
+          total={rollUpToCountries(regions).length}
+        />
+
         <RegionList
           regions={displayRegions}
           selectedCountry={selected}

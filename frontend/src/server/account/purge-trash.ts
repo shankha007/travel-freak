@@ -2,6 +2,7 @@ import 'server-only'
 
 import { createAdminClient } from '@/server/supabase/server'
 import { retentionCutoff } from '@/shared/retention'
+import { displayPath } from '@/shared/media'
 
 /**
  * Emptying the trash once its 30 days are up.
@@ -58,11 +59,21 @@ export async function purgeExpiredTrash(now = Date.now()): Promise<PurgeResult> 
   }
 
   const originals = (media ?? []).map((m) => m.storage_path).filter(Boolean)
+  // The private display copy of a HEIC. Named from the original's key rather
+  // than stored, so it is listed unconditionally — `remove` is untroubled by a
+  // key that was never written, and the alternative is an orphan nothing can
+  // ever find again once the row naming it is gone.
+  const displayCopies = originals.map(displayPath)
   const derivatives = (media ?? []).map((m) => m.public_path).filter((p): p is string => Boolean(p))
 
   const removed =
     (await removeAll(admin.storage.from('media'), originals, errors)) +
     (await removeAll(admin.storage.from('media-public'), derivatives, errors))
+
+  // Swept, but not counted: most originals never had a display copy, and
+  // `remove` reports no error for a key that was never written — so counting
+  // these would report a file removed for every HEIC that never existed.
+  await removeAll(admin.storage.from('media'), displayCopies, errors)
 
   // Deliberately not gated on `errors.length === 0`. A single object that
   // refuses to go should not keep a whole day's expired trash in the database

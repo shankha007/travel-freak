@@ -129,6 +129,48 @@ export function totalDistanceKm(places: ResumePlace[]): number | null {
 }
 
 /**
+ * How much of the distance figure is actually measured.
+ *
+ * `totalDistanceKm` skips the legs it cannot see. That is the honest answer —
+ * an unpinned stop is real distance nobody can compute — but on its own it is
+ * an unexplained one: a trip with three stops and one pin adds nothing to the
+ * total, and the screen showing that total looks like it is claiming the person
+ * has not been far. Both the resume and the analytics screen show this ratio
+ * beside the number so a small total reads as "not pinned yet".
+ *
+ * `measured` requires **two** pinned stops, not one. Distance is a property of
+ * the leg between two points; a single pin on a trip is not half a measurement,
+ * it is none. Counting it as measured was the earlier version of this function
+ * and it contradicted its own explanation.
+ */
+export interface DistanceCoverage {
+  /** Trips carrying two or more pinned stops — the ones inside the total. */
+  measured: number
+  /** Trips with two or more places, so a distance could exist for them at all. */
+  measurable: number
+  /** Trips with any places recorded, pinned or not. */
+  total: number
+}
+
+export function distanceCoverage(places: ResumePlace[]): DistanceCoverage {
+  const counts = new Map<string, { places: number; pinned: number }>()
+
+  for (const place of places) {
+    const trip = counts.get(place.tripId) ?? { places: 0, pinned: 0 }
+    trip.places += 1
+    if (place.lat !== null && place.lng !== null) trip.pinned += 1
+    counts.set(place.tripId, trip)
+  }
+
+  const trips = [...counts.values()]
+  return {
+    measured: trips.filter((t) => t.pinned >= 2).length,
+    measurable: trips.filter((t) => t.places >= 2).length,
+    total: trips.length,
+  }
+}
+
+/**
  * Years travelling, counted as distinct calendar years with a trip in them.
  *
  * Not "last year minus first year": someone who travelled in 2019 and again in
@@ -142,6 +184,26 @@ export function yearsTravelling(dates: (string | null)[]): number {
     if (Number.isFinite(year) && year > 1900) years.add(year)
   }
   return years.size
+}
+
+/**
+ * The line under the resume's distance counter.
+ *
+ * The card has room for about five words, so this is the short form of the
+ * sentence the analytics screen spells out. `null` coverage is the public
+ * profile: coordinates are never exposed to a visitor, so the dash there means
+ * "withheld" and not "unmeasured", and saying "needs pinned places" to somebody
+ * who cannot pin anything would be nonsense.
+ */
+export function distanceCoverageNote(coverage: DistanceCoverage | null): string {
+  if (coverage === null) return 'Not shown publicly'
+  if (coverage.total === 0) return 'Needs pinned places'
+  if (coverage.measurable === 0) return 'Needs a second stop'
+  if (coverage.measured === 0) return `0 of ${coverage.measurable} trips pinned`
+  if (coverage.measured < coverage.measurable) {
+    return `Approximate · ${coverage.measured} of ${coverage.measurable} trips`
+  }
+  return 'Approximate'
 }
 
 /** Formats a distance for display, or the honest dash when there is none. */

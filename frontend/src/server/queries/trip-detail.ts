@@ -4,6 +4,7 @@ import { differenceInCalendarDays, parseISO } from 'date-fns'
 import { createClient } from '@/server/supabase/server'
 import { getSessionUser } from '@/server/auth'
 import { getMediaUrl } from '@/server/queries/vault'
+import { displayKeysFor } from '@/server/media/display'
 import { pointFrom } from '@/shared/geo/point'
 import type { Database } from '@/shared/types/database'
 
@@ -147,7 +148,7 @@ export async function getTripDetail(id: string): Promise<TripDetail | null> {
     // Enough for the gallery card; the vault is where all of them live.
     supabase
       .from('media')
-      .select('id, storage_path, alt_text, caption')
+      .select('id, storage_path, mime, alt_text, caption')
       .eq('trip_id', id)
       .eq('kind', 'image')
       .is('deleted_at', null)
@@ -164,11 +165,17 @@ export async function getTripDetail(id: string): Promise<TripDetail | null> {
       .maybeSingle(),
   ])
 
-  // The bucket is private, so thumbnails need short-lived signed links.
+  // The bucket is private, so thumbnails need short-lived signed links — of the
+  // display copy for a HEIC, which no browser but Safari would have drawn.
   const photoRows = photosResult.data ?? []
+  const displayKeys = await displayKeysFor(
+    photoRows.map((p) => ({ storagePath: p.storage_path, mime: p.mime }))
+  )
+  const keyOf = (path: string) => displayKeys.get(path) ?? path
+
   const signed = photoRows.length
     ? await supabase.storage.from('media').createSignedUrls(
-        photoRows.map((p) => p.storage_path),
+        photoRows.map((p) => keyOf(p.storage_path)),
         60 * 60
       )
     : { data: [] }
@@ -181,7 +188,7 @@ export async function getTripDetail(id: string): Promise<TripDetail | null> {
   const coverInGallery = photoRows.find((p) => p.id === trip.cover_media_id)
   const coverUrl = trip.cover_media_id
     ? coverInGallery
-      ? (urlByPath.get(coverInGallery.storage_path) ?? null)
+      ? (urlByPath.get(keyOf(coverInGallery.storage_path)) ?? null)
       : await getMediaUrl(trip.cover_media_id)
     : null
 
@@ -244,7 +251,7 @@ export async function getTripDetail(id: string): Promise<TripDetail | null> {
     photos: photoRows
       .map((p) => ({
         id: p.id,
-        url: urlByPath.get(p.storage_path) ?? null,
+        url: urlByPath.get(keyOf(p.storage_path)) ?? null,
         altText: p.alt_text,
         caption: p.caption,
       }))

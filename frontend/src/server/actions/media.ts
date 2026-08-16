@@ -10,7 +10,13 @@ import {
   postDerivativePath,
   publicMediaUrl,
 } from '@/server/media/derivatives'
-import { isAllowedImageMime, postImagePath, sniffImageMime, storagePath } from '@/shared/media'
+import {
+  displayPath,
+  isAllowedImageMime,
+  postImagePath,
+  sniffImageMime,
+  storagePath,
+} from '@/shared/media'
 import { publicEnv } from '@/shared/env'
 
 /**
@@ -463,8 +469,10 @@ export async function deleteMedia(mediaId: string): Promise<MediaActionResult> {
   }
 
   // The object is the user's own — the storage policy keys on the first path
-  // segment being their id — so this needs no elevated client.
-  await supabase.storage.from('media').remove([photo.storage_path])
+  // segment being their id — so this needs no elevated client. The display copy
+  // goes with it: it is derived from the original's key, so it can always be
+  // named, and `remove` ignores a key that was never written.
+  await supabase.storage.from('media').remove([photo.storage_path, displayPath(photo.storage_path)])
 
   if (photo.trip_id) {
     revalidatePath(`/trips/${photo.trip_id}/vault`)

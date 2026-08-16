@@ -6,8 +6,10 @@ import { rollUpToCountries, type VisitedRegion } from '@/shared/types/globe'
 import {
   PLACE_KINDS,
   countByKind,
+  distanceCoverage,
   totalDistanceKm,
   yearsTravelling,
+  type DistanceCoverage,
   type PlaceKind,
   type ResumePlace,
 } from '@/shared/resume'
@@ -71,6 +73,11 @@ export interface ResumeStats {
   places: Record<PlaceKind, number>
   /** Approximate, and null until places carry coordinates. */
   distanceKm: number | null
+  /**
+   * How much of that figure is measured. Null for a visitor, who is not shown
+   * distance at all — the card says so rather than implying nothing is pinned.
+   */
+  distancePinned: DistanceCoverage | null
   yearsTravelling: number
   travelDays: number
   percentOfWorld: number
@@ -246,8 +253,9 @@ export async function getResumeData(
       regions: regions.filter((r) => r.regionCode !== '').length,
       percentOfWorld: Math.round((visitedCountries / TOTAL_COUNTRIES) * 100),
       // Distance needs the coordinates themselves, which are never public, so a
-      // visitor sees it as unmeasured. Nothing has coordinates yet either way.
+      // visitor is shown neither the figure nor the coverage behind it.
       distanceKm: viewerIsOwner ? totalDistanceKm(places) : null,
+      distancePinned: viewerIsOwner ? distanceCoverage(places) : null,
       ...counters,
     },
     trips: visibleTrips.map((t) => ({

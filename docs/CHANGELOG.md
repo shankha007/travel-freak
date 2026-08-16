@@ -51,6 +51,28 @@ their own line — nobody outside the repo ever saw them.
 
 ### Added
 
+- **Your route, drawn.** The trip page and the public trip page have always
+  listed a trip's stops as a timeline. Now they draw them too: the pinned stops,
+  numbered and joined in the order you visited them, above the list they
+  describe. A timeline cannot show you that the third stop is back past the
+  first. The note under it says how many stops carry a pin, so a partial route
+  never reads as the whole one, and a trip with nothing pinned simply shows the
+  list as before. Free on every plan.
+- **Filter your globe and your world map** by year and by continent. Both the
+  map and the list beside it narrow together, and only the years and continents
+  you actually have places in are offered, so no choice can empty the screen. A
+  place counts for a year if that year falls between your first and last visit
+  there — which is all the aggregate behind these maps records, and the screen
+  says so rather than implying more.
+- **A menu on the marketing pages, on a phone.** Blogs, About, Pricing,
+  Changelog and Contact were reachable only from the footer below the tablet
+  breakpoint. They are in a menu now, along with sign-in and the three legal
+  documents.
+- **Reorder the days you have not dated yet.** An itinerary day with no date can
+  be dragged into a different position, by pointer, touch or keyboard, the same
+  way entries already could. Dated days deliberately have no handle: they are
+  ordered by their date, and a plan for the 3rd sitting after the plan for the
+  4th would be worse than one you cannot move.
 - **Drag an itinerary entry where it belongs.** Plans are not written in order —
   you remember the restaurant after you have booked the hotel. Entries can now
   be dragged into place within a day, or onto a different day entirely. It works
@@ -129,6 +151,33 @@ their own line — nobody outside the repo ever saw them.
 
 ### Changed
 
+- **Analytics knows what you spent, not just what you planned.** The money
+  section read `budget_planned` and nothing else, so it described intentions
+  even for trips whose receipts you had already entered. It now shows both, per
+  currency, and sets them against each other over the trips that carry both —
+  never plan-total against spend-total, which would fold a budget nobody has
+  spent against together with spend on a trip nobody budgeted and call the
+  difference an overrun. A budgeted trip with no expenses recorded is left out
+  of the comparison rather than counted as an underspend. Currencies are still
+  never added together.
+- **The resume says how much of your distance it could measure.** The figure
+  skips any leg between stops that are not both pinned, which is honest but was
+  unexplained: a trip with three stops and one pin adds nothing at all. The card
+  now reads "2 of 5 trips" beside the total, and on a public profile it says the
+  distance is simply not shown rather than implying nothing is pinned. The
+  analytics screen counted the same ratio slightly wrong — a trip with a single
+  pin was counted as measured — and now agrees.
+- **Every signed-in page starts one network round trip sooner.** Checking who
+  you are happened twice on every navigation — once where the session is
+  refreshed, and again while the page rendered — and both went to the auth
+  server before any of the page's own queries began. The first answer is now
+  carried forward to the second, signed so that only the server that produced it
+  could have. Nothing about how the session is verified has changed: anything
+  that does not verify falls back to asking properly.
+- **A day where everything has a time says so.** Entries on such a day are
+  ordered by the clock, so dragging one puts it straight back. That is
+  deliberate; it just was not signposted, and a handle that springs back reads
+  as a broken handle.
 - **The app responds the moment you click.** Every screen behind the login is
   rendered per request, and Next.js will not prefetch a route like that unless
   it declares a loading state — so none of them were prefetched, and a click
@@ -149,9 +198,16 @@ their own line — nobody outside the repo ever saw them.
 
 - **A trip page no longer says your places have no coordinates when they do.**
   The line under the route timeline was written before places could carry a pin
-  and never changed after they could. It now counts the stops that are actually
-  pinned, links to the vault's map — which has been drawing them in visit order
-  all along — and says plainly when nothing on the trip is pinned yet.
+  and never changed after they could. The route map above it now counts the
+  stops that are actually pinned, and the line under the list says plainly when
+  nothing on the trip is pinned yet.
+- **An iPhone photo is visible in your own vault.** HEIC is what an iPhone
+  writes by default and almost nothing but Safari can display it. Published
+  photos were never affected — publishing re-encodes them, which is the same
+  step that strips their location data — but your own gallery pointed at the
+  original, so the person who took the photograph was the one most likely to see
+  an empty frame. Those views now get a converted copy, kept as private as the
+  original and behind the same expiring links.
 - **Closing a country on the globe no longer flashes "Unknown".** The selection
   lives in the URL, so it emptied while the dialog was still fading out, and the
   last frame was an empty panel with no country name. The country you opened is

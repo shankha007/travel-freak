@@ -4,6 +4,7 @@ import { differenceInCalendarDays, parseISO } from 'date-fns'
 import { createAdminClient, createClient } from '@/server/supabase/server'
 import { derivativePath, ensurePublicDerivative, publicMediaUrl } from '@/server/media/derivatives'
 import { publicEnv } from '@/shared/env'
+import { pointFrom } from '@/shared/geo/point'
 import { mapWithConcurrency } from '@/shared/concurrency'
 import type { Database } from '@/shared/types/database'
 
@@ -42,6 +43,17 @@ export interface PublicTripPlace {
   arrivalDate: string | null
   departureDate: string | null
   notes: string
+  /**
+   * The stop's pin, when the owner set one, so the public page can draw the
+   * route its timeline describes.
+   *
+   * This is a coordinate on a page the owner chose to publish, beside a city
+   * name that is already on it — not a photograph's EXIF, which publication
+   * strips and will go on stripping. A trip nobody published is not reachable
+   * here at all, and an unlisted one is only reachable with its token.
+   */
+  lat: number | null
+  lng: number | null
 }
 
 export interface PublicTripMemory {
@@ -173,7 +185,7 @@ async function loadTrip(
       supabase
         .from('trip_places')
         .select(
-          'id, country_code, region_code, city_name, place_kind, arrival_date, departure_date, notes, order_index'
+          'id, country_code, region_code, city_name, place_kind, arrival_date, departure_date, notes, order_index, latitude, longitude'
         )
         .eq('trip_id', trip.id)
         .order('order_index', { ascending: true }),
@@ -214,6 +226,10 @@ async function loadTrip(
     arrivalDate: p.arrival_date,
     departureDate: p.departure_date,
     notes: p.notes,
+    // Through `pointFrom` like everywhere else: PostGREST hands geography back
+    // as hex EWKB, and these are the generated columns that undo that.
+    lat: pointFrom(p.latitude, p.longitude)?.lat ?? null,
+    lng: pointFrom(p.latitude, p.longitude)?.lng ?? null,
   }))
 
   const env = publicEnv()

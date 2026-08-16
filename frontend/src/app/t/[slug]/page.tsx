@@ -18,6 +18,7 @@ import { BRAND, SITE_URL } from '@/shared/brand'
 import { countryFlag, countryName } from '@/shared/geo/countries'
 import { formatDateRange } from '@/shared/format'
 import { ThemeToggle } from '@/client/components/theme-toggle'
+import { TripRouteMap } from '@/client/components/trips/route-map'
 import { Badge } from '@/client/components/ui/badge'
 import { Card, CardContent } from '@/client/components/ui/card'
 
@@ -201,6 +202,9 @@ export default async function PublicTripPage({ params, searchParams }: PageProps
           {trip.places.length > 0 && (
             <section className="space-y-3">
               <h2 className="text-sm font-semibold">Route</h2>
+              {/* The same map the owner sees on their own trip page, drawn from
+                  the stops they pinned. Renders nothing when none of them is. */}
+              <TripRouteMap stops={trip.places} />
               <ol className="relative space-y-4 border-l pl-6">
                 {trip.places.map((place) => (
                   <li key={place.id} className="relative">

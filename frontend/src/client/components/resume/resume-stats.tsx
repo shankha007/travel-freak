@@ -1,6 +1,6 @@
 import { CalendarRange, Clock, Globe2, Map as MapIcon, Route, Luggage } from 'lucide-react'
 import type { ResumeStats } from '@/server/queries/resume'
-import { PLACE_KINDS, formatDistance, placeKindLabel } from '@/shared/resume'
+import { PLACE_KINDS, distanceCoverageNote, formatDistance, placeKindLabel } from '@/shared/resume'
 import { Card, CardContent } from '@/client/components/ui/card'
 
 /**
@@ -26,8 +26,10 @@ export function ResumeStatsGrid({ stats }: { stats: ResumeStats }) {
       label: 'Distance',
       value: formatDistance(stats.distanceKm),
       icon: Route,
-      // Straight lines between recorded stops, not a GPS track.
-      note: stats.distanceKm === null ? 'Needs pinned places' : 'Approximate',
+      // Straight lines between recorded stops, not a GPS track — and the note
+      // says how many trips are actually in that line, because a trip with
+      // three stops and one pin contributes nothing and used to say so nowhere.
+      note: distanceCoverageNote(stats.distancePinned),
     },
   ]
 

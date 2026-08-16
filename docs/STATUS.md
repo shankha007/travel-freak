@@ -8,7 +8,7 @@ shipped, when, and why lives in [CHANGELOG.md](CHANGELOG.md) — the notes that
 used to accumulate at the bottom of this file are there now, and new ones go
 there rather than here. Keep the gaps at the end of this file current.
 
-Last updated: 2026-08-15 · current release: 0.12.0
+Last updated: 2026-08-16 · current release: 0.12.0
 
 Every ✅ below was re-checked in a browser against the local stack on 2026-08-13,
 including sign-in, the globe and both maps on a free and a paid plan, the trip
@@ -25,6 +25,20 @@ drag gesture itself wants a human. Collaborators
 was checked the same day from both sides — an invitation accepted by email match
 and confirmed in the database, and the owner's trip opened as a collaborator to
 verify the Budget screen is absent and 404s.
+
+The 2026-08-16 changes were checked against a production build on the local
+stack: the phone menu opened and listed all ten links with a clean console, the
+resume read "Approximate · 1 of 2 trips", analytics compared INR 82,900 spent
+against INR 85,000 planned over the one trip carrying both and gave the seed's
+stray USD expense its own uncompared row, the settings email survived the
+session handoff, and the route map rendered on `/trips/[id]` and on
+`/t/cherry-blossom-chase` ("All 3 stops pinned"). Adding a second undated day to
+the Bhutan trip made both undated days grow a handle while the three dated ones
+stayed without one. **What still wants a human** is unchanged and is the same
+harness limitation as before: nothing composites, so MapLibre never initialises
+and the `GlobeExplorer` subtree does not hydrate — the map filters were verified
+as rendered options over real data plus 12 unit tests, not by choosing one, and
+no drag gesture has been performed by hand.
 
 ## Legend
 
@@ -100,7 +114,7 @@ verify the Budget screen is absent and 404s.
 | # | Feature | Status | Notes |
 |---|---|---|---|
 | 8 | **Login** `/login` | ✅ Done | Email + password, Zod-validated, generic error copy, `?next=` preserved and open-redirect guarded |
-| — | Session refresh + route protection | ✅ Done | `src/proxy.ts`; `getUser()` not `getSession()` |
+| — | Session refresh + route protection | ✅ Done | `src/proxy.ts`; `getUser()` not `getSession()`. The proxy hands its verified user to the render in a signed header (`shared/auth-handoff.ts`), so an authenticated page makes one auth round trip rather than two. The token is HMAC'd on `SUPABASE_SERVICE_ROLE_KEY` and the proxy deletes any inbound copy before setting its own; anything that does not verify — a prerender, a forgery, a missing secret — falls back to `getUser()`, which is what the code did before |
 | — | Sign out | ✅ Done | Server Action, clears httpOnly cookies |
 | 7 | **Register** `/register` | ✅ Done | Email + password + optional name, shared Zod schema, 8-character minimum matching `config.toml`. Handles both projects that require email confirmation and local, where sign-up returns a session immediately. Profile, `explorer` subscription and usage row come from the `on_auth_user_created` trigger |
 | 9 | **Forgot / reset / verify** | ✅ Done | `/forgot-password` answers the same way whichever address is typed, so it cannot be used to ask who has an account. `/auth/confirm` trades an emailed token for a session and forwards — it takes a `token_hash`, which is verified server-side and so works on a different device, and still accepts a PKCE `code` for a project on the stock templates. `/reset-password` requires that session; `/verify` covers confirmed, expired and opened-directly, and offers the remedy matching the link that failed. Email templates live in `backend/supabase/templates/` |
@@ -112,11 +126,11 @@ verify the Budget screen is absent and 404s.
 | # | Feature | Status | Notes |
 |---|---|---|---|
 | 13 | **Dashboard** `/dashboard` | ✅ Done | 8 live stat cards, world-progress bar, upcoming-trip widget, recent activity |
-| 14 | **Travel Globe** `/globe` | ✅ Done | Real `visited_regions`; 4-state colouring; region list; empty state |
+| 14 | **Travel Globe** `/globe` | ✅ Done | Real `visited_regions`; 4-state colouring; region list; empty state. Year and continent filters, the same ones the world map carries, narrowing the globe, the list and the three counters on it together |
 | 15 | **Country/region modal** | ✅ Done | Trips, memories, dates, cities; deep-linkable `?region=IND` |
 | — | Globe region-detail paywall | ✅ Done | `showRegionDetail` from `planCode`, decided server-side |
 | — | Dashboard globe preview | 🟡 Partial | Query exists (`getGlobePreviewRegions`); card links to `/globe` instead of embedding |
-| 16 | **World map** `/maps/world` | 🟡 Partial | MapLibre 2D filling the page, with a basemap it draws itself — land, coastline and sea from the palette, no tile key needed. Country fills joined by `feature-state`, a halo on regions with data, hover lift, click-through to the region modal, layer toggles, and a floating places panel that is the keyboard-navigable equivalent. Subdivisions are gated on `globe_region_detail` and lazy-loaded only for the nine countries that have data. **Filters for year, continent and trip type are not built** |
+| 16 | **World map** `/maps/world` | 🟡 Partial | MapLibre 2D filling the page, with a basemap it draws itself — land, coastline and sea from the palette, no tile key needed. Country fills joined by `feature-state`, a halo on regions with data, hover lift, click-through to the region modal, layer toggles, and a floating places panel that is the keyboard-navigable equivalent. Subdivisions are gated on `globe_region_detail` and lazy-loaded only for the nine countries that have data. **Year and continent filters** narrow the fills and the panel together, from `shared/geo/region-filter.ts`; only the years and continents the data can answer for are offered, so no choice empties the map. A year matches when it falls inside a region's first-to-last visit span, which is all `visited_regions` records, and the screen says so. **Trip type is still not built** — it lives on `trips` and this screen reads the aggregate |
 | 17 | **India map** `/maps/india` | ✅ Done | All 36 states and union territories, free on every plan, fitted to the country on load |
 
 ## Trips & planner
@@ -125,11 +139,11 @@ verify the Budget screen is absent and 404s.
 |---|---|---|---|
 | 18 | **My Trips** `/trips` | ✅ Done | Tabs All/Past/Ongoing/Upcoming/Drafts with counts, flags, places, visibility |
 | 19 | **Create trip** `/trips/new` | 🟡 Partial | 4-step wizard (basics → dates → places → visibility), quota-gated, writes trip + places, and each place can carry a pin set by map click or place search. **No cover image** — that still needs a screen that does not exist |
-| 20 | **Trip details** `/trips/[id]` | ✅ Done | Hero, stats, route timeline, memories, linked blogs, gallery counts, details panel, Edit and Share. Route map is buildable now that places carry coordinates |
+| 20 | **Trip details** `/trips/[id]` | ✅ Done | Hero, stats, route timeline, memories, linked blogs, gallery counts, details panel, Edit and Share. **The route map is built** — `TripRouteMap` over the same three `MapView` props the vault's map tab uses, above the timeline, numbered and joined in visit order, with a note saying how many stops carry a pin. Renders nothing when none does, because the line under the list already says so |
 | — | **Edit trip** `/trips/[id]/edit` | ✅ Done | Same wizard as create (`TripForm`), saveable from any step. Slug and `published_at` are deliberately stable; places are matched by id so memories stay pinned |
 | — | **Delete trip** | ✅ Done | Confirm dialog → `soft_delete_trip()`; sets `deleted_at`, repaints the globe, frees quota, destroys nothing. Restorable from `/trash` for 30 days |
 | — | **Trash** `/trash` | ✅ Done | Trips and posts deleted in the last 30 days, with restore, a countdown and a count of what comes back. Reads deleted trips through `list_deleted_trips()`, because `trips_select_own` hides them from their own owner. Restoring is refused when it would breach the plan's trip limit |
-| 21 | **Itinerary builder** `/trips/[id]/itinerary` | ✅ Done | Days and entries over `itinerary_days` / `itinerary_items`. A day needs neither date nor title, so a trip in planning can be laid out before it has dates; a trip that has them offers to create every missing day in one click, capped at 60 so a mistyped year cannot write 370 rows. Six kinds, four statuses, per-day and per-trip cost roll-ups grouped by currency and never summed across. Times, costs, booking refs and links are gated on `itinerary_full` and **dropped rather than refused** on a free plan, which is what the pricing table sells. **Drag and drop** reorders entries within a day and moves them between days, by pointer, touch and keyboard — `@dnd-kit`, chosen over native HTML5 drag events because those do nothing at all on a phone; the write is one `reorder_itinerary_items()` call that renumbers from array position rather than one update per row. Also gated on `itinerary_full`, which is how the pricing table sells it. **The map alongside** draws entries that carry a pin, numbered across the whole trip and joined in order, from the same `PlacePicker` the trip wizard uses; free on every plan, and lazy-loaded like every other map here |
+| 21 | **Itinerary builder** `/trips/[id]/itinerary` | ✅ Done | Days and entries over `itinerary_days` / `itinerary_items`. A day needs neither date nor title, so a trip in planning can be laid out before it has dates; a trip that has them offers to create every missing day in one click, capped at 60 so a mistyped year cannot write 370 rows. Six kinds, four statuses, per-day and per-trip cost roll-ups grouped by currency and never summed across. Times, costs, booking refs and links are gated on `itinerary_full` and **dropped rather than refused** on a free plan, which is what the pricing table sells. **Drag and drop** reorders entries within a day and moves them between days, by pointer, touch and keyboard — `@dnd-kit`, chosen over native HTML5 drag events because those do nothing at all on a phone; the write is one `reorder_itinerary_items()` call that renumbers from array position rather than one update per row. Also gated on `itinerary_full`, which is how the pricing table sells it. **Undated days drag too**, through `reorder_itinerary_days()`; a dated day gets no handle at all, because `getItinerary()` sorts on its date and a handle that lost every time is worse than none. Both levels share one `DndContext` — the day handles live inside the cards, so a second one would have captured them — and a day where every entry is timed says on the card that the clock decides its order. **The map alongside** draws entries that carry a pin, numbered across the whole trip and joined in order, from the same `PlacePicker` the trip wizard uses; free on every plan, and lazy-loaded like every other map here |
 | 22 | **Budget planner** `/trips/[id]/budget` | ✅ Done | `expenses` against `trips.budget_planned`, which is the same field the trip form and analytics read, so a budget set here is set everywhere. One panel per currency: the plan only applies to the currency it was written in, and spend in any other gets a total and no comparison, because there is no exchange rate here. Category breakdown and its chart are gated on `budget_full`; recording an expense and seeing the totals are free, since a budget you cannot write to is not a budget. Also totals what the itinerary expects to cost. `shared/budget.ts` is pure and holds all of it, with 20 assertions |
 | 23 | **Packing / checklists** `/trips/[id]/packing` | ✅ Done | `checklists` / `checklist_items`, packing and to-do, grouped by a free-text category in the order they were built. Adding a line and ticking one off are each one gesture and no dialog; the tick sends the value it means rather than a toggle, so two taps cannot race. `limits.checklists` is read **per trip** — three on the free plan — and templates are the unlimited plans' feature: six of them in `shared/packing.ts`, copied in as ordinary rows so a list can be gutted without breaking anything |
 | 24 | **Collaborators** `/trips/[id]/people` | ✅ Done | Invite by email as `editor` or `viewer`, change a role, remove somebody, and the other side — accept, decline, leave — on `/trips`. The screen states what each role can **and cannot** do, in two lists under two headings rather than one list with two icons, because the tick and the cross are `aria-hidden` and a flat list reads every line as a permission. `collaborators_per_trip` gates it: 0 on Explorer reads as "not available", not as a limit of none. **No email is sent** — an invitation is delivered by the app, which the invite form says plainly |
@@ -138,7 +152,7 @@ verify the Budget screen is absent and 404s.
 
 | # | Feature | Status | Notes |
 |---|---|---|---|
-| 25 | **Memory Vault** `/trips/[id]/vault` | ✅ Done | Timeline, Gallery and Map. Timeline interleaves photos and notes by date; photo detail carries caption, alt text, coordinates, cover photo and a confirmed delete. The map draws pinned places as numbered stops joined in visit order, and photos at their EXIF coordinates or — dashed, and labelled — at the stop whose dates contain them. Photos matching neither are listed with the reason. `shared/geo/photo-placement.ts` owns that policy and is unit-tested |
+| 25 | **Memory Vault** `/trips/[id]/vault` | ✅ Done | Timeline, Gallery and Map. Timeline interleaves photos and notes by date; photo detail carries caption, alt text, coordinates, cover photo and a confirmed delete. The map draws pinned places as numbered stops joined in visit order, and photos at their EXIF coordinates or — dashed, and labelled — at the stop whose dates contain them. Photos matching neither are listed with the reason. `shared/geo/photo-placement.ts` owns that policy and is unit-tested. **HEIC has a fallback here now**: `server/media/display.ts` writes a WebP copy into the *private* bucket, beside the original under the owner's own prefix, and signs that instead — the public bucket would have made an unpublished photograph as reachable as an unlisted link. Generated lazily through the owner's own client, best-effort, and swept by both deletion paths |
 | 26 | **Media upload + quota meter** | ✅ Done | `POST /api/uploads/sign` issues a quota-checked signed URL, the browser PUTs straight to Storage, and `confirmUpload` re-reads the object's real size and sniffs its magic bytes before writing the row. Drag-drop, per-file progress, per-trip and pool meters, EXIF date and GPS captured on the client |
 | 27 | **Blog Studio** `/blogs/new`, `/blogs/[id]/edit` | ✅ Done | Tiptap v3 with a formatting toolbar, **inline images**, autosave (1.5s debounce, ⌘S, unload guard), excerpt and SEO fields, trip link, visibility, publish/unpublish, soft delete and a **share panel** for unlisted links. A new post writes no row until the first save, then swaps the URL in place so the cursor survives. Images upload through the signed-upload route and are inserted as EXIF-stripped copies |
 | 28 | **My Blogs** `/blogs` | ✅ Done | All / Published / Drafts with counts, reading time, linked trip, and a link to the public reader |
@@ -150,8 +164,8 @@ verify the Budget screen is absent and 404s.
 
 | # | Feature | Status | Notes |
 |---|---|---|---|
-| 32 | **Analytics** `/analytics` | ✅ Done | Days away per year, with travel booked stacked apart from travel taken and the empty years drawn rather than skipped; longest, shortest and average trip; distance with the count of trips it could actually measure. Behind `analytics_advanced`: the day-by-day calendar, who you travel with, the countries you return to, and planned budgets grouped per currency — never summed across them, because there is no exchange rate here. `shared/analytics.ts` is pure and holds all of it, with 28 assertions |
-| 33 | **Travel resume** `/resume` | ✅ Done | Countries, regions, trips, travel days — counted by `totalDaysAway` in `shared/timeline.ts`, the same definition the timeline and analytics use, so the three cannot disagree — years travelling, distance, and distinct places by kind — cities, mountains, beaches, UNESCO sites. Plus the share panel: public URL, copy button, the switch that publishes the profile, and display name and bio |
+| 32 | **Analytics** `/analytics` | ✅ Done | Days away per year, with travel booked stacked apart from travel taken and the empty years drawn rather than skipped; longest, shortest and average trip; distance with the count of trips it could actually measure. Behind `analytics_advanced`: the day-by-day calendar, who you travel with, the countries you return to, and money — **planned and actual**, grouped per currency and never summed across them, because there is no exchange rate here. Plan meets spend only over the trips carrying both in the same currency; a budgeted trip with no expenses recorded is left out rather than counted as an underspend. `shared/analytics.ts` is pure and holds all of it |
+| 33 | **Travel resume** `/resume` | ✅ Done | Countries, regions, trips, travel days — counted by `totalDaysAway` in `shared/timeline.ts`, the same definition the timeline and analytics use, so the three cannot disagree — years travelling, distance — with the count of trips actually behind that figure, since a trip with one pin among three contributes nothing and used to say so nowhere — and distinct places by kind: cities, mountains, beaches, UNESCO sites. `distanceCoverage()` is shared with analytics, so the two cannot disagree, and a visitor's card says the distance is not shown rather than implying nothing is pinned. Plus the share panel: public URL, copy button, the switch that publishes the profile, and display name and bio |
 | 34 | Travel Wrapped | ⬜ Not started | Phase 1.2 |
 | 35 | Achievements & XP | ⬜ Not started | Phase 1.2; tables not migrated |
 
@@ -161,7 +175,7 @@ verify the Budget screen is absent and 404s.
 |---|---|---|---|
 | 36 | **Public profile** `/u/[username]` | ✅ Done | Avatar, bio, home city, interests, the resume counters, a read-only globe with its region list, trip cards and published posts. JSON-LD `Person`, canonical URL, `noindex` while private, and the free-plan badge. A private profile 404s for everyone but its owner, who sees a preview notice |
 | — | **Sitemap** `/sitemap.xml` | ✅ Done | Public profiles and published posts, listed through the same client a visitor gets so it can never advertise a private page |
-| 37 | **Public trip** `/t/[slug]` | ✅ Done | Read-only trip: hero, dates, route, gallery, notes and linked posts, with JSON-LD `Article` and OG images. Photos are published as EXIF-stripped derivatives, never originals |
+| 37 | **Public trip** `/t/[slug]` | ✅ Done | Read-only trip: hero, dates, route, gallery, notes and linked posts, with JSON-LD `Article` and OG images. Photos are published as EXIF-stripped derivatives, never originals. The route timeline now carries the same `TripRouteMap` the owner sees — a stop's pin is the place its owner chose from a picker on a trip they chose to publish, which is a different fact from a photograph's EXIF, and publication goes on stripping that |
 | — | **Post share links** | ✅ Done | `share_links.post_id` (migration `20260813000200`) with a check constraint keeping one row to one target. Created and revoked from the studio; a token resolves only while the post is unlisted-or-public **and** published |
 | — | **Share links (unlisted tokens)** | ✅ Done | Create and revoke from the trip page; `/t/[slug]?k=<token>` opens an unlisted trip and is never indexed. A link to a *private* trip resolves to nothing, so pulling a trip back cannot be undone by an old link |
 
@@ -202,80 +216,59 @@ verify the Budget screen is absent and 404s.
    correctness one. Post images are the exception —
    they are converted at upload, because their URL has to live in stored HTML.
    `profiles.strip_exif_on_publish` still has nothing reading it — publication always strips,
-   which is the stricter behaviour.
+   which is the stricter behaviour. The private HEIC display copies added for the vault are
+   lazy in exactly the same way, and would move in the same job.
 2. **Sign-up confirmation is built but not exercised.** `/verify` and the confirmation
    template exist, and the reset flow proves the route they share. But local
    `enable_confirmations` is off, so the signup path itself has never run end to end —
    turning it on locally is the check. Production additionally needs both email templates
    set in the Supabase dashboard and its own origin in the redirect allow-list; nothing in
    the repo can enforce either, so a deploy that skips them sends links that go nowhere.
-3. **HEIC still has no fallback in the vault.** The public page converts it, but the owner's
-   own gallery points at the original, so a browser that cannot decode HEIC shows nothing
-   there. The same transform would fix it for private views.
-4. **The maps have no filters.** The plan asks for year, continent and trip type on screens 14
-   and 16; only the visited/current/planned layer toggles are built. Year needs no new data —
-   `visited_regions` carries first and last visit — but continent and trip type do.
-5. **A post image is public from the moment it is uploaded.** The derivative goes into the
+3. **A post image is public from the moment it is uploaded.** The derivative goes into the
    public bucket under a random uuid so the post's stored HTML can hold a URL that keeps
    working — a signed URL would expire within the hour. That makes it as exposed as an unlisted
    link before the post is published, which the studio states next to the button. Serving post
    images through a resolver that checks the post's visibility would close it properly.
-6. **The trip page still has no route map.** `MapView` now takes markers, a route line and a
-   set of points to frame itself to — that is what the vault's map tab is built on — so the
-   same three props would draw the route timeline on `/trips/[id]` and on the public `/t/[slug]`.
-   Nothing blocks it but the work.
-7. **The marketing nav has no mobile equivalent.** `MarketingHeader` hides its links below
-   `sm`, which was survivable at two and is not at five — a phone visitor reaches Blogs, About,
-   Pricing, Changelog and Contact only through the footer, which now also carries the three legal
-   documents. It needs a menu, or the links need to wrap.
-8. **Nothing tells anyone a contact message arrived.** `submit_contact_message()` writes the row
+4. **The maps still have no trip-type filter.** Year and continent are built, on screens 14 and
+   16 alike. Trip type is the one the plan asks for that is not: `trips.trip_type` is on the
+   trip row and these screens read `visited_regions`, which carries only trip ids — so it needs
+   either a join these screens do not do or a column on the aggregate. The year filter also
+   carries a caveat it states on screen rather than hides: `visited_regions` records a first
+   and a last visit and nothing between, so a region visited in 2019 and 2026 matches every
+   year between. Making that exact needs a per-visit table.
+5. **Nothing tells anyone a contact message arrived.** `submit_contact_message()` writes the row
    and the sender is told it reached us, which is true; but the inbox is a table that somebody has
    to remember to open in Studio. The page promises an answer within about three working days, and
    nothing in the repo makes that happen. A database webhook or a scheduled digest to
    `BRAND.support.email` would close it, and `handled_at` is already there to mark what has been
    answered.
-9. **Analytics still only shows budgets that were *planned*.** `expenses` now exists and the
-   budget screen compares the two per trip, but `/analytics` has not been taught to read it, so
-   its money section is still plans rather than spend. The arithmetic it would need is already
-   written and tested in `shared/budget.ts`; what is missing is the account-wide query and a
-   decision about how to present a figure that cannot be summed across currencies. Both screens
-   already refuse to convert, so whatever is added must too.
-10. **A partially pinned trip reads as unmeasured.** `totalDistanceKm` skips places without
-   coordinates, so one pin among three measures nothing. That is the honest answer — the legs it
-   cannot see are real distance — but the resume shows no explanation for why a trip with places
-   has no number.
-11. **Every navigation revalidates the session twice.** `src/proxy.ts` calls
-   `supabase.auth.getUser()` so the auth cookies are refreshed, and then the app shell calls it
-   again through `getSessionUser()`. `cache()` dedupes the second one within a render, but the
-   proxy runs in a separate pass, so both hit the Supabase auth server — two network round trips
-   in front of every screen, before any of the page's own queries start. Both calls are load
-   bearing as written: the proxy is the only place that can write refreshed cookies, and
-   `getUser()` is deliberate where `getSession()` would trust the cookie. Passing the verified
-   user from the proxy to the render — a request header, or a short-lived per-request cache — is
-   the fix, and it is the largest latency left on an authenticated page now that the screens
-   paint immediately.
-12. **Only itinerary *entries* can be dragged, not days.** `getItinerary()` sorts dated days by
-   their date, so dragging one would either do nothing visible or have to override the date —
-   and a plan for the 3rd sitting after the plan for the 4th is worse than not being able to
-   move it. `reorder_itinerary_days()` exists and is granted, for the undated days that have
-   nothing but `order_index`; no screen calls it yet. The other edge: on a day where every entry
-   is timed, dragging changes nothing visible either, because `time_start` sorts ahead of
-   `order_index`. That is deliberate — a plan with times on it is ordered by the clock — but it
-   is not signposted, and somebody dragging a fully-timed day will wonder why it sprang back.
-13. **A collaborator can plan a trip but not see what it costs.** `expenses` has one policy,
+6. **A collaborator can plan a trip but not see what it costs.** `expenses` has one policy,
    `user_id = auth.uid()`, and no collaborator clause at all, which is the right default for
    money and the wrong answer for four friends splitting a trip. `paid_by` is free text for that
    reason — it records who paid without pretending to settle up. Splitting properly needs its own
    sharing model rather than an early guess at one. Note the line is drawn between the two halves
    of "the budget": `trips.budget_planned` rides on the trip row and RLS shares it, so a
-   collaborator sees the plan and never the spend, and every surface now says exactly that.
-14. **An invitation is delivered by the app, not by email.** There is no transactional email in
-   this codebase — the same gap that leaves a contact message sitting in a table (8). So an
+   collaborator sees the plan and never the spend, and every surface now says exactly that —
+   including the analytics money section, which reads the caller's own expenses and nobody else's.
+7. **An invitation is delivered by the app, not by email.** There is no transactional email in
+   this codebase — the same gap that leaves a contact message sitting in a table (5). So an
    invitation only surfaces when the invitee next opens their own Trips screen, and somebody
    invited at an address they have not signed up with sees nothing until they do. The invite form
    says so rather than letting it be discovered. `invited_email` and the pending state are already
    the right shape for a mail to be sent from; nothing else has to change when one can be.
-15. **Nothing connects a planned cost to what was actually spent.** The budget screen totals the
-   itinerary's costs beside the expenses, but the two are separate rows and nobody can say "this
-   hotel is that expense". Marking an itinerary entry paid, or generating an expense from one,
-   would close the loop; the day it does, per-day actual spend becomes possible too.
+8. **Nothing connects a planned cost to what was actually spent.** The budget screen totals the
+   itinerary's costs beside the expenses, and analytics now sets plan against spend per currency,
+   but the two are still separate rows and nobody can say "this hotel is that expense". Marking an
+   itinerary entry paid, or generating an expense from one, would close the loop; the day it does,
+   per-day actual spend becomes possible too.
+9. **The drag gestures have never been performed by hand.** Entries within and between days, and
+   now undated days themselves. The harness browser does not composite, so every element measures
+   zero and dnd-kit's sensors cannot initialise — the same reason MapLibre never draws and the
+   globe's own subtree does not hydrate there. The markup, the handles and their labels are
+   checked in the DOM, `reorder_itinerary_items()` has pgTAP coverage including the cross-user
+   no-op, `reorder_itinerary_days()` does not yet, and `parseOrderedIds` is unit-tested. The
+   gesture wants a human.
+10. **The map filters are unexercised for the same reason.** `shared/geo/region-filter.ts` is pure
+   and has 12 assertions, `shared/geo/continents.ts` proves its 250-country coverage against the
+   same list every picker reads, and both controls were confirmed rendering the right options over
+   real data. Nobody has chosen one in a browser and watched the fills change.
