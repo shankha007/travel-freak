@@ -179,6 +179,16 @@ their own line — nobody outside the repo ever saw them.
 
 ### Changed
 
+- **A published trip's photographs are ready before anybody looks.** They used
+  to be converted for the web on the first visit to the public page — so the
+  first person to open a link you shared waited while every photo in the gallery
+  was re-encoded, which on a large trip was several seconds of nothing. The work
+  now happens when you publish, straight after the save, and a scheduled job
+  picks up anything that did not finish. Nobody's first visit pays for it. The
+  pictures themselves are identical, and are still stripped of their location
+  data before they are ever public. Photographs in a format your browser cannot
+  display are converted for your own vault at upload now, for the same reason.
+
 - **Analytics knows what you spent, not just what you planned.** The money
   section read `budget_planned` and nothing else, so it described intentions
   even for trips whose receipts you had already entered. It now shows both, per
@@ -253,7 +263,7 @@ their own line — nobody outside the repo ever saw them.
   the entry version does not need: a day addressed through the wrong trip is not
   renumbered even by the person who owns both.
 - **CI runs on every push and pull request.** Two jobs: the frontend one checks
-  formatting, lint, types, the 532 unit tests and a production build; the
+  formatting, lint, types, the 543 unit tests and a production build; the
   database one boots the Supabase stack and runs the 219 pgTAP assertions that
   are the real guarantee one traveller cannot read another's trips. It also
   regenerates the database types and fails if they differ from what is

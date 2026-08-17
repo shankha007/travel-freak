@@ -1,10 +1,12 @@
 'use server'
 
 import { redirect } from 'next/navigation'
+import { after } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/server/supabase/server'
 import { requireUser } from '@/server/auth'
 import { checkTripQuota } from '@/server/entitlements'
+import { buildTripDerivatives } from '@/server/media/derivative-jobs'
 import { slugify, updateTripSchema } from '@/shared/validation/trip'
 import { toPointEwkt } from '@/shared/geo/point'
 import type { CreateTripValues } from '@/shared/validation/trip'
@@ -248,6 +250,32 @@ export async function updateTrip(
   const placesError = await syncPlaces(tripId, values)
   if (placesError) {
     return { error: `Could not save the places: ${placesError}` }
+  }
+
+  // Publishing is the moment a photograph becomes public, so it is the moment
+  // its stripped derivative should be built — not the first request for the
+  // public page, which used to mean a stranger following a link paid for a sharp
+  // pipeline over the whole gallery.
+  //
+  // `after()` runs it once this response has been sent: the owner pressed a
+  // button and something happened, and they do not wait for it. Note this fires
+  // whenever the trip is public rather than only on the private → public edge.
+  // That is deliberate and costs nothing — the job selects on `public_path is
+  // null`, so a trip that was already published finds no work. Detecting the
+  // edge would mean trusting a `published_at` comparison to decide whether to
+  // bother, and being wrong that way is a gallery nobody converts.
+  //
+  // `redirect()` below does not cancel it; `after` runs even when the response
+  // ends in a redirect or a thrown error.
+  if (values.visibility === 'public') {
+    after(async () => {
+      const result = await buildTripDerivatives(tripId)
+      if (result.errors.length > 0) {
+        // Logged and dropped. The scheduled sweep retries anything still without
+        // a derivative, and the public page's own lazy path is behind that.
+        console.error(`derivatives: ${tripId} finished with errors`, result)
+      }
+    })
   }
 
   revalidatePath('/trips')
