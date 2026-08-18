@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   MAX_UPLOAD_BYTES,
+  derivativePath,
   displayPath,
   extensionFor,
   isAllowedImageMime,
@@ -151,6 +152,18 @@ describe('rejectionFor', () => {
 
   it('rejects an empty file', () => {
     expect(rejectionFor({ ...ok, size: 0 })).toMatch(/empty/)
+  })
+})
+
+describe('derivativePath', () => {
+  it('is always .webp, whatever the original was', () => {
+    // The derivative is a re-encode; an extension claiming otherwise would be a
+    // lie the browser then has to work around.
+    expect(derivativePath('u1', 't1', 'm1')).toBe('u1/t1/m1.webp')
+  })
+
+  it('keeps the owner first, as every storage policy requires', () => {
+    expect(derivativePath('u1', 't1', 'm1').split('/')[0]).toBe('u1')
   })
 })
 

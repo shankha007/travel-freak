@@ -2,7 +2,8 @@ import 'server-only'
 
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 import { createAdminClient, createClient } from '@/server/supabase/server'
-import { derivativePath, ensurePublicDerivative, publicMediaUrl } from '@/server/media/derivatives'
+import { ensurePublicDerivative, publicMediaUrl } from '@/server/media/derivatives'
+import { derivativePath } from '@/shared/media'
 import { publicEnv } from '@/shared/env'
 import { pointFrom } from '@/shared/geo/point'
 import { mapWithConcurrency } from '@/shared/concurrency'
@@ -235,12 +236,18 @@ async function loadTrip(
   const env = publicEnv()
   const photoRows = (mediaResult.data ?? []).filter((row) => row.trip_id !== null)
 
-  // Derivatives are generated on first publication and remembered afterwards,
-  // so this is a one-time cost per photo rather than a per-request one. That
-  // first request used to pay for the whole gallery one photo at a time;
-  // photos are independent, so a few go at once. The cap is deliberate — each
-  // one downloads an original and runs a sharp pipeline, and letting two dozen
-  // do that simultaneously trades a slow page for an exhausted server.
+  // Normally a no-op now, and kept for the times it is not.
+  //
+  // Derivatives are built when the trip is published — `after()` on the publish
+  // action, with `/api/cron/build-derivatives` sweeping up whatever that missed —
+  // so this call almost always finds `public_path` already set and returns it
+  // without touching storage. It stays because *correctness* cannot depend on a
+  // job having run: a trip published before any of that existed, or a photo whose
+  // conversion has failed twice, still has to render a page rather than a hole.
+  //
+  // Which is why the concurrency cap remains too. On the rare request that does
+  // real work, each photo downloads an original and runs a sharp pipeline, and
+  // letting two dozen do that at once trades a slow page for an exhausted server.
   const resolved = await mapWithConcurrency(photoRows, DERIVATIVE_CONCURRENCY, (row) =>
     ensurePublicDerivative({
       id: row.id,

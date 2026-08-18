@@ -23,20 +23,21 @@ import { toPublicDerivative } from '@/server/media/image-transform'
  * The transform itself lives in image-transform.ts, where it can be tested
  * against a real file rather than described in a comment.
  *
- * Generation is lazy: the first request for a public page pays for it, and the
- * `public_path` on the row means nothing pays for it twice. A background job at
- * publish time would be better and is what the plan eventually wants; this is
- * the same output without the queue.
+ * **When this runs.** At publish time, from `after()` on the trip's own update
+ * action, and on a schedule from `/api/cron/build-derivatives` for anything that
+ * missed — both in `derivative-jobs.ts`, which explains the split. The public
+ * trip page still calls it, but as a fallback that normally finds `public_path`
+ * already set: correctness cannot depend on a job having run. It used to be the
+ * only path, which meant the first visitor to a published trip paid for a sharp
+ * pipeline over the whole gallery.
+ *
+ * Idempotent by design — a row that already names a derivative returns early —
+ * which is what lets three callers share it without coordinating.
  */
 
 export interface DerivativeResult {
   path: string | null
   error?: string
-}
-
-/** Object key for a trip photo's public derivative. */
-export function derivativePath(userId: string, tripId: string, mediaId: string): string {
-  return `${userId}/${tripId}/${mediaId}.webp`
 }
 
 /**
@@ -46,7 +47,8 @@ export function derivativePath(userId: string, tripId: string, mediaId: string):
  * generating something on behalf of a visitor who has no rights to the
  * original. **Callers must have already established that the visitor may see
  * this image** — this function checks nothing, including where `target` points,
- * which is why `derivativePath` above is the only thing that produces one.
+ * which is why `derivativePath` in `shared/media.ts` is the only thing that
+ * produces one.
  */
 export async function ensurePublicDerivative(media: {
   id: string

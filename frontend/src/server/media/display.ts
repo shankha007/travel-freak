@@ -20,9 +20,15 @@ import { displayPath, needsDisplayCopy } from '@/shared/media'
  * that guards one guards the other, and the URL handed out is still a signed
  * link that expires.
  *
- * Generation is lazy, and deliberately best-effort: if it fails, the caller
- * gets the original's key back and the page renders exactly as badly as it did
- * before. A broken thumbnail is not worth a 500.
+ * **When this runs.** `confirmUpload` calls it through `after()` as soon as a
+ * HEIC lands, so the work belongs to the upload rather than to the first vault
+ * view. This is still the lazy path and still correct on its own — it is what
+ * covers a photo uploaded before that existed, and what makes the eager call
+ * safe to fail — but it should rarely have anything to do.
+ *
+ * Deliberately best-effort either way: if it fails, the caller gets the
+ * original's key back and the page renders exactly as badly as it did before. A
+ * broken thumbnail is not worth a 500.
  *
  * Everything is done through the **caller's own client**, never the service
  * role. The storage policies key on the first path segment being the user's id,

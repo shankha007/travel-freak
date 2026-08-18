@@ -57,6 +57,21 @@ export function storagePath(userId: string, tripId: string, mediaId: string, mim
 }
 
 /**
+ * Object key for a trip photo's public derivative, in the `media-public` bucket.
+ *
+ * Lives here with the other key builders rather than beside the code that writes
+ * the object: it is the same kind of thing as `storagePath` and `displayPath`,
+ * pure string arithmetic over ids, and keeping it importable without pulling in
+ * the service-role client is what lets the batch logic be unit-tested.
+ *
+ * Always `.webp`, whatever the original was — the derivative is a re-encode and
+ * the extension should not claim otherwise.
+ */
+export function derivativePath(userId: string, tripId: string, mediaId: string): string {
+  return `${userId}/${tripId}/${mediaId}.webp`
+}
+
+/**
  * Object key for an image uploaded into a post.
  *
  * A post image belongs to no trip — `media.trip_id` is null — so it needs a

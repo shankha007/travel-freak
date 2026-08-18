@@ -47,6 +47,25 @@ and the budget screen then read "From the itinerary · planned at INR 18,000" on
 it and "· over by INR 1,150" on the flight. The trip-type filter was confirmed
 rendering all five types over the seed's real data on `/maps/world`.
 
+Derivative generation was moved off the request path on 2026-08-17 and
+**verified against the live stack**, which is the only way it could have been:
+two real photographs were written into storage, one on the published Ladakh trip
+and one on the private Bhutan trip. The scheduled endpoint reported
+`{built:1, scanned:1}` — it converted the public trip's photo and never even
+scanned the private one — the derivative came back from the public bucket as a
+3 KB WebP re-encoded from a 22 KB JPEG, a second run reported `scanned:0`, and the
+endpoint answered 401 both with no secret and with a wrong one. Publishing Bhutan
+then built its derivative with **no request to the public page at all**: the save
+returned 303 in 651 ms and the server log carries no `/t/` entry, because
+`after()` did the work. The test rows and objects were removed afterwards and the
+trip put back to private.
+
+That check earned its keep: it caught a bug a green typecheck had hidden. The
+sweep's embedded read needed a constraint-name hint, since `media` and `trips`
+are related twice — `media.trip_id` one way and `trips.cover_media_id` the other —
+and PostgREST refuses to guess, at runtime only. The first call to the endpoint
+returned 207 with that message.
+
 **What still wants a human** is narrower than before but the same limitation:
 nothing composites in the harness browser, so every element measures zero,
 MapLibre never initialises, and the `MapExplorer` and `GlobeExplorer` subtrees do
@@ -104,7 +123,7 @@ there, which is what made the plan-against-actual check above possible.
 | — | HTML sanitisation | ✅ Done | `shared/content/sanitize.ts` — allowlist applied on read, so stored post markup cannot execute on the app's origin |
 | — | **Storage + signed uploads** | ✅ Done | Private `media` bucket, keys `<user>/<trip>/<media>.<ext>` — or `<user>/posts/<post>/<media>.<ext>` for post images — matching the storage policies, which only read the first segment. Reads go out as one-hour signed URLs; `next/image` is allow-listed to the storage host only |
 | — | **Geo assets** | ✅ Done | `npm run build:geo` writes country outlines plus admin-1 split one file per country, simplified 4% with mapshaper. Natural Earth 50m carries ISO 3166-2 for nine large countries, India among them. The map reads `admin1/index.json` before fetching, so an uncovered country costs no request |
-| — | **Public image derivatives** | ✅ Done | `media-public` bucket; sharp re-encodes to WebP ≤1600px, dropping every metadata block, on first publication. **Trip photos only now.** A post's images take the same transform into the *private* bucket at upload — their URL has to live in stored HTML and a signed one expires — and are served through `/api/post-images/[mediaId]`, which checks the post's visibility per request. Tested with the same EXIF parser the uploader uses to read GPS |
+| — | **Public image derivatives** | ✅ Done | `media-public` bucket; sharp re-encodes to WebP ≤1600px, dropping every metadata block. **Built off the request path**: `after()` on the trip's update action starts the work once the owner's save has returned, and `/api/cron/build-derivatives` sweeps hourly for anything that did not finish — both in `server/media/derivative-jobs.ts`, whose sweep query is joined by constraint name because `media` and `trips` are related twice. The lazy call in `public-trip.ts` stays behind both as correctness, not as the plan. **Trip photos only.** A post's images take the same transform into the *private* bucket at upload — their URL has to live in stored HTML and a signed one expires — and are served through `/api/post-images/[mediaId]`, which checks the post's visibility per request. Tested with the same EXIF parser the uploader uses to read GPS, and `derivative-batch.ts` carries 9 assertions over the loop's promises |
 | — | **Framer Motion** | ✅ Done | `shared/motion.ts` owns three durations and one easing curve; `client/components/motion/reveal.tsx` owns the only entrance animation. `MotionConfig reducedMotion="user"` in `providers.tsx` drops the movement and keeps the fade for anyone who asks, so no component has to check. Reveals ship as `opacity: 0`, so the root layout carries a `<noscript>` rule that pins them visible |
 | — | **`contact_messages`** | ✅ Done | RLS on with no policy: nobody reads it through the Data API but the service role. Writes go through `submit_contact_message()`, a security-definer function holding the length checks and a limit of five per address per hour. 12 pgTAP assertions |
 | — | **Scheduled purge** | ✅ Done | `/api/cron/purge-trash` empties trash past its 30 days — trips and posts alike, including the images inside a post now that `media.post_id` exists — files first, while the rows naming them still exist, then the rows. Guarded by `CRON_SECRET` compared in constant time; unset closes the endpoint rather than opening it. `vercel.json` runs it daily. Idempotent — everything is chosen by a cutoff — so a missed day costs a day and a double run costs nothing |
@@ -226,34 +245,25 @@ there, which is what made the plan-against-actual check above possible.
 
 ## Known gaps worth fixing next
 
-1. **Derivatives are generated lazily, on the first request.** That request pays for the
-   re-encode of every photo on the trip — four at a time now rather than one after another,
-   which shortens it but does not move it off the request. The plan wants this in a background
-   job at publish time; the output is identical, so this is a latency problem rather than a
-   correctness one. Post images are the exception — they are converted at upload, because
-   their URL has to live in stored HTML, and they now go to the private bucket rather than the
-   public one. `profiles.strip_exif_on_publish` still has nothing reading it — publication
-   always strips, which is the stricter behaviour. The private HEIC display copies added for
-   the vault are lazy in exactly the same way, and would move in the same job.
-2. **Sign-up confirmation is built but not exercised.** `/verify` and the confirmation
+1. **Sign-up confirmation is built but not exercised.** `/verify` and the confirmation
    template exist, and the reset flow proves the route they share. But local
    `enable_confirmations` is off, so the signup path itself has never run end to end —
    turning it on locally is the check. Production additionally needs both email templates
    set in the Supabase dashboard and its own origin in the redirect allow-list; nothing in
    the repo can enforce either, so a deploy that skips them sends links that go nowhere.
-3. **The year filter is still only as precise as the aggregate.** Trip type is built now, and
+2. **The year filter is still only as precise as the aggregate.** Trip type is built now, and
    the honest caveat that remains is the year's: `visited_regions` records a first and a last
    visit and nothing between, so a region visited in 2019 and 2026 matches every year between.
    The screen states it rather than hiding it. Making it exact needs a per-visit table, which
    is a schema change and a bigger one than it looks — the aggregate is rebuilt from three
    sources in a fixed precedence and a fourth grain would have to survive all of them.
-4. **Nothing tells anyone a contact message arrived.** `submit_contact_message()` writes the row
+3. **Nothing tells anyone a contact message arrived.** `submit_contact_message()` writes the row
    and the sender is told it reached us, which is true; but the inbox is a table that somebody has
    to remember to open in Studio. The page promises an answer within about three working days, and
    nothing in the repo makes that happen. A database webhook or a scheduled digest to
    `BRAND.support.email` would close it, and `handled_at` is already there to mark what has been
    answered.
-5. **A collaborator can plan a trip but not see what it costs.** `expenses` has one policy,
+4. **A collaborator can plan a trip but not see what it costs.** `expenses` has one policy,
    `user_id = auth.uid()`, and no collaborator clause at all, which is the right default for
    money and the wrong answer for four friends splitting a trip. `paid_by` is free text for that
    reason — it records who paid without pretending to settle up. Splitting properly needs its own
@@ -261,26 +271,26 @@ there, which is what made the plan-against-actual check above possible.
    of "the budget": `trips.budget_planned` rides on the trip row and RLS shares it, so a
    collaborator sees the plan and never the spend, and every surface now says exactly that —
    including the analytics money section, which reads the caller's own expenses and nobody else's.
-6. **An invitation is delivered by the app, not by email.** There is no transactional email in
-   this codebase — the same gap that leaves a contact message sitting in a table (4). So an
+5. **An invitation is delivered by the app, not by email.** There is no transactional email in
+   this codebase — the same gap that leaves a contact message sitting in a table (3). So an
    invitation only surfaces when the invitee next opens their own Trips screen, and somebody
    invited at an address they have not signed up with sees nothing until they do. The invite form
    says so rather than letting it be discovered. `invited_email` and the pending state are already
    the right shape for a mail to be sent from; nothing else has to change when one can be.
-7. **Per-day actual spend is possible now, and not built.** An expense can name the itinerary
+6. **Per-day actual spend is possible now, and not built.** An expense can name the itinerary
    entry it settles, so the day it belongs to is finally derivable — but the itinerary still
    totals only what a day was *planned* to cost, and the budget screen still groups by category
    rather than by day. This is the half of the plan-against-actual loop that was unblocked
    rather than finished. Note also that a recorded expense is deliberately editable afterwards
    and is *not* kept in step with the entry: changing the plan's price later does not touch the
    money, which is right, but nothing tells you the two have drifted.
-8. **The drag gestures have never been performed by hand.** Entries within and between days,
+7. **The drag gestures have never been performed by hand.** Entries within and between days,
    and undated days themselves. The harness browser does not composite, so every element
    measures zero and dnd-kit's sensors cannot initialise. The markup, the handles and their
    labels are checked in the DOM, both `reorder_itinerary_items()` and `reorder_itinerary_days()`
    now have pgTAP coverage including the cross-account no-op, and `parseOrderedIds` is
    unit-tested. The gesture wants a human.
-9. **The map filters are unexercised, and for a worse reason than was thought.** All three —
+8. **The map filters are unexercised, and for a worse reason than was thought.** All three —
    year, continent and trip type — were confirmed rendering the right options over real data,
    and `shared/geo/region-filter.ts` is pure with 24 assertions behind it while
    `shared/geo/continents.ts` proves its 250-country coverage against the same list every picker

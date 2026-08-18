@@ -1,14 +1,17 @@
 'use server'
 
+import { after } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createAdminClient, createClient } from '@/server/supabase/server'
 import { requireUser } from '@/server/auth'
 import { checkPhotoQuota, checkStorageQuota } from '@/server/entitlements'
 import { toPublicDerivative } from '@/server/media/image-transform'
+import { displayKeysFor } from '@/server/media/display'
 import {
   displayPath,
   isAllowedImageMime,
+  needsDisplayCopy,
   postImagePath,
   postImageUrl,
   sniffImageMime,
@@ -137,6 +140,20 @@ export async function confirmUpload(input: ConfirmUploadInput): Promise<ConfirmU
     // appearing in the vault.
     await removeObject(path)
     return { ok: false, error: `Could not save that photo: ${error.message}` }
+  }
+
+  // A HEIC's browser-readable copy, built now rather than the first time the
+  // owner opens their own vault. Same reasoning as the public derivatives: the
+  // work belongs to the moment the file arrives, not to a page load. `after()`
+  // keeps it off this response, and `displayKeysFor()` remains the fallback —
+  // it finds the copy already written and signs it.
+  //
+  // Best-effort throughout. If it fails the vault behaves exactly as it did
+  // before, which is to say it tries again on first view.
+  if (needsDisplayCopy(actualMime)) {
+    after(async () => {
+      await displayKeysFor([{ storagePath: path, mime: actualMime }])
+    })
   }
 
   revalidatePath(`/trips/${tripId}/vault`)
