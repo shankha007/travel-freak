@@ -24,6 +24,7 @@ import {
 import type { Checklist, PackingData, PackingItem } from '@/server/queries/packing'
 import { CHECKLIST_KIND_LABEL, groupByCategory, templatesFor } from '@/shared/packing'
 import { EMPTY_FORM_STATE } from '@/shared/validation/form-state'
+import { useActionToast } from '@/client/hooks/use-action-toast'
 import { ItemDialog, ListDialog } from '@/client/components/packing/packing-dialogs'
 import { Badge } from '@/client/components/ui/badge'
 import { Button } from '@/client/components/ui/button'
@@ -255,6 +256,10 @@ function ItemRow({
   const router = useRouter()
   const [toggleState, toggleAction] = useActionState(setChecklistItemDone, EMPTY_FORM_STATE)
   const [removeState, removeAction] = useActionState(deleteChecklistItem, EMPTY_FORM_STATE)
+  // Ticking a box shows itself; removing a line does not, and a failed tick is
+  // otherwise completely silent.
+  useActionToast(toggleState, {})
+  useActionToast(removeState, { success: 'Item removed.' })
 
   useEffect(() => {
     if (toggleState.saved || removeState.saved) router.refresh()
@@ -396,6 +401,7 @@ function AddItemButton() {
 function TemplateSection({ packing, canAdd }: { packing: PackingData; canAdd: boolean }) {
   const router = useRouter()
   const [state, formAction] = useActionState(applyChecklistTemplate, EMPTY_FORM_STATE)
+  useActionToast(state, { success: 'Template added.' })
 
   useEffect(() => {
     if (state.saved) router.refresh()
@@ -495,6 +501,7 @@ function RemoveListDialog({
 }) {
   const router = useRouter()
   const [state, formAction] = useActionState(deleteChecklist, EMPTY_FORM_STATE)
+  useActionToast(state, { success: 'List removed.' })
 
   useEffect(() => {
     if (!state.saved) return

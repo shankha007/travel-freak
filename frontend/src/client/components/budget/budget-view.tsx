@@ -10,6 +10,7 @@ import type { BudgetData, ExpenseRow } from '@/server/queries/budget'
 import { budgetVerdict, categoryLabel, formatMoney, type CurrencyBudget } from '@/shared/budget'
 import { planVariance } from '@/shared/itinerary'
 import { EMPTY_FORM_STATE } from '@/shared/validation/form-state'
+import { useActionToast } from '@/client/hooks/use-action-toast'
 import { CategoryChart } from '@/client/components/budget/category-chart'
 import { ExpenseDialog } from '@/client/components/budget/expense-dialog'
 import { Badge } from '@/client/components/ui/badge'
@@ -358,6 +359,7 @@ function PlanDialog({
 }) {
   const router = useRouter()
   const [state, formAction] = useActionState(setPlannedBudget, EMPTY_FORM_STATE)
+  useActionToast(state, { success: 'Budget saved.', error: false })
 
   useEffect(() => {
     if (!state.saved) return
@@ -506,6 +508,8 @@ function RemoveExpenseDialog({
 }) {
   const router = useRouter()
   const [state, formAction] = useActionState(deleteExpense, EMPTY_FORM_STATE)
+  // The dialog closes on success, so the toast is what says it actually went.
+  useActionToast(state, { success: 'Expense removed.' })
 
   useEffect(() => {
     if (!state.saved) return

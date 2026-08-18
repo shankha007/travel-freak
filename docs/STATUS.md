@@ -66,6 +66,31 @@ are related twice — `media.trip_id` one way and `trips.cover_media_id` the oth
 and PostgREST refuses to guess, at runtime only. The first call to the endpoint
 returned 207 with that message.
 
+The three Global UI gaps were built on 2026-08-18 and checked against the local
+stack. The quota meter was read on both plans: on Voyager it showed
+"Trips 12 used · unlimited" with **no bar** and "Storage 0 B of 30 GB" with one,
+and on Explorer the trips line became "12 of 15" — an amber bar at exactly 80%,
+with the upgrade link appearing only then. The palette opened on Ctrl+K with
+focus in its input and `aria-activedescendant` on the first result; typing "tr"
+ranked Trips, Travel resume and Trash above Globe and World map, which match only
+through "coun-tr-ies"; three real ArrowDowns landed on the fourth *visible* row
+and Enter navigated to the chosen screen.
+
+Those arrow keys found a genuine bug before the fix landed. Results were ranked
+without regard to section while the list renders grouped by one, so "New trip"
+sat fourth in the array and last on the screen — Down three times highlighted a
+row nowhere near where the eye was. `filterCommands` now returns rendered order,
+with a regression test naming the case.
+
+**Toasts are the one thing here not confirmed by eye**, and the harness is why: a
+toast is an animated element that removes itself after four seconds, animations
+never complete where nothing composites, and every `javascript_exec` gets a fresh
+JS world, so an observer cannot outlive the click that would trigger one. The
+hook has 8 assertions with `sonner` mocked instead — including the two failure
+modes that would otherwise be invisible, a repeat on an unrelated re-render and a
+second identical failure going unannounced — and the actions behind it were
+confirmed doing their work.
+
 **What still wants a human** is narrower than before but the same limitation:
 nothing composites in the harness browser, so every element measures zero,
 MapLibre never initialises, and the `MapExplorer` and `GlobeExplorer` subtrees do
@@ -236,10 +261,10 @@ there, which is what made the plan-against-actual check above possible.
 | Skeleton loaders | 🟡 Partial | Globe and login only |
 | Charts | ✅ Done | `recharts` was a dependency nothing used. `client/components/analytics` is the first, reading `--chart-1`…`--chart-5`, so a chart retunes with the theme picker like everything else |
 | Empty states | 🟡 Partial | Globe, trips, dashboard activity |
-| Command palette (⌘K) | ⬜ Not started | |
-| Sidebar quota meter | ⬜ Not started | Needs `entitlements.ts` |
+| Command palette (⌘K) | ✅ Done | Cmd+K or Ctrl+K anywhere in the app shell. Destinations come from `shared/navigation.ts`, so a new route is reachable without a second list to keep; plus "New trip" and "New blog post". Hand-rolled over the existing dialog rather than adding `cmdk` — the matching is 15 lines. Ranked in three tiers (label prefix, label substring, then keyword aliases like "photos" or "bucket list"), and **the returned order is the rendered order**, which is load-bearing: the arrow keys walk the array while the screen groups by section, and a Create item out-ranking a destination used to highlight one thing while the eye was on another. Combobox pattern — focus stays in the input and `aria-activedescendant` announces the highlight. **Trips are not searchable**, which the empty state says rather than letting it be discovered |
+| Sidebar quota meter | ✅ Done | Trips and storage at the foot of the sidebar, from `getAccountUsage()`. Two lines rather than five: one walls off the create button and the other is what costs money, while the per-trip photo cap belongs to a trip the sidebar cannot know. `plans.limits` uses null for **unlimited**, so an unlimited line keeps its count and loses its bar rather than reading "0 left"; a limit of 0 means "not on this plan" and is not a line at all. Amber from four fifths, destructive at the ceiling, and the upgrade link appears only when something is actually tight. Renders nothing on a plan with no limits. `shared/quota.ts` is pure with 13 assertions |
 | `error.tsx` / `not-found.tsx` per group | 🟡 Partial | `not-found.tsx` for `/trips/[id]` and `/b/[slug]`; no `error.tsx` anywhere |
-| Toasts | ⬜ Not started | `sonner` installed and mounted |
+| Toasts | ✅ Done | `sonner` was mounted in `providers.tsx` and nothing ever called it. `useActionToast` announces a Server Action result once per submission — keyed on the state object `useActionState` returns, so a parent re-render cannot repeat it while the same failure twice running is still reported twice. Wired to the surfaces where a write was otherwise silent: the itinerary board, the budget, packing and collaborators. Errors are announced by default and suppressed where the form already prints its own. 8 assertions, with `sonner` mocked — a real toast is an animated element that removes itself after four seconds |
 
 ---
 
