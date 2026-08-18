@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { Camera, MapPin, Plus, Trash2, Users } from 'lucide-react'
+import { Camera, Luggage, MapPin, Plus, Trash2, Users } from 'lucide-react'
 import { Button } from '@/client/components/ui/button'
 import { getTrips, groupTrips, type TripListItem } from '@/server/queries/trips'
 import { getMyInvitations } from '@/server/queries/collaborators'
@@ -10,6 +10,7 @@ import { formatDateRange } from '@/shared/format'
 import { Card, CardContent } from '@/client/components/ui/card'
 import { Badge } from '@/client/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/client/components/ui/tabs'
+import { EmptyState } from '@/client/components/empty-state'
 
 export const metadata: Metadata = {
   title: 'Trips',
@@ -76,9 +77,24 @@ function TripCard({ trip }: { trip: TripListItem }) {
   )
 }
 
-function TripGrid({ trips }: { trips: TripListItem[] }) {
+function TripGrid({ trips, empty }: { trips: TripListItem[]; empty: string }) {
   if (!trips.length) {
-    return <p className="py-8 text-center text-sm text-muted-foreground">Nothing here yet.</p>
+    // Worded per tab. "Nothing here yet" was true on all five and useful on
+    // none: an account with nine past trips and no upcoming one is not empty,
+    // and telling it so is the app failing to read its own data.
+    return (
+      <EmptyState
+        icon={<Luggage className="size-6 text-muted-foreground" aria-hidden />}
+        title={empty}
+        description="Every trip you log shows up under the tabs it belongs to."
+        action={
+          <Button nativeButton={false} render={<Link href="/trips/new" />}>
+            <Plus className="size-4" aria-hidden />
+            Log a trip
+          </Button>
+        }
+      />
+    )
   }
   return (
     <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -99,11 +115,11 @@ export default async function TripsPage() {
   const grouped = groupTrips(trips)
 
   const tabs = [
-    { value: 'all', label: 'All', trips: grouped.all },
-    { value: 'past', label: 'Past', trips: grouped.past },
-    { value: 'ongoing', label: 'Ongoing', trips: grouped.ongoing },
-    { value: 'upcoming', label: 'Upcoming', trips: grouped.upcoming },
-    { value: 'drafts', label: 'Drafts', trips: grouped.drafts },
+    { value: 'all', label: 'All', trips: grouped.all, empty: 'No trips yet' },
+    { value: 'past', label: 'Past', trips: grouped.past, empty: 'Nothing finished yet' },
+    { value: 'ongoing', label: 'Ongoing', trips: grouped.ongoing, empty: 'Nothing under way' },
+    { value: 'upcoming', label: 'Upcoming', trips: grouped.upcoming, empty: 'Nothing planned yet' },
+    { value: 'drafts', label: 'Drafts', trips: grouped.drafts, empty: 'No drafts' },
   ]
 
   return (
@@ -145,7 +161,7 @@ export default async function TripsPage() {
 
         {tabs.map((t) => (
           <TabsContent key={t.value} value={t.value} className="mt-4">
-            <TripGrid trips={t.trips} />
+            <TripGrid trips={t.trips} empty={t.empty} />
           </TabsContent>
         ))}
       </Tabs>

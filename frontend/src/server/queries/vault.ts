@@ -22,6 +22,9 @@ type MemoryKind = Database['public']['Enums']['memory_kind']
 /** An hour: long enough to browse a gallery, short enough to be worthless later. */
 const SIGNED_URL_TTL_S = 60 * 60
 
+/** How many photographs the cover picker offers. Past this it is a search. */
+const COVER_OPTION_LIMIT = 60
+
 export interface VaultPhoto {
   id: string
   url: string | null
@@ -213,6 +216,75 @@ export async function getMediaUrl(mediaId: string | null): Promise<string | null
 }
 
 /** Signed URLs for many ids at once, keyed by id. */
+/** A photo and the cover chosen from a set of them — the wizard's cover step. */
+export interface TripCoverOptions {
+  photos: { id: string; url: string | null; altText: string; caption: string }[]
+  coverId: string | null
+}
+
+/**
+ * The trip's photographs, for choosing a cover.
+ *
+ * Its own query rather than reusing either of the two that already read photos.
+ * `getTripDetail()` caps its gallery at the six most recent, which is right for
+ * a page showing a sample and wrong for a picker where the one you want is
+ * probably older than that; `getVaultData()` returns what the whole vault needs
+ * — memories, places, the map placement — and the wizard needs none of it.
+ *
+ * Capped all the same. A picker is a grid somebody scans, and past a certain
+ * point that is not choosing, it is searching — which is a different control
+ * this does not pretend to be.
+ *
+ * Owner only, like the vault: choosing a cover is editing, so a collaborator's
+ * or a stranger's read finds nothing.
+ */
+export async function getTripCoverOptions(tripId: string): Promise<TripCoverOptions> {
+  const empty: TripCoverOptions = { photos: [], coverId: null }
+
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tripId)) {
+    return empty
+  }
+
+  const supabase = await createClient()
+  const user = await requireUser()
+
+  const [{ data: trip }, { data: rows }] = await Promise.all([
+    supabase
+      .from('trips')
+      .select('id, cover_media_id')
+      .eq('id', tripId)
+      .eq('user_id', user.id)
+      .is('deleted_at', null)
+      .maybeSingle(),
+    supabase
+      .from('media')
+      .select('id, alt_text, caption')
+      .eq('trip_id', tripId)
+      .eq('user_id', user.id)
+      .eq('kind', 'image')
+      .is('deleted_at', null)
+      .order('taken_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      .limit(COVER_OPTION_LIMIT),
+  ])
+
+  if (!trip) return empty
+
+  // One batched signing call, and through `getMediaUrls` so a HEIC gets the
+  // browser-readable copy rather than an original nothing but Safari can draw.
+  const urls = await getMediaUrls((rows ?? []).map((r) => r.id))
+
+  return {
+    photos: (rows ?? []).map((r) => ({
+      id: r.id,
+      url: urls.get(r.id) ?? null,
+      altText: r.alt_text ?? '',
+      caption: r.caption ?? '',
+    })),
+    coverId: trip.cover_media_id,
+  }
+}
+
 export async function getMediaUrls(mediaIds: string[]): Promise<Map<string, string>> {
   const ids = [...new Set(mediaIds.filter(Boolean))]
   if (!ids.length) return new Map()

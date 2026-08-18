@@ -10,7 +10,13 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import { requireUser } from '@/server/auth'
-import { getDashboardStats, getRecentActivity, getUpcomingTrip } from '@/server/queries/dashboard'
+import {
+  getDashboardStats,
+  getGlobePreviewRegions,
+  getRecentActivity,
+  getUpcomingTrip,
+} from '@/server/queries/dashboard'
+import { DashboardGlobe } from '@/client/components/globe/dashboard-globe'
 import { formatDateRange } from '@/shared/format'
 import { Card, CardContent, CardHeader, CardTitle } from '@/client/components/ui/card'
 import { Badge } from '@/client/components/ui/badge'
@@ -26,10 +32,13 @@ export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage() {
   const user = await requireUser()
-  const [stats, upcoming, activity] = await Promise.all([
+  const [stats, upcoming, activity, previewRegions] = await Promise.all([
     getDashboardStats(),
     getUpcomingTrip(),
     getRecentActivity(),
+    // Free: `getVisitedRegions()` underneath is cached per render pass, and the
+    // stat cards above have already asked for it.
+    getGlobePreviewRegions(),
   ])
 
   const cards = [
@@ -80,6 +89,7 @@ export default async function DashboardPage() {
             <CardTitle className="text-base">World progress</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            <DashboardGlobe regions={previewRegions} />
             <Progress value={stats.percentOfWorld} />
             <p className="text-sm text-muted-foreground">
               {stats.countries} of 195 countries. {195 - stats.countries} to go.
@@ -170,7 +180,13 @@ export default async function DashboardPage() {
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-muted-foreground">Nothing yet.</p>
+            // Prose rather than the dashed `EmptyState` card: this sits
+            // inside a Card already, and a bordered box within a bordered box
+            // reads as a rendering mistake. What it borrows from the shared
+            // component is the substance — saying what would appear here.
+            <p className="text-sm text-muted-foreground">
+              Nothing yet. Trips you log and posts you publish show up here as you go.
+            </p>
           )}
         </CardContent>
       </Card>
