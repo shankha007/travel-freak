@@ -401,3 +401,59 @@ export async function checkChecklistQuota(tripId: string): Promise<QuotaCheck> {
         : `${planName} includes ${limit} lists per trip and this trip has ${used}. Upgrade for as many as you like — nothing you have written is affected.`,
   }
 }
+
+export interface AccountUsage {
+  planCode: string
+  planName: string
+  trips: { used: number; limit: number | null }
+  storage: { used: number; limit: number | null }
+}
+
+/**
+ * What the account has used of its plan, for the sidebar meter.
+ *
+ * A read, not a gate. Every `check*Quota` above answers "may this specific
+ * write proceed" and is the enforcement; this answers "how much is left" and is
+ * allowed to be approximate at the edges — it is rendered in chrome on every
+ * authenticated page, so it must stay cheap.
+ *
+ * Two counts, chosen because they are the two limits somebody actually runs
+ * into: trips, which walls off the create button, and storage, which is what
+ * costs money. The per-trip photo cap is deliberately absent — it belongs to a
+ * trip, and the sidebar does not know which one you are looking at.
+ *
+ * `count: 'exact', head: true` for trips so the rows never travel. Storage has
+ * to sum a column PostgREST will not aggregate for us, so it reads `bytes`
+ * alone — one small integer per photo, and the same read `checkStorageQuota`
+ * already does.
+ *
+ * Cached per render pass: the sidebar renders once, but `getEntitlements()`
+ * inside it is shared with whatever the page itself asked about the plan.
+ */
+export const getAccountUsage = cache(async (): Promise<AccountUsage> => {
+  const supabase = await createClient()
+  const user = await requireUser()
+  const { limits, planCode, planName } = await getEntitlements()
+
+  const [tripsResult, mediaResult] = await Promise.all([
+    supabase
+      .from('trips')
+      .select('*', { count: 'exact', head: true })
+      // Load-bearing, for the reason `checkTripQuota` gives: `trips` has a
+      // policy exposing every published public trip, so counting on RLS alone
+      // would charge this account for strangers' holidays.
+      .eq('user_id', user.id)
+      .is('deleted_at', null),
+    supabase.from('media').select('bytes').eq('user_id', user.id).is('deleted_at', null),
+  ])
+
+  return {
+    planCode,
+    planName,
+    trips: { used: tripsResult.count ?? 0, limit: limits.trips ?? null },
+    storage: {
+      used: (mediaResult.data ?? []).reduce((sum, m) => sum + (m.bytes ?? 0), 0),
+      limit: limits.storage_bytes ?? null,
+    },
+  }
+})

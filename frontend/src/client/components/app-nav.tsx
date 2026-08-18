@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -69,12 +70,20 @@ function isActive(pathname: string, item: NavItem) {
   return pathname === item.href || pathname.startsWith(`${item.href}/`)
 }
 
-export function AppSidebar() {
+/**
+ * `footer` is a slot rather than something this component fetches.
+ *
+ * The plan meter that sits there needs the account's usage, which is a database
+ * read, and this is a client component — so the server layout renders the meter
+ * and passes it down already made. That also keeps the meter off every client
+ * navigation.
+ */
+export function AppSidebar({ footer }: { footer?: ReactNode }) {
   const pathname = usePathname()
 
   return (
-    <nav aria-label="Main" className="hidden w-56 shrink-0 border-r md:block">
-      <ul className="flex flex-col gap-0.5 p-3">
+    <nav aria-label="Main" className="hidden w-56 shrink-0 flex-col border-r md:flex">
+      <ul className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-3">
         {PRIMARY_NAV.map((item) => {
           const active = isActive(pathname, item)
           return (
@@ -104,6 +113,8 @@ export function AppSidebar() {
           )
         })}
       </ul>
+
+      {footer}
     </nav>
   )
 }

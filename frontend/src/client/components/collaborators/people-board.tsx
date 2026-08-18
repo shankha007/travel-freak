@@ -33,6 +33,7 @@ import {
   roleLabel,
 } from '@/shared/collaborators'
 import { EMPTY_FORM_STATE } from '@/shared/validation/form-state'
+import { useActionToast } from '@/client/hooks/use-action-toast'
 import { Badge } from '@/client/components/ui/badge'
 import { Button } from '@/client/components/ui/button'
 import { Card, CardContent } from '@/client/components/ui/card'
@@ -201,6 +202,7 @@ function PersonRow({
 function RolePicker({ person, tripId }: { person: TripPerson; tripId: string }) {
   const router = useRouter()
   const [state, formAction] = useActionState(changeCollaboratorRole, EMPTY_FORM_STATE)
+  useActionToast(state, { success: 'Role changed.' })
 
   useEffect(() => {
     if (state.saved) router.refresh()
@@ -443,6 +445,7 @@ function RemovePersonDialog({
 }) {
   const router = useRouter()
   const [state, formAction] = useActionState(removeCollaborator, EMPTY_FORM_STATE)
+  useActionToast(state, { success: 'Removed from the trip.' })
 
   useEffect(() => {
     if (!state.saved) return
@@ -505,6 +508,7 @@ function LeaveDialog({
 }) {
   const router = useRouter()
   const [state, formAction] = useActionState(leaveTrip, EMPTY_FORM_STATE)
+  useActionToast(state, { success: 'You have left the trip.' })
 
   useEffect(() => {
     if (!state.saved) return

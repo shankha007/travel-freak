@@ -40,6 +40,7 @@ import {
   type ItineraryKind,
 } from '@/shared/itinerary'
 import { EMPTY_FORM_STATE } from '@/shared/validation/form-state'
+import { useActionToast } from '@/client/hooks/use-action-toast'
 import { DayDialog } from '@/client/components/itinerary/day-dialog'
 import { ItemDialog } from '@/client/components/itinerary/item-dialog'
 import { ItineraryMap } from '@/client/components/itinerary/itinerary-map'
@@ -447,6 +448,7 @@ function RecordedCost({ item }: { item: ItineraryEntry }) {
 function RecordExpenseButton({ item, tripId }: { item: ItineraryEntry; tripId: string }) {
   const router = useRouter()
   const [state, formAction] = useActionState(recordItineraryExpense, EMPTY_FORM_STATE)
+  useActionToast(state, { success: 'Recorded on the budget.' })
 
   useEffect(() => {
     if (state.saved) router.refresh()
@@ -495,6 +497,9 @@ function RecordExpenseSubmit({ item, error }: { item: ItineraryEntry; error?: st
 function StatusPicker({ item, tripId }: { item: ItineraryEntry; tripId: string }) {
   const router = useRouter()
   const [state, formAction] = useActionState(setItineraryItemStatus, EMPTY_FORM_STATE)
+  // No success toast: the select already shows the new status, and confirming
+  // every change on a board of twenty entries would be a stack of noise.
+  useActionToast(state, {})
 
   useEffect(() => {
     if (state.saved) router.refresh()
@@ -524,6 +529,8 @@ function StatusPicker({ item, tripId }: { item: ItineraryEntry; tripId: string }
 function LayOutDaysButton({ tripId, count }: { tripId: string; count: number }) {
   const router = useRouter()
   const [state, formAction] = useActionState(addTripDays, EMPTY_FORM_STATE)
+  // This form prints its own error underneath, so only the success is spoken.
+  useActionToast(state, { success: 'Days laid out.', error: false })
 
   useEffect(() => {
     if (state.saved) router.refresh()

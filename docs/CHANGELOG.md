@@ -51,6 +51,21 @@ their own line — nobody outside the repo ever saw them.
 
 ### Added
 
+- **Jump anywhere with Cmd+K.** Every screen in the app, and a couple of things
+  you can make, one keystroke away — Ctrl+K if you are not on a Mac. Start
+  typing and it narrows; the arrow keys move, Enter goes. It knows a few other
+  names for things, so "photos" finds your vault and "bucket list" finds the
+  wishlist. It searches screens rather than your trips, and says so when nothing
+  matches.
+- **How much of your plan is left, in the sidebar.** Trips and storage, with a
+  bar for each, on every screen. An unlimited allowance says so instead of
+  drawing a full bar, the bar turns amber when you are near a limit, and the
+  upgrade link only appears when something is actually tight — never as a
+  standing advertisement.
+- **The app tells you when something worked.** Recording a spend, removing a
+  packing line, changing somebody's role, laying out your days: the writes that
+  used to happen in silence now say so, and the ones that fail say that instead
+  of looking like nothing happened.
 - **Record what a plan actually cost.** An itinerary entry with a price on it
   now has a button that files it on the budget, and the two stay joined. The
   entry then shows what it came to next to what you expected — "INR 42,000
@@ -263,7 +278,7 @@ their own line — nobody outside the repo ever saw them.
   the entry version does not need: a day addressed through the wrong trip is not
   renumbered even by the person who owns both.
 - **CI runs on every push and pull request.** Two jobs: the frontend one checks
-  formatting, lint, types, the 543 unit tests and a production build; the
+  formatting, lint, types, the 578 unit tests and a production build; the
   database one boots the Supabase stack and runs the 219 pgTAP assertions that
   are the real guarantee one traveller cannot read another's trips. It also
   regenerates the database types and fails if they differ from what is
