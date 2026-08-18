@@ -18,6 +18,7 @@ import { TRIP_STATUSES, TRIP_TYPES, VISIBILITIES, suggestStatus } from '@/shared
 import { ALL_COUNTRIES, countryFlag, countryName } from '@/shared/geo/countries'
 import { formatLngLat } from '@/shared/geo/point'
 import { PlacePicker } from '@/client/components/trips/place-picker'
+import { CoverPicker, type CoverOption } from '@/client/components/trips/cover-picker'
 import { Button } from '@/client/components/ui/button'
 import { Input } from '@/client/components/ui/input'
 import { Label } from '@/client/components/ui/label'
@@ -32,6 +33,11 @@ const STEPS = [
   { id: 'basics', label: 'Basics' },
   { id: 'dates', label: 'Dates' },
   { id: 'places', label: 'Places' },
+  // §5 of the plan puts `cover` here, between places and visibility, and it was
+  // the one step never built. It is shown on both modes so the wizard has the
+  // same shape either way — on create it explains why it is empty rather than
+  // being hidden, which would make the step numbers change between modes.
+  { id: 'cover', label: 'Cover' },
   { id: 'review', label: 'Visibility' },
 ] as const
 
@@ -109,6 +115,8 @@ export function TripForm({
   tripsUsed,
   tripLimit,
   defaultVisibility = 'private',
+  photos = [],
+  coverId = null,
 }: {
   mode?: 'create' | 'edit'
   tripId?: string
@@ -122,6 +130,10 @@ export function TripForm({
    * afterwards would republish something on the next save.
    */
   defaultVisibility?: string
+  /** The trip's own photographs, for the cover step. Empty while creating. */
+  photos?: CoverOption[]
+  /** The cover already chosen, if any. */
+  coverId?: string | null
 }) {
   const isEdit = mode === 'edit'
   const [state, formAction] = useActionState(isEdit ? updateTrip : createTrip, initialState)
@@ -509,8 +521,23 @@ export function TripForm({
             </>
           )}
 
-          {/* ---------------------------------------------------- review */}
+          {/* ----------------------------------------------------- cover */}
           {step === 3 && (
+            <>
+              {isEdit && tripId ? (
+                <CoverPicker tripId={tripId} photos={photos} coverId={coverId} />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  A cover is chosen from the trip&rsquo;s own photographs, so there is nothing to
+                  choose from yet. Save the trip, add photos to its vault, and this step will offer
+                  them.
+                </p>
+              )}
+            </>
+          )}
+
+          {/* ---------------------------------------------------- review */}
+          {step === 4 && (
             <>
               <div className="space-y-2">
                 <Label htmlFor="visibility">Who can see this?</Label>

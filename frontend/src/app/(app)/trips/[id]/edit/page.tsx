@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { getTripDetail } from '@/server/queries/trip-detail'
+import { getTripCoverOptions } from '@/server/queries/vault'
 import { TripForm, type TripFormInitial } from '@/client/components/trips/trip-form'
 import { DeleteTripDialog } from '@/client/components/trips/delete-trip-dialog'
 import { Button } from '@/client/components/ui/button'
@@ -20,7 +21,7 @@ export async function generateMetadata({
 
 export default async function EditTripPage({ params }: PageProps<'/trips/[id]/edit'>) {
   const { id } = await params
-  const trip = await getTripDetail(id)
+  const [trip, cover] = await Promise.all([getTripDetail(id), getTripCoverOptions(id)])
 
   // Same 404 for "no such trip" and "not yours": RLS returns nothing either way.
   if (!trip) notFound()
@@ -67,7 +68,13 @@ export default async function EditTripPage({ params }: PageProps<'/trips/[id]/ed
       </header>
 
       <div className="max-w-2xl space-y-4">
-        <TripForm mode="edit" tripId={id} initial={initial} />
+        <TripForm
+          mode="edit"
+          tripId={id}
+          initial={initial}
+          photos={cover.photos}
+          coverId={cover.coverId}
+        />
 
         <Card>
           <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">

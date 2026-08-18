@@ -457,6 +457,54 @@ export async function setCoverPhoto(mediaId: string): Promise<MediaActionResult>
 }
 
 /**
+ * Takes the cover off a trip, leaving the photograph alone.
+ *
+ * The other half of `setCoverPhoto`, and it has to exist for the cover picker
+ * in the trip wizard to be a control rather than a one-way door: without it the
+ * only way out of a cover you regret is choosing a different one, and a trip
+ * that should simply have no hero has no way back.
+ *
+ * Clears both things `setCoverPhoto` sets, for the same reason it sets both —
+ * `trips.cover_media_id` is the trip's hero and `media.is_featured` is what
+ * `refresh_visited_regions()` reads for the region's photo on the globe, and
+ * leaving one behind would put the two out of step in a way nothing on screen
+ * would explain.
+ */
+export async function clearCoverPhoto(tripId: string): Promise<MediaActionResult> {
+  const user = await requireUser()
+
+  if (!UUID_RE.test(tripId)) {
+    return { ok: false, error: 'Something went wrong. Please try again.' }
+  }
+
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('trips')
+    .update({ cover_media_id: null })
+    .eq('id', tripId)
+    .eq('user_id', user.id)
+    .is('deleted_at', null)
+
+  if (error) return { ok: false, error: `Could not remove the cover: ${error.message}` }
+
+  // Best-effort, and after the trip row: a stranded `is_featured` only affects
+  // which photo the globe picks, while a cover pointing at nothing is what the
+  // trip page would render as a broken hero.
+  await supabase
+    .from('media')
+    .update({ is_featured: false })
+    .eq('user_id', user.id)
+    .eq('trip_id', tripId)
+
+  revalidatePath(`/trips/${tripId}`)
+  revalidatePath(`/trips/${tripId}/edit`)
+  revalidatePath(`/trips/${tripId}/vault`)
+  revalidatePath('/globe')
+  return { ok: true }
+}
+
+/**
  * Soft-deletes a photo and removes the stored object.
  *
  * The row is kept so the counters can be recomputed and the trip's history still

@@ -91,6 +91,24 @@ modes that would otherwise be invisible, a repeat on an unrelated re-render and 
 second identical failure going unannounced — and the actions behind it were
 confirmed doing their work.
 
+The partial features were finished on 2026-08-18. **The error boundary was
+proved by making a screen throw**: a temporary route under `(app)` that raised on
+render produced "Something went wrong" with the Try again and Back buttons, the
+header and sidebar still standing beside it — which is the whole argument for
+putting the boundary on the group rather than the screen — React's digest shown
+as a reference, and the thrown message nowhere on the page. The route was deleted
+afterwards. The wizard now reads basics → dates → places → **cover** → visibility,
+and the dashboard's globe card renders its lazy container in place of the old
+link.
+
+**Two of the new surfaces could not be exercised here**, both for the documented
+reason. The trip wizard does not hydrate in the harness — its `PlacePicker` lazy
+loads MapLibre, which cannot initialise where nothing composites — so the step
+buttons are inert markup and the cover picker was never clicked; the step list
+and its position were read from the DOM. And the dashboard globe shows its
+skeleton rather than a canvas, because three.js needs the same compositing. Both
+want a human, and are listed below.
+
 **What still wants a human** is narrower than before but the same limitation:
 nothing composites in the harness browser, so every element measures zero,
 MapLibre never initialises, and the `MapExplorer` and `GlobeExplorer` subtrees do
@@ -119,13 +137,13 @@ there, which is what made the plan-against-actual check above possible.
 | Infrastructure | 20 | 0 | 0 | 1 |
 | Public / marketing | 8 | 0 | 0 | 2 |
 | Auth | 6 | 0 | 0 | 1 |
-| Dashboard & globe | 5 | 2 | 0 | 0 |
-| Trips & planner | 9 | 1 | 0 | 0 |
+| Dashboard & globe | 7 | 0 | 0 | 0 |
+| Trips & planner | 10 | 0 | 0 | 0 |
 | Memory & content | 7 | 0 | 0 | 0 |
 | Analytics & resume | 2 | 0 | 0 | 2 |
 | Public sharing | 5 | 0 | 0 | 0 |
 | Account | 3 | 1 | 0 | 3 |
-| **Total** | **65** | **4** | **0** | **9** |
+| **Total** | **68** | **1** | **0** | **9** |
 
 ---
 
@@ -190,8 +208,8 @@ there, which is what made the plan-against-actual check above possible.
 | 14 | **Travel Globe** `/globe` | ✅ Done | Real `visited_regions`; 4-state colouring; region list; empty state. Year, continent and trip-type filters, the same ones the world map carries, narrowing the globe, the list and the three counters on it together |
 | 15 | **Country/region modal** | ✅ Done | Trips, memories, dates, cities; deep-linkable `?region=IND` |
 | — | Globe region-detail paywall | ✅ Done | `showRegionDetail` from `planCode`, decided server-side |
-| — | Dashboard globe preview | 🟡 Partial | Query exists (`getGlobePreviewRegions`); card links to `/globe` instead of embedding |
-| 16 | **World map** `/maps/world` | 🟡 Partial | MapLibre 2D filling the page, with a basemap it draws itself — land, coastline and sea from the palette, no tile key needed. Country fills joined by `feature-state`, a halo on regions with data, hover lift, click-through to the region modal, layer toggles, and a floating places panel that is the keyboard-navigable equivalent. Subdivisions are gated on `globe_region_detail` and lazy-loaded only for the nine countries that have data. **Year, continent and trip-type filters** narrow the fills and the panel together, from `shared/geo/region-filter.ts`; only the years, continents and types the data can answer for are offered, so no choice empties the map. A year matches when it falls inside a region's first-to-last visit span, which is all `visited_regions` records, and the screen says so. **Trip type is built now**: the aggregate carries trip ids and not their kinds, so `getVisitedRegions()` resolves them from `trips` in one extra read — deliberately *not* a column on `visited_regions`, which has a policy exposing every row of anyone with a public profile, and where somebody went is a different disclosure from who they went with. The public profile's read leaves the field empty and the control renders nothing |
+| — | Dashboard globe preview | ✅ Done | `getGlobePreviewRegions()` had existed since the dashboard was built with nothing rendering it — the card offered a link to `/globe`, which is a description of a globe rather than a globe. Now embedded, lazily: `react-globe.gl` pulls in three.js and the dashboard is the first screen an account lands on, so shipping it in the entry chunk would make the slowest paint the one that greets a new user. Presentation only — any click opens `/globe`, where the list, filters and modal live — and it renders nothing at all for an account with no regions yet |
+| 16 | **World map** `/maps/world` | ✅ Done | MapLibre 2D filling the page, with a basemap it draws itself — land, coastline and sea from the palette, no tile key needed. Country fills joined by `feature-state`, a halo on regions with data, hover lift, click-through to the region modal, layer toggles, and a floating places panel that is the keyboard-navigable equivalent. Subdivisions are gated on `globe_region_detail` and lazy-loaded only for the nine countries that have data. **Year, continent and trip-type filters** narrow the fills and the panel together, from `shared/geo/region-filter.ts`; only the years, continents and types the data can answer for are offered, so no choice empties the map. A year matches when it falls inside a region's first-to-last visit span, which is all `visited_regions` records, and the screen says so. **Trip type is built now**: the aggregate carries trip ids and not their kinds, so `getVisitedRegions()` resolves them from `trips` in one extra read — deliberately *not* a column on `visited_regions`, which has a policy exposing every row of anyone with a public profile, and where somebody went is a different disclosure from who they went with. The public profile's read leaves the field empty and the control renders nothing |
 | 17 | **India map** `/maps/india` | ✅ Done | All 36 states and union territories, free on every plan, fitted to the country on load |
 
 ## Trips & planner
@@ -199,7 +217,7 @@ there, which is what made the plan-against-actual check above possible.
 | # | Feature | Status | Notes |
 |---|---|---|---|
 | 18 | **My Trips** `/trips` | ✅ Done | Tabs All/Past/Ongoing/Upcoming/Drafts with counts, flags, places, visibility |
-| 19 | **Create trip** `/trips/new` | 🟡 Partial | 4-step wizard (basics → dates → places → visibility), quota-gated, writes trip + places, and each place can carry a pin set by map click or place search. **No cover image** — that still needs a screen that does not exist |
+| 19 | **Create trip** `/trips/new` | ✅ Done | 5-step wizard (basics → dates → places → cover → visibility), quota-gated, writes trip + places, and each place can carry a pin set by map click or place search. **The cover step is built**, in the position §5 always listed it. It is edit-only in substance and the reason is inherent: a cover is chosen from the trip's own photographs, and a trip being created has none — so on create the step says that rather than showing an empty grid, which also keeps the step numbers the same in both modes. It writes immediately rather than with the payload, the one place the wizard does: the choice is one idempotent field, and it goes through `setCoverPhoto` so the trip hero and `media.is_featured` are set by the same code the vault uses rather than a second copy of it. `clearCoverPhoto` is the way back to no hero |
 | 20 | **Trip details** `/trips/[id]` | ✅ Done | Hero, stats, route timeline, memories, linked blogs, gallery counts, details panel, Edit and Share. **The route map is built** — `TripRouteMap` over the same three `MapView` props the vault's map tab uses, above the timeline, numbered and joined in visit order, with a note saying how many stops carry a pin. Renders nothing when none does, because the line under the list already says so |
 | — | **Edit trip** `/trips/[id]/edit` | ✅ Done | Same wizard as create (`TripForm`), saveable from any step. Slug and `published_at` are deliberately stable; places are matched by id so memories stay pinned |
 | — | **Delete trip** | ✅ Done | Confirm dialog → `soft_delete_trip()`; sets `deleted_at`, repaints the globe, frees quota, destroys nothing. Restorable from `/trash` for 30 days |
@@ -258,12 +276,12 @@ there, which is what made the plan-against-actual check above possible.
 |---|---|---|
 | Sidebar + mobile bottom nav | ✅ Done | Driven by `shared/navigation.ts`; stubs marked "soon". Of the four in the phone's bottom bar, none is a stub now that the wishlist is built |
 | Theme picker | ✅ Done | Six palettes plus System, from `shared/themes.ts`. Dark palettes join the `dark` variant in `globals.css`, which `themes.test.ts` enforces; each retunes the region-state and map colours, not just the chrome |
-| Skeleton loaders | 🟡 Partial | Globe and login only |
+| Skeleton loaders | ✅ Done | A `loading.tsx` on every route under the app shell, built from `page-skeleton.tsx`. They are not decoration: each authenticated route is `force-dynamic`, and Next does not prefetch a dynamic route without a loading boundary — so without one a click buys a full round trip with the previous screen frozen. The heading is passed as real text rather than drawn as a grey bar, because it is known at build time and a skeleton of a word we already have is worse than the word. The public readers — `/b/[slug]`, `/t/[slug]`, `/u/[username]` — have them too now, drawing their headings as bars, since a title belongs to whichever slug resolves |
 | Charts | ✅ Done | `recharts` was a dependency nothing used. `client/components/analytics` is the first, reading `--chart-1`…`--chart-5`, so a chart retunes with the theme picker like everything else |
-| Empty states | 🟡 Partial | Globe, trips, dashboard activity |
+| Empty states | ✅ Done | On every screen that can be empty. `client/components/empty-state.tsx` holds the pattern the planner screens had each grown independently — icon, a line naming what is missing, and an action where one is honest. The trips tabs used to say "Nothing here yet" on all five, which is true of all of them and useful on none: an account with nine past trips and no upcoming one is not empty, and they now say so per tab. Deliberately not used inside a `Card` — the dashboard's two keep prose, because a dashed box in a bordered box reads as a rendering fault; what they borrow is the substance, saying what would appear |
 | Command palette (⌘K) | ✅ Done | Cmd+K or Ctrl+K anywhere in the app shell. Destinations come from `shared/navigation.ts`, so a new route is reachable without a second list to keep; plus "New trip" and "New blog post". Hand-rolled over the existing dialog rather than adding `cmdk` — the matching is 15 lines. Ranked in three tiers (label prefix, label substring, then keyword aliases like "photos" or "bucket list"), and **the returned order is the rendered order**, which is load-bearing: the arrow keys walk the array while the screen groups by section, and a Create item out-ranking a destination used to highlight one thing while the eye was on another. Combobox pattern — focus stays in the input and `aria-activedescendant` announces the highlight. **Trips are not searchable**, which the empty state says rather than letting it be discovered |
 | Sidebar quota meter | ✅ Done | Trips and storage at the foot of the sidebar, from `getAccountUsage()`. Two lines rather than five: one walls off the create button and the other is what costs money, while the per-trip photo cap belongs to a trip the sidebar cannot know. `plans.limits` uses null for **unlimited**, so an unlimited line keeps its count and loses its bar rather than reading "0 left"; a limit of 0 means "not on this plan" and is not a line at all. Amber from four fifths, destructive at the ceiling, and the upgrade link appears only when something is actually tight. Renders nothing on a plan with no limits. `shared/quota.ts` is pure with 13 assertions |
-| `error.tsx` / `not-found.tsx` per group | 🟡 Partial | `not-found.tsx` for `/trips/[id]` and `/b/[slug]`; no `error.tsx` anywhere |
+| `error.tsx` / `not-found.tsx` per group | ✅ Done | `not-found.tsx` for `/trips/[id]` and `/b/[slug]`, and error boundaries at all three levels: `(app)/error.tsx`, a public `app/error.tsx`, and `app/global-error.tsx` for a root layout that itself failed. Group level rather than per screen, and that is the point — the shell is rendered by the group's layout, *outside* the boundary, so a screen that throws keeps its header and sidebar and you can walk away from it. `client/components/error-state.tsx` is shared: it never prints the thrown message, which can carry a row id or the shape of a query, and shows React's digest instead, which identifies the fault without describing it. `global-error.tsx` is styled inline, since a layout that threw may never have loaded the stylesheet |
 | Toasts | ✅ Done | `sonner` was mounted in `providers.tsx` and nothing ever called it. `useActionToast` announces a Server Action result once per submission — keyed on the state object `useActionState` returns, so a parent re-render cannot repeat it while the same failure twice running is still reported twice. Wired to the surfaces where a write was otherwise silent: the itinerary board, the budget, packing and collaborators. Errors are announced by default and suppressed where the form already prints its own. 8 assertions, with `sonner` mocked — a real toast is an animated element that removes itself after four seconds |
 
 ---
@@ -323,3 +341,11 @@ there, which is what made the plan-against-actual check above possible.
    do so established why: the `MapExplorer` subtree carries no React fibers at all in the
    harness, so the controls are inert server-rendered markup there rather than a filter that
    fails. Choosing one is a real check that has never happened.
+
+   The same limitation now covers two more surfaces. **The cover picker has never been
+   clicked**: the trip wizard does not hydrate either, because `PlacePicker` lazy loads
+   MapLibre — the step list was read from the DOM and the write path behind it is
+   `setCoverPhoto`, which the vault has exercised, but choosing a cover from the wizard has
+   not been done by hand. **The dashboard globe has never been seen drawn**, for the same
+   reason the full globe has not: three.js needs compositing, so the card shows its skeleton
+   there. Its container, classes and lazy fallback were confirmed in the DOM.

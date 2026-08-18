@@ -51,6 +51,15 @@ their own line — nobody outside the repo ever saw them.
 
 ### Added
 
+- **Choose a trip's cover picture.** The wizard has a Cover step now, between
+  Places and Visibility, where it was always meant to be. Pick any photograph
+  from the trip and it becomes the image at the top of the page and the one a
+  shared link shows; choose it again to take it off. It saves as you click. You
+  need photos in the trip's vault first, which is why the step is quiet on a trip
+  you are still creating.
+- **A globe on the dashboard, not a link to one.** The world-progress card drew
+  a bar and offered to take you elsewhere. It now shows your countries, and
+  clicking it opens the full globe.
 - **Jump anywhere with Cmd+K.** Every screen in the app, and a couple of things
   you can make, one keystroke away — Ctrl+K if you are not on a Mac. Start
   typing and it narrows; the arrow keys move, Enter goes. It knows a few other
@@ -249,6 +258,15 @@ their own line — nobody outside the repo ever saw them.
 
 ### Fixed
 
+- **A screen that fails no longer takes the app with it.** If something goes
+  wrong loading a page you now get a short explanation, a Try again button and a
+  way back — with your header and sidebar still there, so you can simply go
+  somewhere else. It shows a reference code you can quote to us, and never the
+  raw error, which can carry fragments of your own data.
+- **Empty screens say what goes on them.** Every tab of your trips used to read
+  "Nothing here yet", including the four that were empty only because your trips
+  are somewhere else. Each says what is actually missing now, and offers the next
+  step where there is one.
 - **A trip page no longer says your places have no coordinates when they do.**
   The line under the route timeline was written before places could carry a pin
   and never changed after they could. The route map above it now counts the
