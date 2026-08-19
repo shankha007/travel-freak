@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createProxyClient } from '@/server/supabase/proxy'
 import { signHandoff } from '@/shared/auth-handoff'
-import { buildCsp, createNonce } from '@/shared/security'
+import { buildCsp } from '@/shared/security'
 
 /**
  * Refreshes the Supabase session on every request and guards the app shell.
@@ -51,7 +51,7 @@ const AUTH_ROUTES = ['/login', '/register']
 const CSP_HEADER = 'Content-Security-Policy'
 
 export async function proxy(request: NextRequest) {
-  const { supabase, getResponse, setVerifiedUser, setForwardedHeader } = createProxyClient(request)
+  const { supabase, getResponse, setVerifiedUser } = createProxyClient(request)
 
   // Must be getUser(), not getSession(): only getUser() revalidates the token
   // against the auth server. getSession() trusts whatever the cookie claims.
@@ -63,17 +63,11 @@ export async function proxy(request: NextRequest) {
 
   const needsAuth = PROTECTED.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 
-  /**
-   * The nonce is issued only for the authenticated shell, and the reason is
-   * rendering rather than security: Next applies a nonce during SSR, so a page
-   * carrying one cannot be prerendered. Every route behind the login is
-   * `force-dynamic` already, so the nonce costs nothing there; the public pages
-   * are static or ISR and would lose that. `shared/security.ts` sets out the
-   * trade in full — both policies refuse a script from another origin, which is
-   * the directive a remote injection actually meets.
-   */
-  const nonce = needsAuth ? createNonce() : undefined
-  const csp = buildCsp({ nonce, dev: process.env.NODE_ENV === 'development' })
+  // One policy for every route. `shared/security.ts` explains why the shell no
+  // longer gets a stricter, nonce-based one — it blocked next-themes' no-flash
+  // script, and both ways of exempting that script cost more than the nonce was
+  // worth.
+  const csp = buildCsp({ dev: process.env.NODE_ENV === 'development' })
 
   if (needsAuth && !user) {
     const url = request.nextUrl.clone()
@@ -94,15 +88,6 @@ export async function proxy(request: NextRequest) {
     const redirect = NextResponse.redirect(url)
     redirect.headers.set(CSP_HEADER, csp)
     return redirect
-  }
-
-  // On the request as well as the response: Next finds the nonce by parsing the
-  // request's own CSP header and puts it on the framework's script tags. Only
-  // when there is a nonce to find — forwarding a nonce-less policy would make
-  // Next treat the render as dynamic for no gain.
-  if (nonce) {
-    setForwardedHeader(CSP_HEADER, csp)
-    setForwardedHeader('x-nonce', nonce)
   }
 
   // Only on the way to a render. A redirect above returns before this, which is

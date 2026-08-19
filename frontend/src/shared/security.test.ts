@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildCsp, createNonce } from '@/shared/security'
+import { buildCsp } from '@/shared/security'
 
 /**
  * The policy is a string, so nothing about it fails a typecheck. These are the
@@ -55,27 +55,28 @@ describe('buildCsp', () => {
     expect(d['form-action']).toEqual(["'self'"])
   })
 
-  describe('the strict policy, for the authenticated shell', () => {
-    const strict = directives(buildCsp({ nonce: 'abc123' }))
+  describe('the script policy', () => {
+    const d = directives(buildCsp())
 
-    it('carries the nonce and strict-dynamic, and no inline escape hatch', () => {
-      expect(strict['script-src']).toEqual(["'nonce-abc123'", "'strict-dynamic'"])
-      expect(strict['script-src']).not.toContain("'unsafe-inline'")
+    it('tolerates an inline script but never one from elsewhere', () => {
+      // `'unsafe-inline'` is a stated concession — see the note at the top of
+      // `security.ts` for the nonce that was tried and why it was reverted. The
+      // half that still holds is `'self'`: a remote `<script src>` is refused,
+      // and that is what an injected tag actually needs.
+      expect(d['script-src']).toEqual(["'self'", "'unsafe-inline'"])
     })
 
-    it('still allows inline styles, which no nonce can cover', () => {
-      // `style` attributes are set by MapLibre, three.js and every progress bar
-      // here. A nonce applies to elements, not attributes.
-      expect(strict['style-src']).toContain("'unsafe-inline'")
+    it('is one policy, whatever the route', () => {
+      // The nonce split is gone. If it ever returns, it has to answer for
+      // next-themes' no-flash script first.
+      expect(buildCsp()).toBe(buildCsp())
+      expect(directives(buildCsp())['script-src']).not.toContain("'strict-dynamic'")
     })
-  })
 
-  describe('the public policy, for the pages that are prerendered', () => {
-    const open = directives(buildCsp())
-
-    it('tolerates inline scripts but never a script from elsewhere', () => {
-      expect(open['script-src']).toContain("'unsafe-inline'")
-      expect(open['script-src']).toEqual(["'self'", "'unsafe-inline'"])
+    it('allows inline styles, which are style attributes and unavoidable', () => {
+      // Set by MapLibre, three.js and every progress bar here. Only
+      // `style-src-attr` could narrow this.
+      expect(d['style-src']).toContain("'unsafe-inline'")
     })
   })
 
@@ -96,17 +97,5 @@ describe('buildCsp', () => {
     const sources = directives(buildCsp())['connect-src'].join(' ')
     expect(sources).not.toContain('sentry')
     expect(sources).not.toContain('posthog')
-  })
-})
-
-describe('createNonce', () => {
-  it('never repeats', () => {
-    const seen = new Set(Array.from({ length: 100 }, () => createNonce()))
-    expect(seen.size).toBe(100)
-  })
-
-  it('is long enough to be unguessable', () => {
-    // 16 random bytes, base64 — anything shorter is a nonce in name only.
-    expect(createNonce().length).toBeGreaterThanOrEqual(22)
   })
 })

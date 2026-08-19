@@ -62,17 +62,6 @@ export function createProxyClient(request: NextRequest) {
     setVerifiedUser(token: string) {
       headers.set(HANDOFF_HEADER, token)
     },
-    /**
-     * Forwards a header to the render.
-     *
-     * Used for the CSP nonce: Next finds the nonce by parsing the
-     * `Content-Security-Policy` header **off the request**, and applies it to
-     * its own script tags. Setting it only on the response would ship a policy
-     * that blocks the framework's own bootstrap.
-     */
-    setForwardedHeader(name: string, value: string) {
-      headers.set(name, value)
-    },
     getResponse() {
       const response = NextResponse.next({ request: { headers } })
       for (const { name, value, options } of pendingCookies) {

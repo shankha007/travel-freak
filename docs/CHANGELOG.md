@@ -167,6 +167,13 @@ their own line — nobody outside the repo ever saw them.
 
 ### Security
 
+- **The stricter script policy on signed-in screens was rolled back.** It broke
+  the theme (above), and the two ways of exempting that one script each cost more
+  than the policy was worth: one turned every marketing page from prerendered into
+  per-request, and the other depended on a script fingerprint that changes between
+  a development and a production build — correct locally, broken in production.
+  Every page now carries the same policy, which still refuses any script loaded
+  from another site.
 - **Rate limits on signing in, signing up, uploading and password emails.**
   Repeatedly guessing a password, creating accounts in bulk, or making the site
   send mail to an address over and over are all now stopped after a handful of
@@ -295,6 +302,18 @@ their own line — nobody outside the repo ever saw them.
   authenticated page. It now asks for the eleven.
 
 ### Fixed
+
+- **The Drafts tab was off the screen on a phone.** Five tabs and their counts
+  need more width than a 375px screen has, so the last one was painted past the
+  edge and clipped — not squeezed, gone, with nothing to scroll to reach it. The
+  strip now scrolls sideways.
+- **Itinerary days ran off the right edge on a phone.** Each day card was drawn
+  24px wider than the screen, so the cost of an entry and the button beside it
+  were cut off. They now fit the screen they are on.
+- **The theme flashed on every screen behind the login.** The security policy
+  shipped in the previous change blocked the small script that sets your theme
+  before the page paints, so a dark-theme account saw a white flash on every
+  navigation. The policy no longer blocks it.
 
 - **Public profiles were invisible to everyone who was not signed in.** A
   signed-out visitor opening `/u/<name>` got the "no such profile" page for a
