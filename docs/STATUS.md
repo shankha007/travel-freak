@@ -151,6 +151,20 @@ and the one-column case had not. Tablet and desktop were clean, and both fixes
 were re-checked at 1280px for regressions: the tab strip needs no scrolling there,
 and the itinerary's two-column layout still measures `617px 352px`.
 
+Tap targets were the follow-up, and were done properly rather than for the
+handful first spotted: every icon-only control in the app is now 44px on a coarse
+pointer, from `ui/button.tsx`'s four icon sizes and the itinerary's two drag
+handles, which at 24px had been the smallest control in the product and are the
+only ones that are *dragged*. They grow rather than wearing an invisible hit
+area, because they come in pairs 4px apart and two 44px hit areas around two 28px
+buttons overlap by 12px — a tap landing on whichever element wins the hit test is
+worse than a tap that misses. Gated on `pointer-coarse` rather than a width, since
+it is the input device that matters: verified at 44px with zero overlapping
+targets on a touch viewport, and byte-identical at 28px and 32px under a fine
+pointer. The radio and checkbox inputs that measured 13px and 16px were left
+alone — each is wrapped in a `<label>` that makes the whole row the target, which
+is the pattern that already answers this.
+
 **A third bug came out of the console rather than the layout**, and it was one
 this file had claimed as done: the shell's nonce CSP was blocking next-themes'
 no-flash script, so the theme flashed on every authenticated navigation. That is
