@@ -248,6 +248,15 @@ their own line — nobody outside the repo ever saw them.
 
 ### Changed
 
+- **Icon buttons are finger-sized on a touch screen.** The small icon controls —
+  edit, remove, the itinerary's drag handles, the header's theme and account
+  buttons — were 24 to 32 pixels, which is a fingertip's width or less. On a
+  touch device they are now 44, the size Apple and the accessibility guidelines
+  both settle on. They grow rather than gaining an invisible margin, because
+  several of them sit in pairs a few pixels apart and invisible margins would
+  have overlapped each other — a tap landing on the wrong button of two is worse
+  than a tap that misses. Nothing changes when you are using a mouse.
+
 - **A published trip's photographs are ready before anybody looks.** They used
   to be converted for the web on the first visit to the public page — so the
   first person to open a link you shared waited while every photo in the gallery

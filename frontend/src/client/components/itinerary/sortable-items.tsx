@@ -29,6 +29,27 @@ import { dayLabel } from '@/shared/itinerary'
 import { EMPTY_FORM_STATE } from '@/shared/validation/form-state'
 
 /**
+ * The drag handle, styled once for the two places that render one.
+ *
+ * These were the smallest controls in the app at 24px — a `size-4` grip inside
+ * `p-1` — and the smallest is the worst possible place for it, because this is
+ * the only control here that is *dragged* rather than tapped. A tap forgives a
+ * few pixels of error; a drag that starts off-target does not start at all, and
+ * on a touch screen the finger hides the thing it is missing.
+ *
+ * 44px on a coarse pointer, the same figure `ui/button.tsx` uses for its icon
+ * sizes and for the same reasons, which are written out there. `inline-flex` and
+ * the centring are what let the box grow around the grip rather than the padding
+ * having to be retuned for two different sizes.
+ *
+ * These are plain `<button>`s rather than the `Button` component because dnd-kit
+ * spreads its own listeners and attributes onto them, so they do not go through
+ * that file's variants and need saying here.
+ */
+const DRAG_HANDLE_CLASS =
+  'inline-flex cursor-grab touch-none items-center justify-center rounded p-1 text-muted-foreground hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none active:cursor-grabbing pointer-coarse:size-11'
+
+/**
  * Dragging an entry to a different time or a different day, and dragging an
  * undated day into a different position — screen 21.
  *
@@ -374,7 +395,7 @@ function SortableDay({
         <button
           type="button"
           aria-label={`Reorder ${label}`}
-          className="cursor-grab touch-none rounded p-1 text-muted-foreground hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none active:cursor-grabbing"
+          className={DRAG_HANDLE_CLASS}
           {...attributes}
           {...listeners}
         >
@@ -415,7 +436,7 @@ export function SortableItem({
         <button
           type="button"
           aria-label={`Reorder ${label}`}
-          className="mt-0.5 cursor-grab touch-none rounded p-1 text-muted-foreground hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none active:cursor-grabbing"
+          className={`mt-0.5 ${DRAG_HANDLE_CLASS}`}
           {...attributes}
           {...listeners}
         >
