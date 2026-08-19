@@ -143,7 +143,15 @@ export function ItineraryBoard({ itinerary }: { itinerary: ItineraryData }) {
         // below the days on a phone, where a map above the list would push the
         // thing you came to read off the screen.
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
-          <div>
+          {/* `min-w-0` is load-bearing on a phone, and its absence was a real
+              bug: a grid item defaults to `min-width: auto`, which refuses to
+              shrink below the content's minimum, so the single column on a
+              narrow screen sized itself to the day cards rather than to the
+              screen. The cards ran 24px past the right edge and were clipped —
+              the price of an entry, and the buttons beside it, cut off. The
+              `lg` column already says `minmax(0,1fr)` for exactly this reason;
+              this is the same instruction for the one-column case. */}
+          <div className="min-w-0">
             <SortableDays days={itinerary.days} tripId={itinerary.tripId}>
               {(day, items, dragHandle) => {
                 const index = itinerary.days.findIndex((d) => d.id === day.id)

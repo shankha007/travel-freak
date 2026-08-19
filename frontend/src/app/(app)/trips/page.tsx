@@ -148,7 +148,18 @@ export default async function TripsPage() {
       <InvitationsCard invitations={invitations} />
 
       <Tabs defaultValue="all">
-        <TabsList>
+        {/* Five tabs with their counts need about 415px, and a phone is 375.
+            Without this the list simply ran off the screen and **Drafts was
+            unreachable** — not squeezed, gone: nothing scrolled, because the
+            shell clips at the viewport, so the last tab was painted outside it.
+            Scrolling the strip is the fix rather than wrapping it, because the
+            trigger's height is `calc(100% - 1px)` of the list and a second row
+            would make every tab the height of both.
+
+            The scrollbar is hidden because it would sit inside a 32px pill and
+            eat half of it; the tab clipped at the edge is the affordance, which
+            is how every native tab strip says the same thing. */}
+        <TabsList className="max-w-full [scrollbar-width:none] overflow-x-auto [&::-webkit-scrollbar]:hidden">
           {tabs.map((t) => (
             <TabsTrigger key={t.value} value={t.value}>
               {t.label}

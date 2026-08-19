@@ -7,31 +7,50 @@ import { publicEnv } from '@/shared/env'
  * changed, and because it is worth unit-testing: a directive lost in an edit is
  * invisible until a browser quietly refuses to draw a map.
  *
- * ## Two policies, and why
+ * ## One policy, and why the nonce was taken back out
  *
- * A nonce is the only way to allow Next's own inline bootstrap script without
- * allowing every inline script, and a nonce **has to be generated per request** —
- * which means the page carrying it cannot be prerendered. That is free on the
- * authenticated shell, where every route is already `force-dynamic` because it
- * reads the signed-in user, and expensive everywhere else: the landing page,
- * pricing, the legal pages, the changelog and the three public readers are
- * static or ISR, and the plan asks for Lighthouse ≥ 90 on them.
+ * This file briefly served two: a nonce with `'strict-dynamic'` for the
+ * authenticated shell, and `'unsafe-inline'` for the prerendered public pages.
+ * It was reverted because it broke something visible, and every way of fixing
+ * that cost more than the nonce was worth.
  *
- * So the shell gets the strict policy and the public pages get the one that
- * tolerates inline scripts. Both refuse a script from another origin, which is
- * the directive an injected `<script src>` actually runs into — `'unsafe-inline'`
- * is a weaker answer to inline injection, not to remote loading. `object-src`,
- * `base-uri`, `form-action` and `frame-ancestors` are identical in both.
+ * The casualty was **next-themes' no-flash script** — the inline script that
+ * sets the theme class on `<html>` before the first paint. It is not one of
+ * Next's own scripts, so Next does not nonce it, and the strict policy blocked
+ * it outright: a flash of the wrong theme on every page behind the login, which
+ * is exactly what `suppressHydrationWarning` in the root layout exists to
+ * prevent. Two fixes were tried and measured:
+ *
+ *  - **`<ThemeProvider nonce>`** needs `headers()` in the root layout, and a
+ *    dynamic API there opts *every* page into dynamic rendering. Measured in the
+ *    build output rather than assumed: the landing page, `/about`, `/login` and
+ *    the legal pages all went from `○` to `ƒ`. That is the prerendering the
+ *    split existed to protect, so the fix defeated its own purpose.
+ *  - **Allowing the script by `sha256-` hash** fails for a subtler reason: its
+ *    text is not stable across builds. The same script hashes three different
+ *    ways — unminified from `next dev`, again from a test renderer, and again
+ *    from the production bundle, where the minifier renames its parameters from
+ *    `(e, i, s, u, m, a, l, h)` to `(a,b,c,d,e,f,g,h)`. A hash pinned in source
+ *    cannot be checked by anything short of the production bundler, and would be
+ *    right in development while flashing in production.
+ *
+ * So: one policy, everywhere. `'unsafe-inline'` is a real concession on inline
+ * injection and is stated plainly rather than dressed up. What it does **not**
+ * concede is the rest — a script from another origin is still refused, which is
+ * the directive a remote injection actually runs into, and `object-src`,
+ * `base-uri`, `form-action` and `frame-ancestors` are unchanged. Stored post
+ * markup is sanitised on read (`shared/content/sanitize.ts`), which remains the
+ * primary control against injected script here.
  *
  * ## Directives that look wrong and are not
  *
  * - `worker-src blob:` — MapLibre compiles its own worker and instantiates it
  *   from a blob URL. Without this every 2D map fails to initialise, and the
  *   console message names the worker rather than the policy.
- * - `style-src 'unsafe-inline'` in **both** — unavoidable while any component
- *   sets a `style` attribute, which MapLibre, three.js and every progress bar
- *   here do. A nonce does not cover attributes; only `style-src-attr` would, and
- *   dropping it would mean rewriting third-party libraries.
+ * - `style-src 'unsafe-inline'` — unavoidable while any component sets a `style`
+ *   attribute, which MapLibre, three.js and every progress bar here do. Only
+ *   `style-src-attr` could narrow it, and dropping it would mean rewriting
+ *   third-party libraries.
  * - `img-src` carries the Supabase host because photographs are served from
  *   Storage over signed URLs, and `data:`/`blob:` because an upload is previewed
  *   before it leaves the browser.
@@ -79,18 +98,16 @@ function connectSources(): string[] {
 }
 
 export interface CspOptions {
-  /**
-   * Per-request nonce. Present for the authenticated shell, absent for the
-   * public pages — see the note above.
-   */
-  nonce?: string
   /** `'unsafe-eval'` is required by React's dev overlay and by nothing in production. */
   dev?: boolean
 }
 
 /** Builds the policy string. Pure apart from env, so it can be asserted on. */
-export function buildCsp({ nonce, dev = false }: CspOptions = {}): string {
-  const scriptSrc = nonce ? [`'nonce-${nonce}'`, "'strict-dynamic'"] : ["'self'", "'unsafe-inline'"]
+export function buildCsp({ dev = false }: CspOptions = {}): string {
+  // `'self'` and `'unsafe-inline'` together: the first is what refuses a script
+  // from another origin, and the second is the concession the note at the top of
+  // this file sets out in full.
+  const scriptSrc = ["'self'", "'unsafe-inline'"]
   if (dev) scriptSrc.push("'unsafe-eval'")
 
   const directives: Array<[string, string[]]> = [
@@ -117,11 +134,4 @@ export function buildCsp({ nonce, dev = false }: CspOptions = {}): string {
   if (!dev) policy.push('upgrade-insecure-requests')
 
   return policy.join('; ')
-}
-
-/** Fresh, unpredictable, and per request — a reused nonce is no nonce. */
-export function createNonce(): string {
-  const bytes = new Uint8Array(16)
-  crypto.getRandomValues(bytes)
-  return btoa(String.fromCharCode(...bytes))
 }
