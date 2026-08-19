@@ -17,6 +17,19 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      /**
+       * `server-only` is a build-time guard, not a runtime one. Its package
+       * resolves to a module that throws unless the `react-server` condition is
+       * set, which Next sets and a test runner does not — so importing any file
+       * marked with it fails before a single assertion runs.
+       *
+       * Pointed at the package's own empty module rather than a stub of ours, so
+       * this stays a resolution detail rather than a fake. Without it the rule is
+       * effectively "a server module may be marked server-only or be tested, not
+       * both", and the modules most worth testing are the ones that talk to
+       * something.
+       */
+      'server-only': fileURLToPath(new URL('./node_modules/server-only/empty.js', import.meta.url)),
     },
   },
 })
