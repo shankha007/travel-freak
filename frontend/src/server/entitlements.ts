@@ -3,6 +3,16 @@ import 'server-only'
 import { cache } from 'react'
 import { createClient } from '@/server/supabase/server'
 import { requireUser } from '@/server/auth'
+import {
+  bytesRemaining,
+  decideChecklistQuota,
+  decideCollaboratorQuota,
+  decidePhotoQuota,
+  decideStorageQuota,
+  decideTripQuota,
+  type MediaQuotaDecision,
+  type QuotaDecision,
+} from '@/shared/entitlement-rules'
 
 /**
  * Plan limits and quota checks — the single source of truth for entitlement.
@@ -14,8 +24,14 @@ import { requireUser } from '@/server/auth'
  *   null → unlimited
  *   0    → not available on this plan
  *
- * Every create and upload path must call the relevant `assert*` here **before**
+ * Every create and upload path must call the relevant `check*` here **before**
  * doing any work. Client-side checks exist for UX only; this is the enforcement.
+ *
+ * Each function below is the same two steps: count what exists, then decide. The
+ * counting is here because it needs a database; the deciding is in
+ * `shared/entitlement-rules.ts` because it needed a test — the plan asks for
+ * boundary coverage over every plan × resource, and that could not be written
+ * while the arithmetic only existed inside a function that opens a connection.
  */
 
 export interface PlanLimits {
@@ -78,14 +94,15 @@ export const getEntitlements = cache(async (): Promise<Entitlements> => {
   }
 })
 
-export interface QuotaCheck {
-  allowed: boolean
-  /** Current usage against the limit, for the meter and the upgrade copy. */
-  used: number
-  limit: number | null
-  /** User-facing explanation when `allowed` is false. */
-  reason?: string
-}
+/**
+ * The answer a quota gate gives.
+ *
+ * An alias rather than a second declaration: the shape is decided in
+ * `shared/entitlement-rules.ts`, which is where the decision is made, and two
+ * copies of it would be free to drift. Re-exported here because this file is the
+ * only one features import from.
+ */
+export type QuotaCheck = QuotaDecision
 
 /**
  * Whether the user may create another trip.
@@ -111,19 +128,7 @@ export async function checkTripQuota(): Promise<QuotaCheck> {
     .eq('user_id', user.id)
     .is('deleted_at', null)
 
-  const used = count ?? 0
-
-  if (limit === null) return { allowed: true, used, limit }
-
-  return {
-    allowed: used < limit,
-    used,
-    limit,
-    reason:
-      used < limit
-        ? undefined
-        : `${planName} includes ${limit} trips and you have ${used}. Upgrade to add more — nothing you have recorded is affected.`,
-  }
+  return decideTripQuota({ limit, used: count ?? 0, planName })
 }
 
 export interface MediaQuota {
@@ -170,11 +175,11 @@ export async function getMediaQuota(tripId: string): Promise<MediaQuota> {
     photosLimit: limits.photos_per_trip ?? null,
     storageUsed,
     storageLimit,
-    bytesRemaining: storageLimit === null ? null : Math.max(0, storageLimit - storageUsed),
+    bytesRemaining: bytesRemaining(storageLimit, storageUsed),
   }
 }
 
-export interface MediaQuotaCheck extends QuotaCheck {
+export interface MediaQuotaCheck extends MediaQuotaDecision {
   quota: MediaQuota
 }
 
@@ -190,27 +195,7 @@ export async function checkPhotoQuota(tripId: string, bytes: number): Promise<Me
   const { planName } = await getEntitlements()
   const quota = await getMediaQuota(tripId)
 
-  if (quota.photosLimit !== null && quota.photosUsed >= quota.photosLimit) {
-    return {
-      allowed: false,
-      used: quota.photosUsed,
-      limit: quota.photosLimit,
-      quota,
-      reason: `${planName} includes ${quota.photosLimit} photos per trip and this trip has ${quota.photosUsed}. Upgrade to add more — nothing you have uploaded is affected.`,
-    }
-  }
-
-  if (quota.bytesRemaining !== null && bytes > quota.bytesRemaining) {
-    return {
-      allowed: false,
-      used: quota.storageUsed,
-      limit: quota.storageLimit,
-      quota,
-      reason: `That photo does not fit in what is left of your ${planName} storage. Free some space or upgrade — nothing is deleted either way.`,
-    }
-  }
-
-  return { allowed: true, used: quota.photosUsed, limit: quota.photosLimit, quota }
+  return { ...decidePhotoQuota({ ...quota, bytes, planName }), quota }
 }
 
 /**
@@ -234,7 +219,6 @@ export async function checkStorageQuota(bytes: number): Promise<MediaQuotaCheck>
 
   const storageUsed = (data ?? []).reduce((sum, m) => sum + (m.bytes ?? 0), 0)
   const storageLimit = limits.storage_bytes ?? null
-  const bytesRemaining = storageLimit === null ? null : Math.max(0, storageLimit - storageUsed)
 
   const quota: MediaQuota = {
     // No trip, so no per-trip count to report. Null limit reads as "not
@@ -243,20 +227,10 @@ export async function checkStorageQuota(bytes: number): Promise<MediaQuotaCheck>
     photosLimit: null,
     storageUsed,
     storageLimit,
-    bytesRemaining,
+    bytesRemaining: bytesRemaining(storageLimit, storageUsed),
   }
 
-  if (bytesRemaining !== null && bytes > bytesRemaining) {
-    return {
-      allowed: false,
-      used: storageUsed,
-      limit: storageLimit,
-      quota,
-      reason: `That image does not fit in what is left of your ${planName} storage. Free some space or upgrade — nothing is deleted either way.`,
-    }
-  }
-
-  return { allowed: true, used: storageUsed, limit: storageLimit, quota }
+  return { ...decideStorageQuota({ storageUsed, storageLimit, bytes, planName }), quota }
 }
 
 /** Convenience for read paths that only need the boolean. */
@@ -337,30 +311,7 @@ export async function checkCollaboratorQuota(tripId: string): Promise<QuotaCheck
     .eq('trip_id', tripId)
     .is('declined_at', null)
 
-  const used = count ?? 0
-
-  if (limit === null) return { allowed: true, used, limit }
-
-  if (limit === 0) {
-    return {
-      allowed: false,
-      used,
-      limit,
-      reason: `Planning together comes with the paid plans. On ${planName} a trip is yours alone — everything you have recorded stays exactly as it is.`,
-    }
-  }
-
-  return {
-    allowed: used < limit,
-    used,
-    limit,
-    reason:
-      used < limit
-        ? undefined
-        : `${planName} includes ${limit} ${
-            limit === 1 ? 'collaborator' : 'collaborators'
-          } per trip and this trip has ${used}. Upgrade to add more — nobody already on it is affected.`,
-  }
+  return decideCollaboratorQuota({ limit, used: count ?? 0, planName })
 }
 
 /**
@@ -387,19 +338,7 @@ export async function checkChecklistQuota(tripId: string): Promise<QuotaCheck> {
     .eq('user_id', user.id)
     .eq('trip_id', tripId)
 
-  const used = count ?? 0
-
-  if (limit === null) return { allowed: true, used, limit }
-
-  return {
-    allowed: used < limit,
-    used,
-    limit,
-    reason:
-      used < limit
-        ? undefined
-        : `${planName} includes ${limit} lists per trip and this trip has ${used}. Upgrade for as many as you like — nothing you have written is affected.`,
-  }
+  return decideChecklistQuota({ limit, used: count ?? 0, planName })
 }
 
 export interface AccountUsage {

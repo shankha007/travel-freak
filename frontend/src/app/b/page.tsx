@@ -26,7 +26,13 @@ export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
   title: 'Travel blogs',
   description: `Trip writing published on ${BRAND.name} — routes, places and what the photographs left out.`,
-  alternates: { canonical: `${SITE_URL}/b` },
+  alternates: {
+    canonical: `${SITE_URL}/b`,
+    // The `<link rel="alternate">` a reader's browser extension looks for. A feed
+    // nothing advertises is a feed only somebody who guessed the URL can subscribe
+    // to.
+    types: { 'application/rss+xml': `${SITE_URL}/b/feed.xml` },
+  },
   openGraph: {
     type: 'website',
     title: pageTitle('Travel blogs'),

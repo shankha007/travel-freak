@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/server/supabase/server'
+import { checkRateLimitByIp, rateLimitMessage } from '@/server/rate-limit'
 import { contactSchema } from '@/shared/validation/contact'
 
 /**
@@ -48,6 +49,18 @@ export async function sendContactMessage(
   formData: FormData
 ): Promise<ContactState> {
   const values = submissionOf(formData)
+
+  /**
+   * Per IP, in front of the per-address limit `submit_contact_message()` holds.
+   * Both are needed and neither is redundant: the function's limit is five an
+   * hour for one address, which a sender who varies the address walks straight
+   * past, and this one does not know the address at all.
+   *
+   * Before the honeypot, so a bot filling every field is counted rather than
+   * given a free acknowledgement each time.
+   */
+  const limit = await checkRateLimitByIp('contact')
+  if (!limit.allowed) return { error: rateLimitMessage(limit), values }
 
   // Honeypot. A field hidden from people and left empty by them; a bot that
   // fills every input fills this one too. Answering "sent" rather than "no"

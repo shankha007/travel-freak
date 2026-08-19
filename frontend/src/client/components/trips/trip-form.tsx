@@ -611,7 +611,7 @@ export function TripForm({
                     size="sm"
                     variant="outline"
                     nativeButton={false}
-                    render={<Link href="/pricing" />}
+                    render={<Link href="/upgrade" />}
                   >
                     See plans
                   </Button>

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createClient } from '@/server/supabase/server'
 import { getSessionUser } from '@/server/auth'
 import { checkPhotoQuota, checkStorageQuota } from '@/server/entitlements'
+import { checkRateLimit, rateLimitMessage } from '@/server/rate-limit'
 import { MAX_UPLOAD_BYTES, isAllowedImageMime, postImagePath, storagePath } from '@/shared/media'
 
 /**
@@ -44,6 +45,24 @@ export async function POST(request: Request) {
   const user = await getSessionUser()
   if (!user) {
     return NextResponse.json({ error: 'Sign in to upload.' }, { status: 401 })
+  }
+
+  /**
+   * Keyed on the account rather than the IP, which is the right key for the only
+   * abuse this endpoint has: signing is authenticated, so there is no anonymous
+   * flood to stop, and four people uploading from one office should not share a
+   * budget. The limit is generous enough for a large drag-and-drop batch — the
+   * quota below is what decides how much may be stored, and this only decides
+   * how fast it may be asked for.
+   *
+   * Before the body is read, because parsing a payload is work too.
+   */
+  const limit = await checkRateLimit('uploadSign', user.id)
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: rateLimitMessage(limit) },
+      { status: 429, headers: { 'Retry-After': String(limit.retryAfterSeconds) } }
+    )
   }
 
   let body: unknown

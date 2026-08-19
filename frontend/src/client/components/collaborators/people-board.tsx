@@ -331,7 +331,7 @@ function InviteForm({ tripId, quota }: { tripId: string; quota: TripPeople['quot
               <Lock className="mt-0.5 size-4 shrink-0" aria-hidden />
               <span>
                 {quota.reason}{' '}
-                <Link href="/pricing" className="underline underline-offset-2">
+                <Link href="/upgrade" className="underline underline-offset-2">
                   See the plans
                 </Link>
                 .

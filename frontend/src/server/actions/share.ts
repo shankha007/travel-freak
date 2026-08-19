@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/server/supabase/server'
 import { requireUser } from '@/server/auth'
+import { captureFunnelEvent } from '@/server/funnel'
 
 /**
  * Share links for unlisted trips and posts.
@@ -77,6 +78,12 @@ export async function createShareLink(tripId: string): Promise<ShareLinkResult> 
   if (error) {
     return { ok: false, error: `Could not create a link: ${error.message}` }
   }
+
+  // Step five. Below the `existing` short-circuit above, deliberately: opening
+  // the share panel on a trip that already has a link is not a new share, and
+  // counting it would make the step look healthier every time somebody checked
+  // a URL they had already sent.
+  captureFunnelEvent(user.id, 'share_created', { share_kind: 'trip', share_method: 'link' })
 
   revalidatePath(`/trips/${tripId}`)
   return { ok: true, token: data.token }
@@ -159,6 +166,9 @@ export async function createPostShareLink(postId: string): Promise<ShareLinkResu
   if (error) {
     return { ok: false, error: `Could not create a link: ${error.message}` }
   }
+
+  // Same step, same reason for sitting below the short-circuit.
+  captureFunnelEvent(user.id, 'share_created', { share_kind: 'post', share_method: 'link' })
 
   revalidatePath(`/blogs/${postId}/edit`)
   return { ok: true, token: data.token }

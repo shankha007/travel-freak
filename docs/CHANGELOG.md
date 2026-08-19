@@ -51,6 +51,27 @@ their own line — nobody outside the repo ever saw them.
 
 ### Added
 
+- **Sign in with Google.** "Continue with Google" now sits above the email and
+  password fields on both the sign-in and create-account screens. It is one act
+  rather than two — a Google account that has not been here before becomes an
+  account on the way through. Where you were headed is preserved, so a link that
+  bounced you to the sign-in page still lands where you meant to go. Cancelling
+  on Google's screen brings you back with a note and the password form ready.
+- **A feed for every public profile.** `/u/<name>/feed.xml` publishes that
+  person's public posts as RSS, and `/b/feed.xml` does the same for the whole
+  public index. Both are advertised in the page's own markup, so a reader
+  extension finds them without anybody typing a URL. A private profile has no
+  feed and says so the same way it says everything else: it is not there.
+- **A `robots.txt`.** Search engines are pointed at the sitemap and away from the
+  screens behind the login, from the API, and from the single-use links in
+  confirmation emails — a crawler that fetched one of those spent it before the
+  person it was sent to could.
+- **The world map when the globe cannot be drawn.** A browser without WebGL used
+  to get a loading shape that never resolved. It now gets a flat map of the same
+  countries in the same four colours, clickable, with every country named and its
+  state spelled out in words. It is also what appears if the globe fails to
+  load, and such a browser never downloads the 3D library at all.
+
 - **Choose a trip's cover picture.** The wizard has a Cover step now, between
   Places and Visibility, where it was always meant to be. Pick any photograph
   from the trip and it becomes the image at the top of the page and the one a
@@ -145,6 +166,23 @@ their own line — nobody outside the repo ever saw them.
   as "Someone".
 
 ### Security
+
+- **Rate limits on signing in, signing up, uploading and password emails.**
+  Repeatedly guessing a password, creating accounts in bulk, or making the site
+  send mail to an address over and over are all now stopped after a handful of
+  attempts, with a message saying how long to wait. The thresholds leave room for
+  an honest mistake — mistyping a password four times will never meet one.
+- **A content security policy, and the headers that go with it.** Every page now
+  states where scripts, styles, images and connections may come from, so a script
+  injected into a page has nowhere to load from and nothing to talk to. The
+  screens behind the login get the stricter of two policies. Also sent: HSTS,
+  `nosniff`, a referrer policy that never leaks the page you came from, and a
+  permissions policy that turns off the camera, the microphone and location —
+  none of which this product asks for.
+- **Guessing a share link is now rate limited.** Wrong tokens are counted and
+  correct ones are not, so a link you sent to forty colleagues costs nothing while
+  forty misses from one address is stopped. A refused attempt gets the same page a
+  wrong token always did, so the limit itself gives nothing away.
 
 - **An image in an unpublished post was readable by anyone with its address.**
   Pictures uploaded into a blog post were stored in public storage from the
@@ -258,6 +296,16 @@ their own line — nobody outside the repo ever saw them.
 
 ### Fixed
 
+- **Public profiles were invisible to everyone who was not signed in.** A
+  signed-out visitor opening `/u/<name>` got the "no such profile" page for a
+  profile that exists and is public; the sitemap listed no profiles at all; the
+  author's name vanished from the public blog index; and a shared profile link
+  previewed as the generic site card. One permission rule added alongside
+  collaborators was being applied to signed-out readers too, and it failed for
+  them in a way that took the whole read down with it — so every one of those
+  surfaces, which are all written to treat a missing profile as a private one,
+  showed exactly what a private profile looks like.
+
 - **A screen that fails no longer takes the app with it.** If something goes
   wrong loading a page you now get a short explanation, a Try again button and a
   way back — with your header and sidebar still there, so you can simply go
@@ -288,6 +336,18 @@ their own line — nobody outside the repo ever saw them.
   to be read, since it is what a new account sees first.
 
 ### Infrastructure
+
+- **Errors and the signup funnel are instrumented.** Sentry reports server and
+  browser errors, and the six steps from signing up to sharing are recorded so it
+  is possible to see where people stop. Both are off unless configured, so a
+  local checkout behaves exactly as before. Nothing but an account id is sent —
+  no email, no name, no IP address — and what a person types is never recorded.
+- **Plan limits are tested at the boundary.** The rules deciding whether a trip,
+  a photo, a checklist or a collaborator may be added are now separate from the
+  queries that count them, and covered for every plan at the point they change:
+  the fifteenth trip allowed and the sixteenth refused, the fifth photo and the
+  sixth. Including what happens after a downgrade — everything stays, nothing is
+  deleted, and the next one is refused.
 
 - **Reordering days is covered by the database tests.** Dragging entries had
   pgTAP coverage from the day it shipped and dragging whole days did not, which

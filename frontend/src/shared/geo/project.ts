@@ -106,8 +106,15 @@ export function splitByVisited(
   return { base, highlighted }
 }
 
-/** Pulls the rings out of a GeoJSON geometry, flattening MultiPolygon. */
-export function ringsOf(geometry: { type: string; coordinates: unknown }): Position[][] {
+/**
+ * Pulls the rings out of a GeoJSON geometry, flattening MultiPolygon.
+ *
+ * `coordinates` is optional in the parameter type because `GeoJSON.Geometry` is a
+ * union that includes `GeometryCollection`, which has none — so a caller holding
+ * a general geometry could not pass it otherwise. Such a geometry falls through
+ * to the empty return below, which is the same answer a point or a line gets.
+ */
+export function ringsOf(geometry: { type: string; coordinates?: unknown }): Position[][] {
   if (geometry.type === 'Polygon') {
     return geometry.coordinates as Position[][]
   }
