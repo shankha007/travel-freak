@@ -5,6 +5,7 @@ import { after } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/server/supabase/server'
 import { requireUser } from '@/server/auth'
+import { captureFunnelEvent } from '@/server/funnel'
 import { checkTripQuota } from '@/server/entitlements'
 import { buildTripDerivatives } from '@/server/media/derivative-jobs'
 import { slugify, updateTripSchema } from '@/shared/validation/trip'
@@ -172,6 +173,13 @@ export async function createTrip(
     return { error: `Could not save the places: ${placesError.message}` }
   }
 
+  // Step three. `quota.used` is the count taken *before* this insert, so zero
+  // means this is the account's first trip — the funnel step is "first trip",
+  // and this is the one place in the request where that is knowable without a
+  // second query. On an unlimited plan the count is still taken, so the property
+  // is as true for a paying account as for a free one.
+  captureFunnelEvent(user.id, 'trip_created', { is_first: quota.used === 0 })
+
   // Inserting places fires refresh_visited_regions, so the globe and dashboard
   // are already stale by the time we get here.
   revalidatePath('/trips')
@@ -199,7 +207,7 @@ export async function updateTrip(
   _prev: CreateTripState,
   formData: FormData
 ): Promise<CreateTripState> {
-  await requireUser()
+  const user = await requireUser()
 
   const tripId = formData.get('tripId')
   if (typeof tripId !== 'string' || !UUID_RE.test(tripId)) {
@@ -214,7 +222,10 @@ export async function updateTrip(
 
   const { data: existing } = await supabase
     .from('trips')
-    .select('id, published_at')
+    // `visibility` is read as well as written: the funnel step below is a trip
+    // *becoming* shareable, which is a transition and not a state, and this is
+    // the only place the previous value is still available.
+    .select('id, published_at, visibility')
     .eq('id', tripId)
     .is('deleted_at', null)
     .maybeSingle()
@@ -275,6 +286,20 @@ export async function updateTrip(
         // a derivative, and the public page's own lazy path is behind that.
         console.error(`derivatives: ${tripId} finished with errors`, result)
       }
+    })
+  }
+
+  // Step five, by the other route. Publishing a trip is sharing it just as much
+  // as handing out a link is, and an account that has never made a link but has
+  // three public trips has plainly passed this step.
+  //
+  // Only on the edge, unlike the derivative job above: that one is idempotent
+  // and cheap to repeat, while an event fired on every save of an
+  // already-public trip would count editing a typo as a share.
+  if (values.visibility !== 'private' && existing.visibility === 'private') {
+    captureFunnelEvent(user.id, 'share_created', {
+      share_kind: 'trip',
+      share_method: 'published',
     })
   }
 

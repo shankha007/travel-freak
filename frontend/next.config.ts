@@ -1,4 +1,5 @@
 import { loadEnvConfig } from '@next/env'
+import { withSentryConfig } from '@sentry/nextjs'
 import type { NextConfig } from 'next'
 
 /**
@@ -27,7 +28,40 @@ const supabase = supabaseUrl ? new URL(supabaseUrl) : null
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '[::1]', '::1']
 const usingLocalSupabase = supabase !== null && LOCAL_HOSTS.includes(supabase.hostname)
 
+/**
+ * Response headers that are the same on every request and are not the CSP.
+ *
+ * Here rather than in the proxy for one reason: the proxy's matcher deliberately
+ * skips `_next/static`, `/geo` and image files, and `nosniff` on a served asset
+ * is worth as much as it is on a document. The CSP genuinely belongs in the
+ * proxy, because which policy applies depends on a per-request nonce —
+ * `src/shared/security.ts` explains that half.
+ */
+const SECURITY_HEADERS = [
+  // Two years, subdomains included. This app is served over https only, so
+  // there is no window in which the pin locks anyone out of a working site.
+  { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' },
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  // `frame-ancestors 'none'` says the same to a browser that implements CSP;
+  // this is for the ones that do not.
+  { key: 'X-Frame-Options', value: 'DENY' },
+  // Enough for a referrer to name this site, never the path a visitor came from.
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  // Nothing here asks for a camera, a microphone or a payment sheet. Geolocation
+  // is deliberately in the list: a place is chosen from a picker and a photo's
+  // coordinates come from its EXIF, so the browser is never asked where the
+  // visitor is standing.
+  {
+    key: 'Permissions-Policy',
+    value: 'accelerometer=(), camera=(), geolocation=(), microphone=(), payment=(), usb=()',
+  },
+  { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+]
+
 const nextConfig: NextConfig = {
+  async headers() {
+    return [{ source: '/:path*', headers: SECURITY_HEADERS }]
+  },
   /**
    * Every screen behind the login is `force-dynamic`, and the client cache does
    * not retain a dynamic segment at all by default. That makes returning to a
@@ -63,4 +97,42 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default nextConfig
+/**
+ * Sentry's build-time half: source-map upload, so a production stack trace names
+ * a real line in a real file rather than `chunk-4f2a.js:1:88412`.
+ *
+ * **Applied only when it is configured**, and that condition is doing real work.
+ * `withSentryConfig` rewrites the webpack config, injects its own client
+ * instrumentation and — without a token — prints a warning on every build. CI has
+ * no token and no DSN, so wrapping unconditionally would mean every pull request
+ * building differently from every other environment, for no benefit. Unwrapped,
+ * the config below is exactly what it was before Sentry existed.
+ *
+ * The auth token is a build secret and never `NEXT_PUBLIC_`: it can write to the
+ * Sentry project, and the browser has no use for it.
+ */
+const sentryConfigured = Boolean(
+  process.env.NEXT_PUBLIC_SENTRY_DSN &&
+    process.env.SENTRY_AUTH_TOKEN &&
+    process.env.SENTRY_ORG &&
+    process.env.SENTRY_PROJECT
+)
+
+export default sentryConfigured
+  ? withSentryConfig(nextConfig, {
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      // The build log is for build problems. An upload that succeeded is not one.
+      silent: true,
+      // Uploaded, then deleted from the deployed output: a source map served next
+      // to its bundle hands anyone the original source, and the point of
+      // uploading it is that Sentry has it and nobody else needs to.
+      widenClientFileUpload: true,
+      sourcemaps: { deleteSourcemapsAfterUpload: true },
+      // Proxies the SDK's requests through this origin, so an ad blocker that
+      // recognises Sentry's domain cannot silently stop error reports arriving.
+      tunnelRoute: '/monitoring',
+      disableLogger: true,
+    })
+  : nextConfig

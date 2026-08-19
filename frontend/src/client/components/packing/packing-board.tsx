@@ -86,7 +86,7 @@ export function PackingBoard({ packing }: { packing: PackingData }) {
           <Lock className="mt-0.5 size-4 shrink-0" aria-hidden />
           <span>
             {packing.quota.reason}{' '}
-            <Link href="/pricing" className="underline underline-offset-2">
+            <Link href="/upgrade" className="underline underline-offset-2">
               See the plans
             </Link>
             .
@@ -455,7 +455,7 @@ function TemplateSection({ packing, canAdd }: { packing: PackingData; canAdd: bo
 
       {!packing.templatesAllowed && (
         <p className="text-sm">
-          <Link href="/pricing" className="underline underline-offset-2">
+          <Link href="/upgrade" className="underline underline-offset-2">
             See what the paid plans add
           </Link>
         </p>

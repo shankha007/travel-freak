@@ -9,6 +9,7 @@ import { rollUpToCountries } from '@/shared/types/globe'
 import { TOTAL_COUNTRIES } from '@/shared/geo/countries'
 import { NO_REGION_FILTER, filterRegions, type RegionFilter } from '@/shared/geo/region-filter'
 import { useLazyComponent } from '@/client/hooks/use-lazy-component'
+import { useWebglSupport } from '@/client/hooks/use-webgl-support'
 import { RegionFilterNote, RegionFilters } from './region-filters'
 import { RegionLegend } from './region-legend'
 import { RegionList } from './region-list'
@@ -38,9 +39,21 @@ export function GlobeExplorer({
   const router = useRouter()
   const searchParams = useSearchParams()
   const selected = searchParams.get('region')
-  const { Component: GlobeView, failed } = useLazyComponent(
-    async () => (await import('./globe-view')).GlobeView
-  )
+
+  /**
+   * Which of the two renderers this browser gets. `null` until the effect behind
+   * `useWebglSupport` has run, which is why the placeholder below covers three
+   * cases rather than two — drawing the flat map for a frame and then replacing it
+   * with a globe would be worse than a moment of nothing.
+   *
+   * The choice is made by *mounting* one of two components rather than by
+   * selecting between two loaded modules, and that is the point: `useLazyComponent`
+   * imports on mount, so a component that is never mounted is a chunk that is
+   * never fetched. A browser without WebGL does not download three.js at all —
+   * the fallback is not only a different picture, it is half a megabyte the device
+   * that could least afford it never pays for.
+   */
+  const webgl = useWebglSupport()
 
   const [detail, setDetail] = useState<{
     forCountry: string
@@ -118,18 +131,12 @@ export function GlobeExplorer({
       <div className="relative flex min-h-[420px] flex-1 items-center justify-center overflow-hidden rounded-xl border bg-gradient-to-b from-sky-50 to-slate-100 lg:min-h-0 dark:from-slate-900 dark:to-slate-950">
         {/* Positioned rather than sized: `h-full` collapses to zero inside a
             centring flex parent, which leaves the WebGL canvas with no viewport. */}
-        {GlobeView ? (
-          <GlobeView
-            regions={displayRegions}
-            onSelectCountry={selectCountry}
-            className="absolute inset-0"
-          />
-        ) : failed ? (
-          <p className="max-w-xs px-6 text-center text-sm text-muted-foreground">
-            The globe could not load. Your places are still listed alongside.
-          </p>
-        ) : (
+        {webgl === null ? (
           <Skeleton className="absolute inset-0 rounded-xl" />
+        ) : webgl ? (
+          <LazyGlobe regions={displayRegions} onSelectCountry={selectCountry} />
+        ) : (
+          <LazyFlatMap regions={displayRegions} onSelectCountry={selectCountry} />
         )}
 
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-wrap items-end justify-between gap-3 bg-gradient-to-t from-black/25 to-transparent p-4">
@@ -189,5 +196,65 @@ export function GlobeExplorer({
         onClose={closeModal}
       />
     </div>
+  )
+}
+
+interface RendererProps {
+  regions: VisitedRegion[]
+  onSelectCountry: (countryCode: string) => void
+}
+
+/**
+ * The 3D globe, imported on mount — and **falling back to the flat map when the
+ * import fails**, which is a change from the sentence that used to be here.
+ *
+ * A chunk that will not load is not different, from the visitor's side, from a
+ * browser that cannot run it: in both cases there is no globe and there is a map
+ * to draw instead. The old copy ("The globe could not load. Your places are still
+ * listed alongside.") described the failure accurately and left the largest
+ * element on the screen empty, when the data behind it was already in hand.
+ */
+function LazyGlobe({ regions, onSelectCountry }: RendererProps) {
+  const { Component: GlobeView, failed } = useLazyComponent(
+    async () => (await import('./globe-view')).GlobeView
+  )
+
+  if (failed) return <LazyFlatMap regions={regions} onSelectCountry={onSelectCountry} />
+  if (!GlobeView) return <Skeleton className="absolute inset-0 rounded-xl" />
+
+  return (
+    <GlobeView regions={regions} onSelectCountry={onSelectCountry} className="absolute inset-0" />
+  )
+}
+
+/**
+ * The flat SVG world — §6's fallback.
+ *
+ * `inset-6` rather than `inset-0`: the globe fills its container because a sphere
+ * has no corners, and a rectangular map pressed against a rounded border looks
+ * like a mistake. This is the last renderer, so its own failure is the one case
+ * left with nothing to offer but a sentence — and the region list beside it still
+ * carries every country this would have coloured.
+ */
+function LazyFlatMap({ regions, onSelectCountry }: RendererProps) {
+  const { Component: StaticChoropleth, failed } = useLazyComponent(
+    async () => (await import('./static-choropleth')).StaticChoropleth
+  )
+
+  if (failed) {
+    return (
+      <p className="max-w-xs px-6 text-center text-sm text-muted-foreground">
+        The map could not load. Your places are still listed alongside.
+      </p>
+    )
+  }
+  if (!StaticChoropleth) return <Skeleton className="absolute inset-0 rounded-xl" />
+
+  return (
+    <StaticChoropleth
+      regions={regions}
+      onSelectCountry={onSelectCountry}
+      className="absolute inset-6"
+    />
   )
 }

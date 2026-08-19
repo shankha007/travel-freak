@@ -52,7 +52,7 @@ export default async function NewTripPage() {
               <h2 className="font-medium">You have used all your trips</h2>
               <p className="text-sm text-muted-foreground">{quota.reason}</p>
               <div className="flex gap-2">
-                <Button nativeButton={false} render={<Link href="/pricing" />}>
+                <Button nativeButton={false} render={<Link href="/upgrade" />}>
                   See plans
                 </Button>
                 <Button variant="outline" nativeButton={false} render={<Link href="/trips" />}>

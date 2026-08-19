@@ -436,7 +436,7 @@ function AdvancedLocked() {
             Everything above this line stays free, and so does your timeline and your resume.
           </p>
         </div>
-        <Button size="lg" nativeButton={false} render={<Link href="/pricing" />}>
+        <Button size="lg" nativeButton={false} render={<Link href="/upgrade" />}>
           See the plans
           <ArrowRight className="size-4" aria-hidden />
         </Button>

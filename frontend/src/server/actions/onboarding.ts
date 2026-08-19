@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/server/supabase/server'
 import { requireUser } from '@/server/auth'
+import { captureFunnelEvent } from '@/server/funnel'
 import {
   onboardingProfileSchema,
   visitedCountriesSchema,
@@ -138,6 +139,12 @@ export async function finishOnboarding(): Promise<void> {
     .eq('id', user.id)
     // Re-running the wizard later must not rewrite the original date.
     .is('onboarded_at', null)
+
+  // Step two. Unconditional, unlike the update above: the `is null` guard is
+  // there so a second run cannot rewrite the original date, and an account that
+  // walks back through the wizard has still completed onboarding once. PostHog
+  // funnels count the first occurrence per person, so a repeat costs nothing.
+  captureFunnelEvent(user.id, 'onboarding_completed')
 
   revalidatePath('/globe')
   revalidatePath('/dashboard')

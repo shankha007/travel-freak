@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { createAdminClient, createClient } from '@/server/supabase/server'
 import { requireUser } from '@/server/auth'
+import { captureFunnelEvent } from '@/server/funnel'
 import { checkPhotoQuota, checkStorageQuota } from '@/server/entitlements'
 import { toPublicDerivative } from '@/server/media/image-transform'
 import { displayKeysFor } from '@/server/media/display'
@@ -155,6 +156,20 @@ export async function confirmUpload(input: ConfirmUploadInput): Promise<ConfirmU
       await displayKeysFor([{ storagePath: path, mime: actualMime }])
     })
   }
+
+  // Step four, and recorded here rather than at the signing route: a signed URL
+  // is permission to upload, and counting those would count the ones that were
+  // abandoned, refused by the sniffer or rolled back above. This line is reached
+  // only once a `media` row exists.
+  //
+  // `quota.quota.photosUsed` is the count before this insert, so zero is the
+  // account's first photograph on this trip. It is per trip and not per account,
+  // which is the honest reading of what was measured — and it is also the number
+  // the funnel step means, since the step before it is a trip being created.
+  captureFunnelEvent(user.id, 'photo_uploaded', {
+    is_first: quota.quota.photosUsed === 0,
+    bytes: actualBytes,
+  })
 
   revalidatePath(`/trips/${tripId}/vault`)
   revalidatePath(`/trips/${tripId}`)

@@ -55,7 +55,7 @@ export function QuotaMeter({ usage, className }: { usage: AccountUsage; classNam
 
       {pressed && (
         <Link
-          href="/pricing"
+          href="/upgrade"
           className="block text-xs font-medium text-primary underline-offset-2 hover:underline"
         >
           Upgrade for more

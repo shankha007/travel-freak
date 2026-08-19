@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { createAdminClient, createClient } from '@/server/supabase/server'
+import { checkRateLimit, forgiveRateLimit, requestIp } from '@/server/rate-limit'
 import { sanitizePostHtml } from '@/shared/content/sanitize'
 import type { Database } from '@/shared/types/database'
 
@@ -80,14 +81,24 @@ export async function getBlogPost(slug: string): Promise<BlogPostView | null> {
  * The token is the authorisation. Once it resolves, the read is done with the
  * service role because RLS has no way to know about it — scoped, every time, to
  * the single id the token produced.
+ *
+ * Rate limited exactly as the trip's token is, and for the same reasons — see
+ * `getSharedTrip()` in `public-trip.ts`. A refusal returns null, so it is the
+ * same 404 a wrong token gets.
  */
 export async function getSharedBlogPost(token: string): Promise<BlogPostView | null> {
   if (!token || token.length > 128) return null
+
+  const ip = await requestIp()
+  const limit = await checkRateLimit('shareToken', ip)
+  if (!limit.allowed) return null
 
   const supabase = await createClient()
   const { data: postId } = await supabase.rpc('resolve_post_share_link', { p_token: token })
 
   if (!postId) return null
+
+  await forgiveRateLimit('shareToken', ip)
 
   const admin = createAdminClient()
   const { data: post } = await admin

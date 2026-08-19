@@ -41,7 +41,13 @@ export async function generateMetadata({ params }: PageProps<'/u/[username]'>): 
   return {
     title,
     description,
-    alternates: { canonical: `${SITE_URL}/u/${profile.username}` },
+    alternates: {
+      canonical: `${SITE_URL}/u/${profile.username}`,
+      // Advertised only on a profile that is actually public — the same condition
+      // the branch above uses to withhold the page. A private profile's feed
+      // route 404s anyway, so this is consistency rather than enforcement.
+      types: { 'application/rss+xml': `${SITE_URL}/u/${profile.username}/feed.xml` },
+    },
     openGraph: { type: 'profile', title, description },
   }
 }

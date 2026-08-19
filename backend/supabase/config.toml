@@ -368,6 +368,38 @@ skip_nonce_check = false
 # If enabled, it will allow the user to successfully authenticate when the provider does not return an email address.
 email_optional = false
 
+# Google — the second half of the plan's "Auth (email + Google)".
+#
+# Off by default and left that way in the repo, deliberately: turning it on needs
+# a client id and a secret from a Google Cloud project, and a checkout that ships
+# with `enabled = true` and no credentials fails at the redirect with a message
+# from Google rather than from us. The app already handles that — the button
+# reports that Google is unavailable and points at the password form — but a
+# working local stack out of the box is worth more than a button that is present
+# and broken.
+#
+# To turn it on locally: create an OAuth client (type "Web application") in
+# Google Cloud, add `http://127.0.0.1:54321/auth/v1/callback` as an authorised
+# redirect URI, put the id below, export the secret, and flip `enabled`.
+#
+# `skip_nonce_check` is the one line that is not obvious. Google returns an
+# id_token whose nonce cannot be verified against a local stack, so sign-in fails
+# with an opaque nonce error unless this is set — it is a local-development
+# accommodation and must stay false in a hosted project.
+#
+# A hosted project configures none of this here: it is the Supabase dashboard,
+# plus the deployed origin in the redirect allow-list. Nothing in this repo can
+# enforce either, so a deploy that skips them has a button that goes nowhere.
+[auth.external.google]
+enabled = false
+client_id = ""
+# DO NOT commit your OAuth provider secret to git.
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+redirect_uri = ""
+url = ""
+skip_nonce_check = true
+email_optional = false
+
 # Allow Solana wallet holders to sign in to your project via the Sign in with Solana (SIWS, EIP-4361) standard.
 # You can configure "web3" rate limit in the [auth.rate_limit] section and set up [auth.captcha] if self-hosting.
 [auth.web3.solana]

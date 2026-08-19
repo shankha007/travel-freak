@@ -316,7 +316,7 @@ function CurrencyPanel({
             <span>
               The category breakdown comes with the paid plans. Totals, the budget and every expense
               you record are free —{' '}
-              <Link href="/pricing" className="underline underline-offset-2">
+              <Link href="/upgrade" className="underline underline-offset-2">
                 what that changes
               </Link>
               .

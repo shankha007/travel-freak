@@ -560,6 +560,56 @@ select isnt_empty(
   'a public profile does report its place counts'
 );
 
+-- ---------------------------------------------------------------------------
+-- Reading the table itself, and not only through a helper.
+--
+-- These four exist because of a regression that lived through a release. Every
+-- assertion above goes through a security-definer function — `public_place_counts`,
+-- `public_resume_stats` — which is precisely why none of them noticed when
+-- `profiles` itself became unreadable to `anon`: `profiles_select_trip_mates`
+-- called a function `anon` had no EXECUTE on, and Postgres evaluates every
+-- permissive policy for the asking role, so the call errored and took the whole
+-- read down with it.
+--
+-- The page at `/u/[username]`, `sitemap.xml`, the per-profile RSS feed and the
+-- profile OG card all read the table directly, and all four are written to treat
+-- a missing profile as a private one. So the failure looked exactly like a
+-- privacy setting, everywhere, at once. Fixed in `20260819000100`.
+-- ---------------------------------------------------------------------------
+
+select lives_ok(
+  $$ select username from public.profiles $$,
+  'a signed-out visitor can read the profiles table at all'
+);
+
+-- The username is not chosen here: `on_auth_user_created` derives it from the
+-- address, so alice@rls.test becomes `alice`.
+select is(
+  (select username from public.profiles
+   where id = 'aaaaaaaa-0000-4000-8000-000000000001'),
+  'alice',
+  'and gets the public profile back by id'
+);
+
+select is(
+  (select count(*) from public.profiles
+   where id = 'bbbbbbbb-0000-4000-8000-000000000002')::int,
+  0,
+  'while bob, who is still private, is not in the answer'
+);
+
+-- Scoped to the two fixture ids rather than counting the table. These tests run
+-- against the seeded development database, so `select count(*) from profiles`
+-- also counts the seed's own public demo account — a number that would change
+-- whenever the seed did, and fail for a reason that has nothing to do with RLS.
+select is(
+  (select count(*) from public.profiles
+   where id in ('aaaaaaaa-0000-4000-8000-000000000001',
+                'bbbbbbbb-0000-4000-8000-000000000002'))::int,
+  1,
+  'so of the two fixtures exactly one is visible, and it is the published one'
+);
+
 -- Alice has two trips, one private and one public. The counters describe her
 -- whole history, the way the public globe already does — otherwise a shared
 -- resume would shrink the moment someone else looked at it.

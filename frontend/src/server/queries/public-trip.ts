@@ -2,6 +2,7 @@ import 'server-only'
 
 import { differenceInCalendarDays, parseISO } from 'date-fns'
 import { createAdminClient, createClient } from '@/server/supabase/server'
+import { checkRateLimit, forgiveRateLimit, requestIp } from '@/server/rate-limit'
 import { ensurePublicDerivative, publicMediaUrl } from '@/server/media/derivatives'
 import { derivativePath } from '@/shared/media'
 import { publicEnv } from '@/shared/env'
@@ -128,14 +129,27 @@ export async function getPublicTrip(slug: string): Promise<PublicTrip | null> {
  * The token is the authorisation. Once it resolves, the read is done with the
  * service role because RLS has no way to know about it — scoped, every time, to
  * the single id the token produced.
+ *
+ * Rate limited per IP and forgiven on a hit, so the limit counts only the misses:
+ * a link shared with forty colleagues behind one address is forty successes and
+ * costs nothing, while forty misses is somebody working through the token space.
  */
 export async function getSharedTrip(token: string): Promise<PublicTrip | null> {
   if (!token || token.length > 128) return null
+
+  const ip = await requestIp()
+  const limit = await checkRateLimit('shareToken', ip)
+  // A refusal renders the same 404 a wrong token does, deliberately: the page
+  // must not distinguish "no such link" from "too many tries", or the refusal
+  // itself becomes the signal that a guess was close enough to be counted.
+  if (!limit.allowed) return null
 
   const supabase = await createClient()
   const { data: tripId } = await supabase.rpc('resolve_share_link', { p_token: token })
 
   if (!tripId) return null
+
+  await forgiveRateLimit('shareToken', ip)
 
   const admin = createAdminClient()
   const { data: trip } = await admin

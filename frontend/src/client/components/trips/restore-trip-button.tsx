@@ -63,7 +63,7 @@ export function RestoreTripButton({ tripId, title }: { tripId: string; title: st
           <span className="space-y-1">
             <span className="block">{error}</span>
             {quotaExceeded && (
-              <Link href="/pricing" className="underline underline-offset-4">
+              <Link href="/upgrade" className="underline underline-offset-4">
                 See plans
               </Link>
             )}

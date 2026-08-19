@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { AlertCircle, Loader2 } from 'lucide-react'
 import { signIn, type AuthFormState } from '@/server/actions/auth'
+import { AuthDivider, GoogleButton } from '@/client/components/auth/google-button'
 import { Button } from '@/client/components/ui/button'
 import { Input } from '@/client/components/ui/input'
 import { Label } from '@/client/components/ui/label'
@@ -26,59 +27,87 @@ function SubmitButton() {
 
 export function LoginForm() {
   const [state, formAction] = useActionState(signIn, initialState)
-  const next = useSearchParams().get('next')
+  const params = useSearchParams()
+  const next = params.get('next')
+
+  /**
+   * `/auth/callback` sends people back here with `?error=oauth` when Google
+   * refused or the exchange failed — including the ordinary case of somebody
+   * pressing Cancel on Google's own screen. Deliberately vague about which:
+   * cancelling is not an error to explain, and a configuration problem is not one
+   * the visitor can act on. Either way the remedy is the form below.
+   */
+  const oauthFailed = params.get('error') === 'oauth'
 
   return (
-    <form action={formAction} className="space-y-4">
-      {/* Preserved from the proxy redirect so users land where they were headed. */}
-      {next && <input type="hidden" name="next" value={next} />}
-
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <Input
-          id="email"
-          name="email"
-          type="email"
-          autoComplete="email"
-          required
-          placeholder="you@example.com"
-          defaultValue="demo@travelfreak.app"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <Label htmlFor="password">Password</Label>
-          {/* Beside the field it is about, which is where someone looks the
-              moment the password they typed did not work. */}
-          <Link
-            href="/forgot-password"
-            className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-          >
-            Forgot password?
-          </Link>
-        </div>
-        <Input
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          required
-          defaultValue="password123"
-        />
-      </div>
-
-      {state.error && (
+    <div className="space-y-5">
+      {oauthFailed && (
         <p
           role="alert"
           className="flex items-start gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive"
         >
           <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
-          {state.error}
+          That Google sign-in did not complete. Try again, or use your email and password.
         </p>
       )}
 
-      <SubmitButton />
-    </form>
+      {/* Above the fields, because it is one press and they are four. `next` is
+          handed to it too, so a visitor bounced here from a deep link lands back
+          on it whichever way they sign in. */}
+      <GoogleButton next={next} />
+      <AuthDivider />
+
+      <form action={formAction} className="space-y-4">
+        {/* Preserved from the proxy redirect so users land where they were headed. */}
+        {next && <input type="hidden" name="next" value={next} />}
+
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            required
+            placeholder="you@example.com"
+            defaultValue="demo@travelfreak.app"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="password">Password</Label>
+            {/* Beside the field it is about, which is where someone looks the
+                moment the password they typed did not work. */}
+            <Link
+              href="/forgot-password"
+              className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            >
+              Forgot password?
+            </Link>
+          </div>
+          <Input
+            id="password"
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            required
+            defaultValue="password123"
+          />
+        </div>
+
+        {state.error && (
+          <p
+            role="alert"
+            className="flex items-start gap-2 rounded-md bg-destructive/10 p-3 text-sm text-destructive"
+          >
+            <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
+            {state.error}
+          </p>
+        )}
+
+        <SubmitButton />
+      </form>
+    </div>
   )
 }

@@ -8,7 +8,7 @@ shipped, when, and why lives in [CHANGELOG.md](CHANGELOG.md) — the notes that
 used to accumulate at the bottom of this file are there now, and new ones go
 there rather than here. Keep the gaps at the end of this file current.
 
-Last updated: 2026-08-16 · current release: 0.12.0
+Last updated: 2026-08-19 · current release: 0.12.0
 
 Every ✅ below was re-checked in a browser against the local stack on 2026-08-13,
 including sign-in, the globe and both maps on a free and a paid plan, the trip
@@ -109,6 +109,35 @@ and its position were read from the DOM. And the dashboard globe shows its
 skeleton rather than a canvas, because three.js needs the same compositing. Both
 want a human, and are listed below.
 
+The Phase 1 release blockers were built on 2026-08-19 and checked against the
+local stack. The headers were read off a real response: the landing page carries
+`script-src 'self' 'unsafe-inline'` and `/dashboard` carries
+`script-src 'nonce-…' 'strict-dynamic'` with no inline escape hatch, which is the
+two-policy split working as designed, and both pages loaded with an empty console
+— no violation from MapLibre's blob worker, from three.js, or from any inline
+style. HSTS, `nosniff`, `X-Frame-Options`, the referrer policy and the
+permissions policy were all present on the same response. `robots.txt` renders,
+`/b/feed.xml` returns real seeded posts as RSS, and `/u/demo/feed.xml` returns the
+demo account's writing while `/u/riya/feed.xml` — a private profile — and
+`/u/nope/feed.xml` both return the same 404, which is the whole point. The Google
+button renders above the credentials form on both auth screens; **the OAuth round
+trip itself has not been performed**, because it needs a Google Cloud client this
+repo deliberately does not carry, and it is listed below.
+
+**That check found a bug that had been shipped.** The per-profile feed 404'd for
+`demo`, which is public — and so did the profile page, and so did the sitemap's
+profile list. `profiles_select_trip_mates`, added with collaborators, called a
+function `anon` had no EXECUTE on; Postgres evaluates every permissive policy for
+the asking role, so an anonymous read of `profiles` *errored* rather than
+returning fewer rows, and took `profiles_select_public` down with it. Every
+signed-out surface built on a profile — the public profile page, `sitemap.xml`,
+the byline on `/b`, the profile OG card — is written to treat a missing profile as
+a private one, so the failure looked exactly like a privacy setting everywhere at
+once. Migration `20260819000100` scopes the policy to `authenticated`, which is
+the role it was always about, and four pgTAP assertions now read the table
+directly as `anon` rather than only through the security-definer helpers that hid
+this.
+
 **What still wants a human** is narrower than before but the same limitation:
 nothing composites in the harness browser, so every element measures zero,
 MapLibre never initialises, and the `MapExplorer` and `GlobeExplorer` subtrees do
@@ -134,16 +163,16 @@ there, which is what made the plan-against-actual check above possible.
 
 | Area | Done | Partial | Stub | Not started |
 |---|---|---|---|---|
-| Infrastructure | 20 | 0 | 0 | 1 |
-| Public / marketing | 8 | 0 | 0 | 2 |
-| Auth | 6 | 0 | 0 | 1 |
-| Dashboard & globe | 7 | 0 | 0 | 0 |
+| Infrastructure | 24 | 0 | 0 | 0 |
+| Public / marketing | 9 | 0 | 0 | 1 |
+| Auth | 7 | 0 | 0 | 0 |
+| Dashboard & globe | 8 | 0 | 0 | 0 |
 | Trips & planner | 10 | 0 | 0 | 0 |
 | Memory & content | 7 | 0 | 0 | 0 |
 | Analytics & resume | 2 | 0 | 0 | 2 |
 | Public sharing | 5 | 0 | 0 | 0 |
 | Account | 3 | 1 | 0 | 3 |
-| **Total** | **68** | **1** | **0** | **9** |
+| **Total** | **75** | **1** | **0** | **6** |
 
 ---
 
@@ -171,7 +200,10 @@ there, which is what made the plan-against-actual check above possible.
 | — | **`contact_messages`** | ✅ Done | RLS on with no policy: nobody reads it through the Data API but the service role. Writes go through `submit_contact_message()`, a security-definer function holding the length checks and a limit of five per address per hour. 12 pgTAP assertions |
 | — | **Scheduled purge** | ✅ Done | `/api/cron/purge-trash` empties trash past its 30 days — trips and posts alike, including the images inside a post now that `media.post_id` exists — files first, while the rows naming them still exist, then the rows. Guarded by `CRON_SECRET` compared in constant time; unset closes the endpoint rather than opening it. `vercel.json` runs it daily. Idempotent — everything is chosen by a cutoff — so a missed day costs a day and a double run costs nothing |
 | — | **CI (GitHub Actions)** | ✅ Done | `.github/workflows/ci.yml`, on every push and pull request. Frontend: format, lint, types, tests, production build — with dummy Supabase env, because a build that needs production credentials is one nobody can reproduce. Database: the full stack, `supabase test db`, and a check that the generated types match the migrations. The CLI is pinned rather than `latest`, so a CLI release cannot turn an unrelated pull request red |
-| — | Sentry + PostHog | ⬜ Not started | Plan wants the funnel instrumented on day one |
+| — | **Sentry + PostHog** | ✅ Done | `instrumentation.ts` and `instrumentation-client.ts`; `onRequestError` catches renders, route handlers, actions and the proxy alike. The funnel is `shared/funnel.ts` — six names, ordered, because the array *is* the PostHog insight — captured server-side over `fetch` inside `after()`, with **no client SDK at all**: every step is a server event, so the browser ships no tracking script, the CSP stays tight and an ad blocker cannot skew the numbers. `upgrade_viewed` is the one step with no server moment of its own, so the thirteen in-app upgrade prompts point at `/upgrade`, which records and redirects; the marketing nav still links straight to `/pricing`, because a stranger reading the plans is not in this funnel. Both SDKs are no-ops when unset, so a checkout without keys behaves exactly as before. Only an account id is sent — `$ip: null` explicitly, since PostHog would otherwise geolocate *our server* — and `beforeBreadcrumb` drops `ui.input`, because a breadcrumb trail through this product is a transcript of somebody's private writing |
+| — | **CSP + security headers** | ✅ Done | Two policies, chosen per request in the proxy. The shell is `force-dynamic` already, so it gets a nonce with `'strict-dynamic'` and no inline escape hatch; the public pages are static or ISR and get the policy that tolerates inline scripts, since a nonce would force them dynamic and the plan asks for Lighthouse ≥ 90 on them. Both refuse a script from another origin, which is the directive a remote injection actually meets. `worker-src blob:` is load-bearing — MapLibre instantiates its worker from a blob and the console blames the worker, not the policy. `style-src 'unsafe-inline'` in both and unavoidable: no nonce covers a `style` attribute. Hosts come from env, so an analytics origin is allowed only while it is configured. HSTS, `nosniff`, `X-Frame-Options`, referrer and permissions policies live in `next.config.ts` instead, because the proxy's matcher skips `_next/static` and `nosniff` on an asset is worth as much as on a document |
+| — | **Rate limiting** | ✅ Done | `shared/rate-limit.ts` holds the policies and a sliding-window counter — sliding, because a fixed window lets twice the limit through across a seam; `server/rate-limit.ts` holds the backend. Upstash over its REST API when configured, this process's memory otherwise, and the same interface either way, so a local checkout needs no Redis. **Fails open** when Redis is unreachable and deliberately does not fall back to the memory counter: a blip should not become an outage of sign-in, and a per-instance count taking over mid-incident would refuse legitimate callers unpredictably. Applied to sign-in (per IP *and* per address, since either alone is walkable), sign-up, the two forms that send mail — per IP **only**, because a per-address bucket would answer "too many attempts" to a stranger and disclose that somebody just asked for a reset — upload signing (per account, since it is authenticated), contact, and share tokens. The token limiter is forgiven on a hit, so it counts only misses and a link opened by forty people behind one NAT costs nothing |
+| — | **Entitlement rules + boundary tests** | ✅ Done | `shared/entitlement-rules.ts` — the decisions with the database taken out, which is what made §10's "every plan × every resource, at the boundary" writable at all; the counting stays in `server/entitlements.ts`, which is still the only file a feature imports. 43 assertions: the fifteenth trip and the sixteenth, the fifth photo and the sixth on all three plans, a file that exactly fills the pool and the byte after it, and the downgrade case — over quota refuses the next one, reports the *real* count rather than clamping it, and promises nothing is deleted. Also that `null` and `0` never collapse into each other, which is the bug the whole convention exists to prevent |
 
 ## Public / marketing
 
@@ -186,7 +218,7 @@ there, which is what made the plan-against-actual check above possible.
 | 11 | **Legal** `/privacy`, `/terms`, `/refunds` | ✅ Done | One renderer over `shared/content/legal.ts`, so three documents cannot drift into three typographic treatments. Each states its effective date and carries a contents list — capped and scrollable on a phone, sticky on desktop. `legal.test.ts` enforces unique anchors, non-empty blocks, a date that has already arrived and a contact address in every document. Written by the people who built the product, not by counsel |
 | 12 | **Changelog** `/changelog` | ✅ Done | Public, no login, statically rendered from `docs/CHANGELOG.md` at build time. Timeline of releases with per-kind sections; the parser refuses a malformed entry rather than dropping it |
 | — | **Share cards** | ✅ Done | `opengraph-image.tsx` at four segments rather than the plan's `/api/og/*` — the file convention generates the URL, the size metadata and the cache headers, which hand-rolled routes would have meant hand-rolling too. A profile and a trip card draw a real world map with the relevant countries filled, from `shared/geo/project.ts` (pure, unit-tested, two SVG paths for 177 countries). Every card reads through the visitor's client, so a private trip, an unpublished post and a private profile all fall back to the site card — the same one an unknown URL gets, which is what stops the endpoint confirming that a username exists |
-| — | SEO (JSON-LD, sitemap, RSS) | ⬜ Not started | |
+| — | **SEO (JSON-LD, sitemap, robots, RSS)** | ✅ Done | JSON-LD and `sitemap.xml` were already here; `robots.ts` and the feeds close the list. Robots points at the sitemap and away from the shell, the API and `/auth/` — a crawler that fetches a confirmation link spends the token before its recipient can. **Unlisted content is deliberately absent from it**: naming the pattern would publish a map to the URLs a token exists to keep out of an index, and `noindex` on the page is the mechanism that actually works. RSS is hand-built in `shared/content/feed.ts` — a feed is four tags and a date, and the two things worth getting right are the escaping and RFC 822, both of which are tested rather than delegated to a dependency. `/u/<name>/feed.xml` reads through the visitor's own client, so a private profile 404s exactly as its page does; posts only, because a trip's `published_at` is when it was shared and a feed ordered by that would deliver a 2019 holiday as today's news |
 
 ## Auth
 
@@ -198,7 +230,7 @@ there, which is what made the plan-against-actual check above possible.
 | 7 | **Register** `/register` | ✅ Done | Email + password + optional name, shared Zod schema, 8-character minimum matching `config.toml`. Handles both projects that require email confirmation and local, where sign-up returns a session immediately. Profile, `explorer` subscription and usage row come from the `on_auth_user_created` trigger |
 | 9 | **Forgot / reset / verify** | ✅ Done | `/forgot-password` answers the same way whichever address is typed, so it cannot be used to ask who has an account. `/auth/confirm` trades an emailed token for a session and forwards — it takes a `token_hash`, which is verified server-side and so works on a different device, and still accepts a PKCE `code` for a project on the stock templates. `/reset-password` requires that session; `/verify` covers confirmed, expired and opened-directly, and offers the remedy matching the link that failed. Email templates live in `backend/supabase/templates/` |
 | 10 | **Onboarding wizard** `/welcome` | ✅ Done | Username, home country, then tap the countries you have been to on a map that fills in as you go, with a searchable list beside it. Each step saves before advancing, so it resumes; only the last sets `onboarded_at`, which is what the app shell gates on |
-| — | Google OAuth | ⬜ Not started | |
+| — | **Google OAuth** | ✅ Done | A Server Action starts it, so the browser never holds a client that can begin an OAuth flow and there is one code path into a session. `/auth/callback` is separate from `/auth/confirm` on purpose: that route verifies a `token_hash` server-side *so a link works in another browser*, and a PKCE code must do the opposite, so one route with two contracts would eventually apply the looser one to both. `next` rides through Google as a query parameter and is re-checked on return — a cookie would be a `Lax`/`Strict` distinction nobody should have to remember. Signup and sign-in are indistinguishable here, so `created_at` inside a minute is what fires the funnel's first step; without it every Google account would be missing from step one and present at every step after. `prompt=select_account`, so a shared computer does not silently reuse whichever account the browser holds. **Provider config is not in the repo**: `[auth.external.google]` is committed disabled with the local recipe, including `skip_nonce_check`, which local sign-in fails without; a hosted project needs the dashboard and its own origin in the allow-list |
 
 ## Dashboard & signature views
 
@@ -210,6 +242,7 @@ there, which is what made the plan-against-actual check above possible.
 | — | Globe region-detail paywall | ✅ Done | `showRegionDetail` from `planCode`, decided server-side |
 | — | Dashboard globe preview | ✅ Done | `getGlobePreviewRegions()` had existed since the dashboard was built with nothing rendering it — the card offered a link to `/globe`, which is a description of a globe rather than a globe. Now embedded, lazily: `react-globe.gl` pulls in three.js and the dashboard is the first screen an account lands on, so shipping it in the entry chunk would make the slowest paint the one that greets a new user. Presentation only — any click opens `/globe`, where the list, filters and modal live — and it renders nothing at all for an account with no regions yet |
 | 16 | **World map** `/maps/world` | ✅ Done | MapLibre 2D filling the page, with a basemap it draws itself — land, coastline and sea from the palette, no tile key needed. Country fills joined by `feature-state`, a halo on regions with data, hover lift, click-through to the region modal, layer toggles, and a floating places panel that is the keyboard-navigable equivalent. Subdivisions are gated on `globe_region_detail` and lazy-loaded only for the nine countries that have data. **Year, continent and trip-type filters** narrow the fills and the panel together, from `shared/geo/region-filter.ts`; only the years, continents and types the data can answer for are offered, so no choice empties the map. A year matches when it falls inside a region's first-to-last visit span, which is all `visited_regions` records, and the screen says so. **Trip type is built now**: the aggregate carries trip ids and not their kinds, so `getVisitedRegions()` resolves them from `trips` in one extra read — deliberately *not* a column on `visited_regions`, which has a policy exposing every row of anyone with a public profile, and where somebody went is a different disclosure from who they went with. The public profile's read leaves the field empty and the control renders nothing |
+| — | **No-WebGL fallback** | ✅ Done | §6 asked for "no WebGL or low-power device → static SVG choropleth" and it was the one line of that section with nothing behind it: a browser without WebGL got a skeleton that never resolved, because `react-globe.gl` imports fine, three.js constructs a renderer, and the context request is what fails. `use-webgl-support.ts` asks for a real context — `'WebGLRenderingContext' in window` is true on every browser whose *driver* is blocklisted, which is how WebGL is commonly missing and covers most of the low-power half — and releases it immediately. `static-choropleth.tsx` draws the same regions in the same four states over `shared/geo/project.ts`, the projection the OG cards already use, so the two cannot disagree about where a country is. One merged path for the unvisited world and one path per country with data, so the element count scales with somebody's travel rather than with the world; `var()` fills, so it retunes with the theme picker without the canvas round-trip WebGL needs. **The choice is made by mounting**, not by picking between loaded modules, so a browser without WebGL never downloads three.js at all. It is also the fallback when the globe's chunk fails, which replaced a sentence that left the largest element on the screen empty while the data sat in hand. Used by `/globe` and the dashboard card alike, with 11 assertions |
 | 17 | **India map** `/maps/india` | ✅ Done | All 36 states and union territories, free on every plan, fitted to the country on load |
 
 ## Trips & planner
@@ -288,25 +321,41 @@ there, which is what made the plan-against-actual check above possible.
 
 ## Known gaps worth fixing next
 
-1. **Sign-up confirmation is built but not exercised.** `/verify` and the confirmation
+1. **The Google round trip has never been performed.** The button, the action, the
+   callback and the funnel event on a first arrival are all built and typecheck, and
+   the sign-in screen renders correctly with the button above the credentials form.
+   But no one has been bounced to Google and back, because that needs an OAuth client
+   from a Google Cloud project and the repo deliberately ships `[auth.external.google]`
+   disabled with no credentials. The recipe is in `config.toml` next to the switch.
+   Production additionally needs the provider configured in the Supabase dashboard and
+   the deployed origin in the redirect allow-list — the same class of gap as (3), and
+   nothing in the repo can enforce either.
+2. **Rate limiting is per-instance until Upstash is configured.** Without
+   `UPSTASH_REDIS_REST_URL` the counter lives in the server's own memory, which is a
+   real limit on one long-lived process and an approximation on serverless: a caller
+   spread across enough instances gets more than the policy says, and a cold start
+   forgets. The interface is identical either way, so this is a deployment step rather
+   than a code change — but it is a deployment step somebody has to remember, and the
+   limits are advertised in the changelog as though they hold.
+3. **Sign-up confirmation is built but not exercised.** `/verify` and the confirmation
    template exist, and the reset flow proves the route they share. But local
    `enable_confirmations` is off, so the signup path itself has never run end to end —
    turning it on locally is the check. Production additionally needs both email templates
    set in the Supabase dashboard and its own origin in the redirect allow-list; nothing in
    the repo can enforce either, so a deploy that skips them sends links that go nowhere.
-2. **The year filter is still only as precise as the aggregate.** Trip type is built now, and
+4. **The year filter is still only as precise as the aggregate.** Trip type is built now, and
    the honest caveat that remains is the year's: `visited_regions` records a first and a last
    visit and nothing between, so a region visited in 2019 and 2026 matches every year between.
    The screen states it rather than hiding it. Making it exact needs a per-visit table, which
    is a schema change and a bigger one than it looks — the aggregate is rebuilt from three
    sources in a fixed precedence and a fourth grain would have to survive all of them.
-3. **Nothing tells anyone a contact message arrived.** `submit_contact_message()` writes the row
+5. **Nothing tells anyone a contact message arrived.** `submit_contact_message()` writes the row
    and the sender is told it reached us, which is true; but the inbox is a table that somebody has
    to remember to open in Studio. The page promises an answer within about three working days, and
    nothing in the repo makes that happen. A database webhook or a scheduled digest to
    `BRAND.support.email` would close it, and `handled_at` is already there to mark what has been
    answered.
-4. **A collaborator can plan a trip but not see what it costs.** `expenses` has one policy,
+6. **A collaborator can plan a trip but not see what it costs.** `expenses` has one policy,
    `user_id = auth.uid()`, and no collaborator clause at all, which is the right default for
    money and the wrong answer for four friends splitting a trip. `paid_by` is free text for that
    reason — it records who paid without pretending to settle up. Splitting properly needs its own
@@ -314,26 +363,26 @@ there, which is what made the plan-against-actual check above possible.
    of "the budget": `trips.budget_planned` rides on the trip row and RLS shares it, so a
    collaborator sees the plan and never the spend, and every surface now says exactly that —
    including the analytics money section, which reads the caller's own expenses and nobody else's.
-5. **An invitation is delivered by the app, not by email.** There is no transactional email in
-   this codebase — the same gap that leaves a contact message sitting in a table (3). So an
+7. **An invitation is delivered by the app, not by email.** There is no transactional email in
+   this codebase — the same gap that leaves a contact message sitting in a table (5). So an
    invitation only surfaces when the invitee next opens their own Trips screen, and somebody
    invited at an address they have not signed up with sees nothing until they do. The invite form
    says so rather than letting it be discovered. `invited_email` and the pending state are already
    the right shape for a mail to be sent from; nothing else has to change when one can be.
-6. **Per-day actual spend is possible now, and not built.** An expense can name the itinerary
+8. **Per-day actual spend is possible now, and not built.** An expense can name the itinerary
    entry it settles, so the day it belongs to is finally derivable — but the itinerary still
    totals only what a day was *planned* to cost, and the budget screen still groups by category
    rather than by day. This is the half of the plan-against-actual loop that was unblocked
    rather than finished. Note also that a recorded expense is deliberately editable afterwards
    and is *not* kept in step with the entry: changing the plan's price later does not touch the
    money, which is right, but nothing tells you the two have drifted.
-7. **The drag gestures have never been performed by hand.** Entries within and between days,
+9. **The drag gestures have never been performed by hand.** Entries within and between days,
    and undated days themselves. The harness browser does not composite, so every element
    measures zero and dnd-kit's sensors cannot initialise. The markup, the handles and their
    labels are checked in the DOM, both `reorder_itinerary_items()` and `reorder_itinerary_days()`
    now have pgTAP coverage including the cross-account no-op, and `parseOrderedIds` is
    unit-tested. The gesture wants a human.
-8. **The map filters are unexercised, and for a worse reason than was thought.** All three —
+10. **The map filters are unexercised, and for a worse reason than was thought.** All three —
    year, continent and trip type — were confirmed rendering the right options over real data,
    and `shared/geo/region-filter.ts` is pure with 24 assertions behind it while
    `shared/geo/continents.ts` proves its 250-country coverage against the same list every picker

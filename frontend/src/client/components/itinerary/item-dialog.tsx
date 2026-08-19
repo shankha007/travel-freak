@@ -309,7 +309,7 @@ export function ItemDialog({
                 Times, costs, booking references, links and dragging entries into order come with
                 the paid plans. Days, activities, notes and the pin that puts this on the map are
                 yours on every plan —{' '}
-                <Link href="/pricing" className="underline underline-offset-2">
+                <Link href="/upgrade" className="underline underline-offset-2">
                   see what else changes
                 </Link>
                 .
