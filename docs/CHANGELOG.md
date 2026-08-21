@@ -21,6 +21,18 @@ The file is parsed, not just read, so the shape matters:
 
 ### Added
 
+- **Invitations arrive by email.** Inviting somebody to a trip now sends them a
+  message naming you, the trip and whether they can edit it or only look. The
+  invitation still waits on their own Trips screen exactly as before — the email
+  is the nudge, not the mechanism, so it failing cannot lose an invitation. It
+  carries no accept button on purpose: an invitation is matched to the address it
+  was sent to, so forwarding the mail cannot hand your trip to somebody else.
+- **A message sent through Contact now reaches a person.** It used to be written
+  to a table that somebody had to remember to open. The page promises an answer
+  within about three working days, and that promise now has something behind it —
+  support gets the message by email, with your address set as the reply-to, so
+  answering is one press.
+
 - **Short label** — what it does, in a sentence or two. Use `code` for routes,
   files and table names.
 ```
@@ -167,6 +179,10 @@ their own line — nobody outside the repo ever saw them.
 
 ### Security
 
+- **Inviting somebody is rate limited.** The invite form is the one place in the
+  product that can put a message in an address of your choosing, so it is now
+  capped per account — far above anyone organising a holiday and far below
+  anything worth doing with a mail relay.
 - **The stricter script policy on signed-in screens was rolled back.** It broke
   the theme (above), and the two ways of exempting that one script each cost more
   than the policy was worth: one turned every marketing page from prerendered into

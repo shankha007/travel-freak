@@ -1,9 +1,13 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { after } from 'next/server'
 import { createClient } from '@/server/supabase/server'
 import { requireUser } from '@/server/auth'
 import { checkCollaboratorQuota } from '@/server/entitlements'
+import { checkRateLimit, rateLimitMessage } from '@/server/rate-limit'
+import { sendEmail } from '@/server/mail/send'
+import { invitationEmail } from '@/shared/mail/templates'
 import {
   changeRoleSchema,
   collaboratorRowSchema,
@@ -70,7 +74,10 @@ export async function inviteCollaborator(_prev: FormState, formData: FormData): 
   // sentence, and stops an invitation being sent to a deleted trip.
   const { data: trip } = await supabase
     .from('trips')
-    .select('id')
+    // The title is read for the email below. One more column on a query that
+    // already runs, rather than a second read inside `after()` where the
+    // request's cookies are no longer around to authorise one.
+    .select('id, title')
     .eq('id', tripId)
     .eq('user_id', user.id)
     .is('deleted_at', null)
@@ -82,6 +89,12 @@ export async function inviteCollaborator(_prev: FormState, formData: FormData): 
   if (!quota.allowed) {
     return { error: quota.reason ?? 'That is one person too many.', values }
   }
+
+  // Per account, and it is here rather than nowhere because this action now puts
+  // a real message in an address its caller chose — see `collaboratorInvite` in
+  // `shared/rate-limit.ts` for why the plan's own quotas do not bound that.
+  const limit = await checkRateLimit('collaboratorInvite', user.id)
+  if (!limit.allowed) return { error: rateLimitMessage(limit), values }
 
   const { error } = await supabase.from('trip_collaborators').insert({
     trip_id: tripId,
@@ -102,6 +115,34 @@ export async function inviteCollaborator(_prev: FormState, formData: FormData): 
     }
     return { error: 'Could not send that invitation. Please try again.', values }
   }
+
+  /**
+   * The email, once the row exists and once this response has gone.
+   *
+   * Deliberately after the insert and not instead of it: the invitation lives in
+   * `trip_collaborators` and surfaces on the invitee's own Trips screen whether
+   * or not this mail arrives. The email is a notification, not the mechanism —
+   * which is what lets it fail without the owner being told their invitation did
+   * not work, because it did.
+   *
+   * The inviter's name is read here rather than passed in, and falls back to
+   * their address: an invitation from "somebody" is worse than one from an email
+   * address, and both are better than not saying.
+   */
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('display_name, username')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  const inviterName = profile?.display_name || profile?.username || user.email
+
+  after(async () => {
+    await sendEmail({
+      to: email,
+      ...invitationEmail({ inviterName, tripTitle: trip.title, role, invitedEmail: email }),
+    })
+  })
 
   repaint(tripId)
   return { error: null, saved: true }
