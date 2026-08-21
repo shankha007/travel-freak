@@ -103,12 +103,23 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+/**
+ * How long to wait for the geometry fetch to resolve and the SVG to appear.
+ *
+ * Testing Library's default is one second, which is ample on an idle machine and
+ * is not always ample on a loaded CI runner — this file is the only one here that
+ * waits on anything asynchronous, and a full run under load produced two
+ * unattributed failures once. Three seconds costs nothing when the assertion
+ * passes, because `waitFor` returns as soon as it does.
+ */
+const WAIT = 3000
+
 /** Waits past the geometry fetch, which is what replaces the skeleton. */
 async function renderMap(regions: VisitedRegion[], onSelect = vi.fn()) {
   const view = render(
     <StaticChoropleth regions={regions} onSelectCountry={onSelect} className="size-full" />
   )
-  await waitFor(() => expect(screen.getByRole('img')).toBeInTheDocument())
+  await waitFor(() => expect(screen.getByRole('img')).toBeInTheDocument(), { timeout: WAIT })
   return { ...view, onSelect }
 }
 
@@ -208,7 +219,7 @@ describe('StaticChoropleth', () => {
     )
 
     render(<StaticChoropleth regions={[region()]} onSelectCountry={vi.fn()} />)
-    await waitFor(() => expect(screen.getByRole('img')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('img')).toBeInTheDocument(), { timeout: WAIT })
     expect(screen.getByRole('img')).toHaveAccessibleName(/0 countries filled in/)
   })
 })
