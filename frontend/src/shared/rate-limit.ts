@@ -58,6 +58,20 @@ export const POLICIES = {
   shareToken: { limit: 20, windowSeconds: 600 },
   /** In front of the per-address limit `submit_contact_message()` already holds. */
   contact: { limit: 10, windowSeconds: 3600 },
+  /**
+   * Inviting somebody to a trip, per account.
+   *
+   * This limit exists because the invite form now sends real email to an address
+   * its user chooses, which makes it the one place in the product that can put a
+   * message in a stranger's inbox on demand. The plan's quotas bound how many
+   * collaborators a *trip* may have and a unique index stops the same address
+   * being invited to it twice, but neither bounds how many trips an account can
+   * make or how many different addresses it can reach across them.
+   *
+   * Twenty an hour is far past anyone organising a holiday and far short of
+   * anything worth doing with a mail relay.
+   */
+  collaboratorInvite: { limit: 20, windowSeconds: 3600 },
 } as const satisfies Record<string, RateLimitPolicy>
 
 export type PolicyName = keyof typeof POLICIES

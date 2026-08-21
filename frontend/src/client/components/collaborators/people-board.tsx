@@ -349,13 +349,14 @@ function InviteForm({ tripId, quota }: { tripId: string; quota: TripPeople['quot
             </p>
           )}
 
-          {/* Said plainly rather than discovered: there is no transactional
-              email in this codebase yet, so an invitation is delivered by the
-              app and not by the inbox. */}
+          {/* The email is a notification, not the mechanism — the invitation
+              lives in the database and surfaces on their Trips screen whether or
+              not the mail arrives. Said in that order because the second half is
+              what somebody needs when they ask "did it go?". */}
           <p className="flex items-start gap-2 text-xs text-muted-foreground">
             <Mail className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-            No email is sent yet. They will see the invitation on their own Trips screen when they
-            next sign in with this address — so tell them it is waiting.
+            We email them an invitation. It also waits on their own Trips screen — they need to sign
+            in with this exact address to accept it.
           </p>
         </form>
       </CardContent>

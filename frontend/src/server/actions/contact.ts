@@ -1,8 +1,12 @@
 'use server'
 
+import { after } from 'next/server'
 import { createClient } from '@/server/supabase/server'
 import { checkRateLimitByIp, rateLimitMessage } from '@/server/rate-limit'
-import { contactSchema } from '@/shared/validation/contact'
+import { sendEmail } from '@/server/mail/send'
+import { contactNotificationEmail } from '@/shared/mail/templates'
+import { BRAND } from '@/shared/brand'
+import { contactSchema, topicLabel } from '@/shared/validation/contact'
 
 /**
  * The `/contact` form's write — screen 6.
@@ -104,6 +108,39 @@ export async function sendContactMessage(
     }
     return { error: 'Could not send that. Please try again, or write to us by email.', values }
   }
+
+  /**
+   * Tell somebody it arrived.
+   *
+   * The page promises an answer "within about three working days", and until this
+   * existed that promise rested on a person remembering to open a table in
+   * Studio. The row is still the record — `contact_messages` and its `handled_at`
+   * are unchanged — and this is the notification that makes the promise
+   * something the product keeps rather than something it hopes for.
+   *
+   * The sender's address rides in `Reply-To`, so answering is one press rather
+   * than a copy and paste. `after()` keeps it off the acknowledgement the sender
+   * is waiting for, and a failure is logged without changing what they are told:
+   * their message did reach us, which is the thing that was true either way.
+   */
+  after(async () => {
+    await sendEmail({
+      to: BRAND.support.email,
+      replyTo: parsed.data.email,
+      ...contactNotificationEmail({
+        name: parsed.data.name,
+        email: parsed.data.email,
+        // The label rather than the stored value: the row keeps `bug`, and a
+        // subject line reading "bug: Ada Lovelace" is a database column leaking
+        // into somebody's inbox. `topicLabel` is the same map the form's own
+        // picker renders, so the two cannot describe a message differently.
+        topic: topicLabel(parsed.data.topic),
+        message: parsed.data.message,
+        sourcePath:
+          typeof sourcePath === 'string' && sourcePath ? sourcePath.slice(0, 200) : undefined,
+      }),
+    })
+  })
 
   return { error: null, sent: true }
 }

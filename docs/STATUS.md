@@ -215,7 +215,7 @@ there, which is what made the plan-against-actual check above possible.
 
 | Area | Done | Partial | Stub | Not started |
 |---|---|---|---|---|
-| Infrastructure | 24 | 0 | 0 | 0 |
+| Infrastructure | 25 | 0 | 0 | 0 |
 | Public / marketing | 9 | 0 | 0 | 1 |
 | Auth | 7 | 0 | 0 | 0 |
 | Dashboard & globe | 8 | 0 | 0 | 0 |
@@ -224,7 +224,7 @@ there, which is what made the plan-against-actual check above possible.
 | Analytics & resume | 2 | 0 | 0 | 2 |
 | Public sharing | 5 | 0 | 0 | 0 |
 | Account | 3 | 1 | 0 | 3 |
-| **Total** | **75** | **1** | **0** | **6** |
+| **Total** | **76** | **1** | **0** | **6** |
 
 ---
 
@@ -249,6 +249,7 @@ there, which is what made the plan-against-actual check above possible.
 | — | **Geo assets** | ✅ Done | `npm run build:geo` writes country outlines plus admin-1 split one file per country, simplified 4% with mapshaper. Natural Earth 50m carries ISO 3166-2 for nine large countries, India among them. The map reads `admin1/index.json` before fetching, so an uncovered country costs no request |
 | — | **Public image derivatives** | ✅ Done | `media-public` bucket; sharp re-encodes to WebP ≤1600px, dropping every metadata block. **Built off the request path**: `after()` on the trip's update action starts the work once the owner's save has returned, and `/api/cron/build-derivatives` sweeps hourly for anything that did not finish — both in `server/media/derivative-jobs.ts`, whose sweep query is joined by constraint name because `media` and `trips` are related twice. The lazy call in `public-trip.ts` stays behind both as correctness, not as the plan. **Trip photos only.** A post's images take the same transform into the *private* bucket at upload — their URL has to live in stored HTML and a signed one expires — and are served through `/api/post-images/[mediaId]`, which checks the post's visibility per request. Tested with the same EXIF parser the uploader uses to read GPS, and `derivative-batch.ts` carries 9 assertions over the loop's promises |
 | — | **Framer Motion** | ✅ Done | `shared/motion.ts` owns three durations and one easing curve; `client/components/motion/reveal.tsx` owns the only entrance animation. `MotionConfig reducedMotion="user"` in `providers.tsx` drops the movement and keeps the fade for anyone who asks, so no component has to check. Reveals ship as `opacity: 0`, so the root layout carries a `<noscript>` rule that pins them visible |
+| — | **Transactional email** | ✅ Done | Resend over `fetch`, for the same reasons PostHog and Upstash are: one POST to a documented endpoint, no SDK, works unchanged on the edge. Two messages — the collaborator invitation and the contact-form notification — both sent inside `after()` and both incapable of failing the write that caused them, because the row is the record and the mail is the notification. The templates are **pure** in `shared/mail/templates.ts` with 20 assertions, since an email cannot be corrected once sent: every interpolation is escaped (a trip title and a contact message are somebody else's text), each carries a plain-text part, and neither loads anything from a remote host — a logo fetched from our origin would report when the mail was opened. `From` is always our verified sender, because it is the only address SPF and DKIM cover; the person to answer goes in `Reply-To`. **Unset means off**, logged, with the whole message printed in development. The invite action is rate limited per account now that it can put mail in an address of its caller's choosing |
 | — | **`contact_messages`** | ✅ Done | RLS on with no policy: nobody reads it through the Data API but the service role. Writes go through `submit_contact_message()`, a security-definer function holding the length checks and a limit of five per address per hour. 12 pgTAP assertions |
 | — | **Scheduled purge** | ✅ Done | `/api/cron/purge-trash` empties trash past its 30 days — trips and posts alike, including the images inside a post now that `media.post_id` exists — files first, while the rows naming them still exist, then the rows. Guarded by `CRON_SECRET` compared in constant time; unset closes the endpoint rather than opening it. `vercel.json` runs it daily. Idempotent — everything is chosen by a cutoff — so a missed day costs a day and a double run costs nothing |
 | — | **CI (GitHub Actions)** | ✅ Done | `.github/workflows/ci.yml`, on every push and pull request. Frontend: format, lint, types, tests, production build — with dummy Supabase env, because a build that needs production credentials is one nobody can reproduce. Database: the full stack, `supabase test db`, and a check that the generated types match the migrations. The CLI is pinned rather than `latest`, so a CLI release cannot turn an unrelated pull request red |
@@ -409,12 +410,23 @@ there, which is what made the plan-against-actual check above possible.
    The screen states it rather than hiding it. Making it exact needs a per-visit table, which
    is a schema change and a bigger one than it looks — the aggregate is rebuilt from three
    sources in a fixed precedence and a fourth grain would have to survive all of them.
-5. **Nothing tells anyone a contact message arrived.** `submit_contact_message()` writes the row
-   and the sender is told it reached us, which is true; but the inbox is a table that somebody has
-   to remember to open in Studio. The page promises an answer within about three working days, and
-   nothing in the repo makes that happen. A database webhook or a scheduled digest to
-   `BRAND.support.email` would close it, and `handled_at` is already there to mark what has been
-   answered.
+5. **Transactional email is wired but unconfigured.** Resend, behind
+   `server/mail/send.ts`, and it closes what used to be two separate gaps: a contact
+   message now reaches `BRAND.support.email` with the sender in `Reply-To`, and an
+   invitation now reaches the person invited. Both send inside `after()` and neither
+   can fail the write that caused it — the `contact_messages` row and the
+   `trip_collaborators` row are still the record, and the mail is the notification.
+   What remains is a deployment step nothing in the repo can do: a `RESEND_API_KEY`,
+   and a sender on a domain **verified in Resend** with its SPF and DKIM records
+   published, or every send is refused as unverified. Unset means no mail and a
+   logged warning; in development the whole message is logged, so the copy can be
+   read without an inbox.
+
+   Supabase Auth's own mail — confirmation and recovery — is **not** routed through
+   this. Those are sent by the auth server, so pointing them at Resend is SMTP
+   configuration in the Supabase dashboard rather than anything here, and a hosted
+   project that skips it sends them from Supabase's shared sender.
+
 6. **A collaborator can plan a trip but not see what it costs.** `expenses` has one policy,
    `user_id = auth.uid()`, and no collaborator clause at all, which is the right default for
    money and the wrong answer for four friends splitting a trip. `paid_by` is free text for that
@@ -423,12 +435,16 @@ there, which is what made the plan-against-actual check above possible.
    of "the budget": `trips.budget_planned` rides on the trip row and RLS shares it, so a
    collaborator sees the plan and never the spend, and every surface now says exactly that —
    including the analytics money section, which reads the caller's own expenses and nobody else's.
-7. **An invitation is delivered by the app, not by email.** There is no transactional email in
-   this codebase — the same gap that leaves a contact message sitting in a table (5). So an
-   invitation only surfaces when the invitee next opens their own Trips screen, and somebody
-   invited at an address they have not signed up with sees nothing until they do. The invite form
-   says so rather than letting it be discovered. `invited_email` and the pending state are already
-   the right shape for a mail to be sent from; nothing else has to change when one can be.
+7. **An invitation still cannot reach somebody who has not signed up.** The email
+   goes out now (5), and it says which address to register with — but the invitation
+   itself is matched on `invited_email` against a *verified* account address, so
+   until they sign up with that exact address there is nothing for them to accept.
+   That is the right way round for a permission grant, and it is why the mail carries
+   no accept link: a link that granted access on click would be an authorisation
+   sitting in an inbox, and forwarding it would hand somebody else a trip. The cost
+   is that a mistyped address produces an invitation nobody can ever accept, and
+   nothing surfaces that to the owner beyond the pending row.
+
 8. **Per-day actual spend is possible now, and not built.** An expense can name the itinerary
    entry it settles, so the day it belongs to is finally derivable — but the itinerary still
    totals only what a day was *planned* to cost, and the budget screen still groups by category
