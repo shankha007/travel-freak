@@ -171,6 +171,25 @@ no-flash script, so the theme flashed on every authenticated navigation. That is
 written up in the infrastructure table above, along with why the fix was to drop
 the two-policy split rather than to exempt the script.
 
+The "known gaps" list was worked through on 2026-08-20, and two of its ten entries
+closed. **Sign-up confirmation is no longer untested** — run end to end with
+confirmations turned on, including the case the route was written for: the emailed
+link carries a `pkce_`-prefixed `token_hash` and was opened on a different host from
+the one that signed up, and it still worked, which is the "different device" claim
+made good. Nothing was broken; the gap was that nobody had looked. **The map and
+globe filters are no longer unexercised** either — all three were driven over real
+data on both screens, singly and in combination, narrowing the places panel, the
+region list and the globe's three counters exactly as documented, with each caveat
+sentence rendering. What remains there is only the painted fills, which need WebGL.
+
+Two things were checked and found *not* to be bugs, which is worth recording so they
+are not re-investigated: the itinerary's drag handles are genuinely live (they carry
+dnd-kit's `aria-roledescription` and `aria-describedby`) and cannot be driven here
+because they measure 0×0 in the harness and a zero-size element cannot take focus;
+and a previous route's DOM appearing to linger after a client-side navigation is a
+pending React transition holding the old UI, not a failure to unmount — a clean load
+of the same route carries none of it.
+
 **What still wants a human** is narrower than before but the same limitation:
 nothing composites in the harness browser, so every element measures zero,
 MapLibre never initialises, and the `MapExplorer` and `GlobeExplorer` subtrees do
@@ -370,12 +389,20 @@ there, which is what made the plan-against-actual check above possible.
    forgets. The interface is identical either way, so this is a deployment step rather
    than a code change — but it is a deployment step somebody has to remember, and the
    limits are advertised in the changelog as though they hold.
-3. **Sign-up confirmation is built but not exercised.** `/verify` and the confirmation
-   template exist, and the reset flow proves the route they share. But local
-   `enable_confirmations` is off, so the signup path itself has never run end to end —
-   turning it on locally is the check. Production additionally needs both email templates
-   set in the Supabase dashboard and its own origin in the redirect allow-list; nothing in
-   the repo can enforce either, so a deploy that skips them sends links that go nowhere.
+3. **Sign-up confirmation works locally; production still needs its dashboard set up.**
+   The path is no longer untested — on 2026-08-20 it was run end to end with
+   `enable_confirmations = true`: sign-up returned the "check your inbox" branch, the
+   mail arrived under the custom subject and template, and the link confirmed the
+   address and forwarded to `/verify`, with the profile, `explorer` subscription and
+   usage row all created by the trigger. Two things about that check are worth keeping:
+   the link carries a **`pkce_`-prefixed `token_hash`**, and it was opened on a
+   different host from the one that signed up — 127.0.0.1 rather than localhost, so a
+   different cookie jar — and still worked, which is exactly the claim `/auth/confirm`
+   makes about a mail opened on another device. `config.toml` records how to re-run it.
+   What remains is the half no repo can enforce: a hosted project needs both email
+   templates set in the Supabase dashboard and its own origin in the redirect
+   allow-list, or it sends links that go nowhere.
+
 4. **The year filter is still only as precise as the aggregate.** Trip type is built now, and
    the honest caveat that remains is the year's: `visited_regions` records a first and a last
    visit and nothing between, so a region visited in 2019 and 2026 matches every year between.
@@ -409,25 +436,38 @@ there, which is what made the plan-against-actual check above possible.
    rather than finished. Note also that a recorded expense is deliberately editable afterwards
    and is *not* kept in step with the entry: changing the plan's price later does not touch the
    money, which is right, but nothing tells you the two have drifted.
-9. **The drag gestures have never been performed by hand.** Entries within and between days,
-   and undated days themselves. The harness browser does not composite, so every element
-   measures zero and dnd-kit's sensors cannot initialise. The markup, the handles and their
-   labels are checked in the DOM, both `reorder_itinerary_items()` and `reorder_itinerary_days()`
-   now have pgTAP coverage including the cross-account no-op, and `parseOrderedIds` is
-   unit-tested. The gesture wants a human.
-10. **The map filters are unexercised, and for a worse reason than was thought.** All three —
-   year, continent and trip type — were confirmed rendering the right options over real data,
-   and `shared/geo/region-filter.ts` is pure with 24 assertions behind it while
-   `shared/geo/continents.ts` proves its 250-country coverage against the same list every picker
-   reads. But nobody has chosen one in a browser and watched the fills change, and an attempt to
-   do so established why: the `MapExplorer` subtree carries no React fibers at all in the
-   harness, so the controls are inert server-rendered markup there rather than a filter that
-   fails. Choosing one is a real check that has never happened.
+9. **The drag gestures still want a human, and the keyboard path cannot stand in.**
+   Entries within and between days, and undated days themselves. The obvious dodge was
+   to drive dnd-kit's keyboard sensor instead of a pointer — space to lift, arrows to
+   move, space to drop — since that needs no compositing. It was tried on 2026-08-20
+   and does not work here either, for a reason worth writing down: the handle measures
+   **0×0** in the harness, a zero-size element cannot take focus, and dnd-kit's
+   keyboard sensor is anchored on the activator having it. The sortable itself is
+   plainly live — the handles carry `aria-roledescription="sortable"` and
+   `aria-describedby`, so `useSortable` ran — and a synthetic `keydown` reaches the
+   document without dnd-kit acting on it. The markup, the handles and their labels are
+   checked in the DOM, both `reorder_itinerary_items()` and `reorder_itinerary_days()`
+   have pgTAP coverage including the cross-account no-op, and `parseOrderedIds` is
+   unit-tested. The gesture wants a real browser.
 
-   The same limitation now covers two more surfaces. **The cover picker has never been
-   clicked**: the trip wizard does not hydrate either, because `PlacePicker` lazy loads
-   MapLibre — the step list was read from the DOM and the write path behind it is
-   `setCoverPhoto`, which the vault has exercised, but choosing a cover from the wizard has
-   not been done by hand. **The dashboard globe has never been seen drawn**, for the same
-   reason the full globe has not: three.js needs compositing, so the card shows its skeleton
-   there. Its container, classes and lazy fallback were confirmed in the DOM.
+10. **The map and globe filters are exercised now; only the painted fills are not.**
+   All three — year, continent and trip type — were driven in a browser over the seed's
+   real data on 2026-08-20, on `/maps/world` and `/globe` alike. Choosing a continent
+   narrowed the places panel from 10 countries to 1 and the note read "Showing 1 of 10";
+   trip type "solo" gave 3 of 10 and "family" 1 of 10, each with its own caveat sentence
+   rendered; year 2022 gave 1 of 10 with the aggregate's caveat; continent and type
+   together narrowed to the intersection; and clearing each restored the full list. On
+   the globe the three counters moved with the list — 6 countries, 15 cities and 3% of
+   the world going to 0, 0 and 0% under a filter whose only match is a *planned* region,
+   which is `rollUpToCountries` counting `visited`/`current` and nothing else, exactly as
+   documented. `shared/geo/region-filter.ts` has 24 assertions behind it and
+   `shared/geo/continents.ts` proves its 250-country coverage.
+
+   **What is still unverified is the picture.** Nobody has watched the country *fills*
+   change colour, because MapLibre and three.js need compositing the harness does not do
+   — so the filter's effect on the data and on the keyboard-navigable panel is proved,
+   and its effect on the canvas is not. The same limitation still covers two other
+   surfaces: **the cover picker has never been clicked**, because the trip wizard does not
+   hydrate where `PlacePicker` lazy-loads MapLibre, and **the dashboard globe has never
+   been seen drawn**. Their write paths are exercised elsewhere — `setCoverPhoto` by the
+   vault — and their markup was read from the DOM.
